@@ -4,6 +4,11 @@ import {
   validateGeneratedInvestigation,
 } from './generatedInvestigation'
 import goldenInvestigation from '../../../../fixtures/blank-cheque.golden-investigation.json'
+import unsupportedVersion from '../../../../fixtures/contracts/invalid/unsupported-version.json'
+import missingEvidenceReference from '../../../../fixtures/contracts/invalid/missing-evidence-reference.json'
+import claimWithoutSupportingEvidence from '../../../../fixtures/contracts/invalid/claim-without-supporting-evidence.json'
+import disputedRelationshipMissingCounterevidence from '../../../../fixtures/contracts/invalid/disputed-relationship-missing-counterevidence.json'
+import overpreciseMapMarker from '../../../../fixtures/contracts/invalid/overprecise-map-marker.json'
 
 function makeValidPackage() {
   return {
@@ -329,5 +334,30 @@ describe('Blank Cheque golden investigation', () => {
     expect(claim && 'evidenceLinks' in claim).toBe(false)
     expect(relationship?.evidenceClassification).toBe('disputed')
     expect(relationship?.evidenceLinkIds).toHaveLength(2)
+  })
+})
+
+/**
+ * Phase C0 cross-language parity: fixtures/contracts/invalid/*.json are
+ * minimal, deliberately-broken mutations of the golden package, each
+ * targeting one validateGeneratedInvestigation() rule. The Python mirror
+ * (backend/tests/contract/test_invalid_fixtures.py) asserts the exact same
+ * fixtures are rejected — this is the cheap half of "Preventing schema
+ * drift" (chronicle_phase_c_adjusted_plan.md §6): both runtimes reject the
+ * same broken packages, not just accept the same valid one.
+ */
+describe('Shared invalid fixtures (Python/TypeScript parity)', () => {
+  it.each([
+    ['unsupported-version', unsupportedVersion, /unsupported.*schema version/i],
+    ['missing-evidence-reference', missingEvidenceReference, /unknown Passage/i],
+    ['claim-without-supporting-evidence', claimWithoutSupportingEvidence, /requires a supporting EvidenceLink/i],
+    [
+      'disputed-relationship-missing-counterevidence',
+      disputedRelationshipMissingCounterevidence,
+      /requires supporting and counterevidence links/i,
+    ],
+    ['overprecise-map-marker', overpreciseMapMarker, /exceeds Place/i],
+  ])('rejects %s', (_name, fixture, messagePattern) => {
+    expect(() => validateGeneratedInvestigation(fixture)).toThrow(messagePattern)
   })
 })

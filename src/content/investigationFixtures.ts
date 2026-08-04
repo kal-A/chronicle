@@ -1,4 +1,5 @@
 import goldenInvestigationJson from '../../fixtures/blank-cheque.golden-investigation.json'
+import concertOfEuropeInvestigationJson from '../../fixtures/concert-of-europe.generated-investigation.json'
 import {
   validateGeneratedInvestigation,
   type GeneratedInvestigation,
@@ -95,7 +96,17 @@ const goldenInvestigation = validateGeneratedInvestigation(
   goldenInvestigationJson,
 )
 
+// Generated end-to-end by the Python pipeline's curated (not mock) provider
+// set — see backend/src/chronicle/providers/curated/concert_of_europe/ and
+// plans/current-phase.md's Phase C3 section. Registering it here, alongside
+// the hand-authored golden fixture, is what proves the generic renderer has
+// no hidden coupling to blank-cheque's specific content.
+const concertOfEuropeInvestigation = validateGeneratedInvestigation(
+  concertOfEuropeInvestigationJson,
+)
+
 export const investigationFixtures: FixtureRegistration[] = [
   { investigation: goldenInvestigation, isDefault: true },
+  { investigation: concertOfEuropeInvestigation, isDefault: false },
   { investigation: makeEmptyInvestigation(goldenInvestigation), isDefault: false },
 ]

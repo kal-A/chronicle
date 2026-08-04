@@ -1,0 +1,26 @@
+[project]
+name = "chronicle-backend"
+version = "0.1.0"
+description = "Chronicle deterministic generation backend (Phase C)"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.9",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+chronicle = "chronicle.cli.main:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

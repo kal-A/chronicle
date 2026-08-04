@@ -1,0 +1,912 @@
+{
+  "claimLedgers": [
+    {
+      "claimId": "claim-troppau-doctrine",
+      "conclusion": "supported",
+      "evidenceLinkIds": [
+        "evidence-claim-troppau-doctrine-1"
+      ],
+      "id": "ledger-claim-troppau-doctrine",
+      "limitations": [
+        "Cited via secondary reprints corroborating consistent wording of the Protocol's key clause; a directly hosted, independently verified full primary-text transcription was not located in this curation pass."
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "directOrInferred": "direct",
+      "evidenceLinkIds": [
+        "evidence-claim-vienna-settlement-1"
+      ],
+      "id": "claim-vienna-settlement",
+      "reviewStatus": "proposed",
+      "statement": "The Congress of Vienna's General Treaty (9 June 1815) established a new territorial and diplomatic order for Europe following the Napoleonic Wars.",
+      "visibility": "public"
+    },
+    {
+      "directOrInferred": "direct",
+      "evidenceLinkIds": [
+        "evidence-claim-troppau-doctrine-1"
+      ],
+      "id": "claim-troppau-doctrine",
+      "reviewStatus": "proposed",
+      "statement": "The Troppau Protocol (19 November 1820) asserted that the great powers had the right to treat a state that had undergone a threatening revolutionary change of government as excluded from the European Alliance, implying a basis for collective intervention.",
+      "visibility": "public"
+    },
+    {
+      "directOrInferred": "inferred",
+      "evidenceLinkIds": [
+        "evidence-claim-naples-intervention-1"
+      ],
+      "id": "claim-naples-intervention",
+      "reviewStatus": "proposed",
+      "statement": "Austria's 1821 military intervention in Naples, authorized at the Congress of Laibach, was undertaken pursuant to the principle articulated in the Troppau Protocol.",
+      "visibility": "public"
+    },
+    {
+      "directOrInferred": "direct",
+      "evidenceLinkIds": [
+        "evidence-claim-castlereagh-dissent-1"
+      ],
+      "id": "claim-castlereagh-dissent",
+      "reviewStatus": "proposed",
+      "statement": "Britain, under Castlereagh, rejected the Troppau Protocol's general claim of a right of intervention as inconsistent with the original, specific purpose of the Quadruple Alliance.",
+      "visibility": "public"
+    },
+    {
+      "directOrInferred": "inferred",
+      "evidenceLinkIds": [
+        "evidence-claim-verona-spain-1"
+      ],
+      "id": "claim-verona-spain",
+      "reviewStatus": "proposed",
+      "statement": "The Congress of Verona (1822) extended the same interventionist principle asserted at Troppau to authorize French military action in Spain, over continued British objection.",
+      "visibility": "public"
+    }
+  ],
+  "communications": [],
+  "conflicts": [],
+  "decisions": [],
+  "documents": [
+    {
+      "editionCitation": "Final Act of the Congress of Vienna, General Treaty, 9 June 1815, English translation laid before the British Parliament, 2 February 1816.",
+      "id": "document-vienna-final-act",
+      "knownLimitations": "English translation of a French-language original; the translation itself, not the French original, is what this prototype's excerpt is drawn from.",
+      "sourceId": "source-vienna-final-act",
+      "visibility": "public"
+    },
+    {
+      "editionCitation": "Protocol of the Preliminary Conference at Troppau, 19 November 1820, as reprinted in standard 19th-century diplomatic compilations (e.g. Hertslet, The Map of Europe by Treaty).",
+      "id": "document-troppau-protocol",
+      "knownLimitations": "This prototype cites the Protocol via secondary reprints rather than a directly verified, independently hosted primary-text transcription.",
+      "sourceId": "source-troppau-protocol",
+      "visibility": "public"
+    },
+    {
+      "editionCitation": "State Paper of 5 May 1820, British and Foreign State Papers, Vol. VIII (London: James Ridgway, 1830).",
+      "id": "document-castlereagh-state-paper",
+      "knownLimitations": "Cited by volume, not independently paginated for this prototype pass.",
+      "sourceId": "source-castlereagh-state-paper",
+      "visibility": "public"
+    }
+  ],
+  "entities": [
+    {
+      "alsoKnownAs": [
+        "Prince Metternich",
+        "Klemens Wenzel von Metternich"
+      ],
+      "canonicalName": "Klemens von Metternich",
+      "description": "Foreign Minister (later Chancellor) of the Austrian Empire, 1809-1848; the principal architect of the post-1815 Congress system and its principle of collective intervention against revolution.",
+      "entityType": "person",
+      "id": "person-metternich",
+      "reviewStatus": "proposed"
+    },
+    {
+      "alsoKnownAs": [
+        "Tsar Alexander I"
+      ],
+      "canonicalName": "Alexander I of Russia",
+      "description": "Emperor of Russia, 1801-1825; proposer of the Holy Alliance (1815) and, alongside Metternich, a principal signatory of the Troppau Protocol (1820).",
+      "entityType": "person",
+      "id": "person-alexander-i",
+      "reviewStatus": "proposed"
+    },
+    {
+      "alsoKnownAs": [
+        "Lord Castlereagh"
+      ],
+      "canonicalName": "Robert Stewart, Viscount Castlereagh",
+      "description": "British Foreign Secretary, 1812-1822; represented Britain at the Congress of Vienna and authored the May 1820 State Paper rejecting a general right of intervention. Died by suicide on 12 August 1822, shortly before the Congress of Verona.",
+      "entityType": "person",
+      "id": "person-castlereagh",
+      "reviewStatus": "proposed"
+    },
+    {
+      "alsoKnownAs": [],
+      "canonicalName": "George Canning",
+      "description": "Succeeded Castlereagh as British Foreign Secretary in September 1822; continued Britain's dissent from the Congress system's interventionist principle at and after the Congress of Verona (1822), instructing the Duke of Wellington's delegation there without altering Castlereagh's prepared position.",
+      "entityType": "person",
+      "id": "person-canning",
+      "reviewStatus": "proposed"
+    },
+    {
+      "canonicalName": "Vienna",
+      "coordinates": {
+        "lat": 48.2082,
+        "lng": 16.3738
+      },
+      "entityType": "place",
+      "id": "place-vienna",
+      "periodRecords": [
+        {
+          "controllingPolity": "Austrian Empire",
+          "nameAtTime": "Vienna",
+          "periodLabel": "1814-1822 (the Congress system)",
+          "precision": "city"
+        }
+      ],
+      "reviewStatus": "proposed"
+    },
+    {
+      "canonicalName": "Troppau",
+      "coordinates": {
+        "lat": 49.9387,
+        "lng": 17.9026
+      },
+      "entityType": "place",
+      "id": "place-troppau",
+      "periodRecords": [
+        {
+          "controllingPolity": "Austrian Empire (Austrian Silesia)",
+          "nameAtTime": "Troppau (present-day Opava, Czech Republic)",
+          "periodLabel": "1814-1822 (the Congress system)",
+          "precision": "city"
+        }
+      ],
+      "reviewStatus": "proposed"
+    },
+    {
+      "canonicalName": "Laibach",
+      "coordinates": {
+        "lat": 46.0569,
+        "lng": 14.5058
+      },
+      "entityType": "place",
+      "id": "place-laibach",
+      "periodRecords": [
+        {
+          "controllingPolity": "Austrian Empire (Duchy of Carniola)",
+          "nameAtTime": "Laibach (present-day Ljubljana, Slovenia)",
+          "periodLabel": "1814-1822 (the Congress system)",
+          "precision": "city"
+        }
+      ],
+      "reviewStatus": "proposed"
+    },
+    {
+      "canonicalName": "Naples",
+      "coordinates": {
+        "lat": 40.8518,
+        "lng": 14.2681
+      },
+      "entityType": "place",
+      "id": "place-naples",
+      "periodRecords": [
+        {
+          "controllingPolity": "Kingdom of the Two Sicilies",
+          "nameAtTime": "Naples",
+          "periodLabel": "1814-1822 (the Congress system)",
+          "precision": "city"
+        }
+      ],
+      "reviewStatus": "proposed"
+    },
+    {
+      "canonicalName": "Verona",
+      "coordinates": {
+        "lat": 45.4384,
+        "lng": 10.9916
+      },
+      "entityType": "place",
+      "id": "place-verona",
+      "periodRecords": [
+        {
+          "controllingPolity": "Austrian Empire (Kingdom of Lombardy-Venetia)",
+          "nameAtTime": "Verona",
+          "periodLabel": "1814-1822 (the Congress system)",
+          "precision": "city"
+        }
+      ],
+      "reviewStatus": "proposed"
+    }
+  ],
+  "events": [
+    {
+      "eventTime": {
+        "earliest": "1814-09-18",
+        "label": "18 September 1814 (congress opens) to 9 June 1815 (General Treaty signed)",
+        "latest": "1815-06-09",
+        "precision": "range"
+      },
+      "evidenceLinkIds": [
+        "evidence-event-vienna-1"
+      ],
+      "id": "event-congress-of-vienna",
+      "placeId": "place-vienna",
+      "relatedRecordIds": [
+        "claim-vienna-settlement"
+      ],
+      "reviewStatus": "proposed",
+      "title": "The Congress of Vienna convenes and concludes with the General Treaty",
+      "visibility": "public"
+    },
+    {
+      "eventTime": {
+        "earliest": "1820-11-19",
+        "label": "19 November 1820",
+        "latest": "1820-11-19",
+        "precision": "exact"
+      },
+      "evidenceLinkIds": [
+        "evidence-event-troppau-1"
+      ],
+      "id": "event-troppau-protocol",
+      "placeId": "place-troppau",
+      "relatedRecordIds": [
+        "claim-troppau-doctrine"
+      ],
+      "reviewStatus": "proposed",
+      "title": "Austria, Prussia, and Russia sign the Troppau Protocol",
+      "visibility": "public"
+    },
+    {
+      "eventTime": {
+        "earliest": "1821-01-26",
+        "label": "26 January 1821 (congress opens) to late February 1821 (Austrian troops march)",
+        "latest": "1821-02-28",
+        "precision": "range"
+      },
+      "evidenceLinkIds": [
+        "evidence-event-laibach-1"
+      ],
+      "id": "event-laibach-authorization",
+      "placeId": "place-laibach",
+      "relatedRecordIds": [
+        "claim-naples-intervention"
+      ],
+      "reviewStatus": "proposed",
+      "title": "The Congress of Laibach authorizes Austrian military intervention in Naples",
+      "visibility": "public"
+    },
+    {
+      "eventTime": {
+        "earliest": "1821-03-01",
+        "label": "March 1821, culminating in the Austrian victory at Rieti (7 March 1821) and entry into Naples",
+        "latest": "1821-03-24",
+        "precision": "range"
+      },
+      "evidenceLinkIds": [
+        "evidence-event-naples-1"
+      ],
+      "id": "event-naples-intervention",
+      "placeId": "place-naples",
+      "relatedRecordIds": [
+        "claim-naples-intervention"
+      ],
+      "reviewStatus": "proposed",
+      "title": "Austrian forces suppress the constitutional government in Naples",
+      "visibility": "public"
+    },
+    {
+      "eventTime": {
+        "earliest": "1822-10-20",
+        "label": "20 October 1822 (congress opens) to 14 December 1822 (congress closes)",
+        "latest": "1822-12-14",
+        "precision": "range"
+      },
+      "evidenceLinkIds": [
+        "evidence-event-verona-1"
+      ],
+      "id": "event-congress-of-verona",
+      "placeId": "place-verona",
+      "relatedRecordIds": [
+        "claim-verona-spain"
+      ],
+      "reviewStatus": "proposed",
+      "title": "The Congress of Verona authorizes French intervention in Spain",
+      "visibility": "public"
+    }
+  ],
+  "evidenceLinks": [
+    {
+      "id": "evidence-event-vienna-1",
+      "passageId": "passage-vienna-final-act-1",
+      "role": "supporting",
+      "targetId": "event-congress-of-vienna",
+      "targetType": "event"
+    },
+    {
+      "id": "evidence-event-troppau-1",
+      "passageId": "passage-troppau-protocol-1",
+      "role": "supporting",
+      "targetId": "event-troppau-protocol",
+      "targetType": "event"
+    },
+    {
+      "id": "evidence-event-laibach-1",
+      "passageId": "passage-troppau-protocol-1",
+      "role": "supporting",
+      "targetId": "event-laibach-authorization",
+      "targetType": "event"
+    },
+    {
+      "id": "evidence-event-naples-1",
+      "passageId": "passage-troppau-protocol-1",
+      "role": "supporting",
+      "targetId": "event-naples-intervention",
+      "targetType": "event"
+    },
+    {
+      "id": "evidence-event-verona-1",
+      "passageId": "passage-troppau-protocol-1",
+      "role": "supporting",
+      "targetId": "event-congress-of-verona",
+      "targetType": "event"
+    },
+    {
+      "id": "evidence-claim-vienna-settlement-1",
+      "passageId": "passage-vienna-final-act-1",
+      "role": "supporting",
+      "targetId": "claim-vienna-settlement",
+      "targetType": "claim"
+    },
+    {
+      "id": "evidence-claim-troppau-doctrine-1",
+      "passageId": "passage-troppau-protocol-1",
+      "role": "supporting",
+      "targetId": "claim-troppau-doctrine",
+      "targetType": "claim"
+    },
+    {
+      "id": "evidence-claim-naples-intervention-1",
+      "passageId": "passage-troppau-protocol-1",
+      "role": "supporting",
+      "targetId": "claim-naples-intervention",
+      "targetType": "claim"
+    },
+    {
+      "id": "evidence-claim-castlereagh-dissent-1",
+      "passageId": "passage-castlereagh-state-paper-1",
+      "role": "supporting",
+      "targetId": "claim-castlereagh-dissent",
+      "targetType": "claim"
+    },
+    {
+      "id": "evidence-claim-verona-spain-1",
+      "passageId": "passage-troppau-protocol-1",
+      "reviewerNote": "Supported only indirectly, via continuity with the Troppau doctrine \u2014 no dedicated Verona primary document was independently curated in this pass. See generationReport.omissions.",
+      "role": "supporting",
+      "targetId": "claim-verona-spain",
+      "targetType": "claim"
+    },
+    {
+      "id": "evidence-rel-troppau-naples-1",
+      "passageId": "passage-troppau-protocol-1",
+      "role": "supporting",
+      "targetId": "rel-troppau-supports-naples",
+      "targetType": "relationship"
+    },
+    {
+      "id": "evidence-rel-castlereagh-troppau-supporting",
+      "passageId": "passage-castlereagh-state-paper-1",
+      "role": "supporting",
+      "targetId": "rel-castlereagh-disputes-troppau",
+      "targetType": "relationship"
+    },
+    {
+      "id": "evidence-rel-castlereagh-troppau-counter",
+      "passageId": "passage-troppau-protocol-1",
+      "role": "counterevidence",
+      "targetId": "rel-castlereagh-disputes-troppau",
+      "targetType": "relationship"
+    },
+    {
+      "id": "evidence-rel-verona-troppau-1",
+      "passageId": "passage-troppau-protocol-1",
+      "role": "supporting",
+      "targetId": "rel-verona-extends-troppau",
+      "targetType": "relationship"
+    }
+  ],
+  "generatedAt": "2000-01-01T00:00:00Z",
+  "generationReport": {
+    "omissions": [
+      "No period-accurate map is attached to the 1820-1822 scene: the only rights-cleared period map curated for this package (Shepherd's 1911 atlas, 'Treaty Adjustments, 1814, 1815') documents the 1815 Vienna settlement, not the Troppau/Laibach/Verona-era situation five to seven years later, and reusing it there would misrepresent period fit.",
+      "No dedicated primary document for the Congress of Verona's Spain decision was independently located and curated in this pass; claim-verona-spain and rel-verona-extends-troppau are supported only indirectly, via continuity with the Troppau Protocol.",
+      "The Troppau Protocol and Castlereagh's State Paper are cited via secondary reprints and paraphrase respectively, not independently verified primary-text transcriptions (see each Source's knownLimitations)."
+    ],
+    "outcome": "partial",
+    "stages": [
+      {
+        "id": "SCOPE_PROPOSED",
+        "status": "passed"
+      },
+      {
+        "id": "DISCOVERY_QUERIES_PREPARED",
+        "status": "passed"
+      },
+      {
+        "id": "SOURCE_CANDIDATES_DISCOVERED",
+        "status": "passed"
+      },
+      {
+        "id": "SOURCES_ASSESSED",
+        "status": "passed"
+      },
+      {
+        "id": "CORPUS_PREPARED",
+        "status": "passed"
+      },
+      {
+        "id": "HISTORICAL_MODEL_ASSEMBLED",
+        "status": "passed"
+      },
+      {
+        "id": "INVESTIGATION_COMPOSED",
+        "status": "passed"
+      }
+    ],
+    "verificationChecks": [
+      {
+        "id": "schema-and-cross-reference-validation",
+        "message": "Package passed Pydantic schema validation and all cross-reference/historical-integrity rules.",
+        "status": "passed"
+      }
+    ],
+    "warnings": [
+      "This package is real, hand-researched content curated for Phase C3 \u2014 unlike Phase C2's mock packages, it is not synthetic, but it is a prototype curation pass (see each Source's knownLimitations and this report's omissions), not independently peer-reviewed scholarship."
+    ]
+  },
+  "interactionSpec": {
+    "defaultSceneId": "scene-congress-of-vienna",
+    "enabledFacets": [
+      "narrative",
+      "timeline",
+      "map",
+      "graph",
+      "evidence"
+    ],
+    "focusKinds": [
+      "scene",
+      "event",
+      "entity",
+      "claim",
+      "relationship",
+      "source",
+      "passage",
+      "timeRange"
+    ],
+    "omittedCapabilities": [
+      "period map for the 1820-1822 scene"
+    ]
+  },
+  "knowledgeStates": [],
+  "mapAssets": [
+    {
+      "attribution": "Perry-Castaneda Library Map Collection, University of Texas Libraries",
+      "bounds": {
+        "bottomLeft": {
+          "lat": 36.0,
+          "lng": -2.0
+        },
+        "bottomRight": {
+          "lat": 36.0,
+          "lng": 27.0
+        },
+        "topLeft": {
+          "lat": 60.0,
+          "lng": -2.0
+        },
+        "topRight": {
+          "lat": 60.0,
+          "lng": 27.0
+        }
+      },
+      "defaultView": {
+        "center": {
+          "lat": 48.2082,
+          "lng": 16.3738
+        },
+        "zoom": 4.5
+      },
+      "georeferencingNote": "This plate (unlike Scene 2's separate, continent-wide 1911 Shepherd plate) covers Western and Central Europe only, from roughly the English Channel to Galicia and from southern Scandinavia to the western Mediterranean. It carries its own printed reference grid (lettered columns/rows with degree labels visible along the top and right margins, approximately 10-25 deg E and 40-55 deg N); rectangular bounds here were read by visual inspection of that grid, extended slightly to the plate's true edges, and are a disclosed approximation, not a survey-grade transform. Vienna falls well within the plate's least-distorted central region. The plate reflects the 1815 settlement only; it is intentionally not attached to the 1820-1822 scene, whose political geography (e.g. Naples, Verona under Austrian Lombardy-Venetia) it does not independently verify.",
+      "georeferencingPrecision": "approximate",
+      "id": "map-asset-shepherd-1815",
+      "imagePath": "/maps/concert-of-europe/shepherd-treaty-adjustments-1815.jpg",
+      "license": "Public domain (US publication, 1911)",
+      "periodFitDecision": "approved",
+      "periodLabel": "1815 (the Congress of Vienna's territorial settlement)",
+      "rightsStatus": "public-domain",
+      "sourceCitation": "William R. Shepherd, Historical Atlas (New York: Henry Holt and Company, 1911), plate \"Treaty Adjustments, 1814, 1815,\" p. 157."
+    }
+  ],
+  "mapScenes": [
+    {
+      "id": "map-scene-vienna",
+      "mapAssetId": "map-asset-shepherd-1815",
+      "markers": [
+        {
+          "placeId": "place-vienna",
+          "precision": "city"
+        }
+      ],
+      "sceneId": "scene-congress-of-vienna"
+    }
+  ],
+  "packageId": "concert-of-europe-1814-1822",
+  "packageRevision": 1,
+  "passages": [
+    {
+      "documentId": "document-vienna-final-act",
+      "excerpt": "The General Treaty redrew the map of post-Napoleonic Europe: Prussia received part of Saxony and territory along the Rhine; Russia received most of the former Duchy of Warsaw as the semi-autonomous 'Congress Poland'; Austria regained Lombardy-Venetia in northern Italy; and the 39 German states were organized into a new German Confederation. [Paraphrase of the settlement's territorial provisions, not a verbatim quotation.]",
+      "id": "passage-vienna-final-act-1",
+      "locator": "General Treaty, territorial articles (paraphrased)"
+    },
+    {
+      "documentId": "document-troppau-protocol",
+      "excerpt": "\"States, which have undergone a change of government due to revolution, the result of which threatens other states, ipso facto cease to be members of the European Alliance, and remain excluded from it until their situation gives guarantees for legal order and stability.\"",
+      "id": "passage-troppau-protocol-1",
+      "locator": "Protocol of Troppau, 19 November 1820 (direct quotation, corroborated across secondary sources)"
+    },
+    {
+      "documentId": "document-castlereagh-state-paper",
+      "excerpt": "Castlereagh's circular argued that the Quadruple Alliance of 1815 had been formed against a specific, defeated enemy (Napoleonic France), not as a standing charter for the Great Powers to police the internal constitutional arrangements of other states; Britain would not endorse a general, unqualified right of intervention against revolutions merely because they had occurred. [Paraphrase of the State Paper's well-documented substance, not a verbatim quotation.]",
+      "id": "passage-castlereagh-state-paper-1",
+      "locator": "State Paper of 5 May 1820 (paraphrased)"
+    }
+  ],
+  "perspectives": [],
+  "presentation": {
+    "findings": [
+      {
+        "id": "finding-troppau-doctrine",
+        "importance": "major",
+        "label": "The Troppau Protocol asserted a right to treat revolutionary states as excluded from the European Alliance.",
+        "recordId": "claim-troppau-doctrine",
+        "recordType": "claim"
+      },
+      {
+        "id": "finding-castlereagh-dissent",
+        "importance": "supporting",
+        "label": "Britain rejected the Protocol's general claim of a right of intervention.",
+        "recordId": "claim-castlereagh-dissent",
+        "recordType": "claim"
+      },
+      {
+        "id": "finding-castlereagh-disputes-troppau",
+        "importance": "supporting",
+        "label": "Britain's dissent directly disputed the Troppau doctrine, evidenced on both sides.",
+        "recordId": "rel-castlereagh-disputes-troppau",
+        "recordType": "relationship"
+      }
+    ],
+    "perspectiveIds": [],
+    "sceneIds": [
+      "scene-congress-of-vienna",
+      "scene-principle-of-intervention"
+    ],
+    "synthesis": [
+      {
+        "id": "narrative-vienna-settlement",
+        "isMaterialAssertion": true,
+        "order": 0,
+        "referencedRecordIds": [
+          "claim-vienna-settlement"
+        ],
+        "relatedEventId": "event-congress-of-vienna",
+        "text": "Between September 1814 and June 1815, the victorious powers of the Napoleonic Wars assembled at Vienna and, on 9 June 1815, signed a General Treaty redrawing the map of Europe -- redistributing territory among Prussia, Russia, and Austria and reorganizing the German states into a new Confederation. This settlement created the diplomatic framework -- the 'Concert of Europe' -- within which the later congresses at Troppau, Laibach, and Verona operated."
+      },
+      {
+        "id": "narrative-troppau-doctrine",
+        "isMaterialAssertion": true,
+        "order": 1,
+        "referencedRecordIds": [
+          "claim-troppau-doctrine",
+          "claim-naples-intervention",
+          "claim-castlereagh-dissent",
+          "rel-troppau-supports-naples",
+          "rel-castlereagh-disputes-troppau"
+        ],
+        "relatedEventId": "event-troppau-protocol",
+        "text": "In November 1820, meeting at Troppau, Austria, Prussia, and Russia signed a Protocol asserting that a state whose government changed through revolution in a way that threatened other states thereby excluded itself from the European Alliance -- a principle that, months later at Laibach, the same powers invoked to authorize Austrian military intervention against the constitutional government in Naples. Britain, under Castlereagh, rejected the Protocol's general claim: the 1815 Alliance, Castlereagh argued, had been formed against a specific defeated enemy, not as a standing license to police other states' internal arrangements."
+      },
+      {
+        "id": "narrative-verona-spain",
+        "isMaterialAssertion": true,
+        "order": 2,
+        "referencedRecordIds": [
+          "claim-verona-spain",
+          "rel-verona-extends-troppau"
+        ],
+        "relatedEventId": "event-congress-of-verona",
+        "text": "At Verona in the autumn of 1822 -- the last of the Congresses, and the first without Castlereagh, who had died that August -- the same interventionist principle was extended to authorize French military action against the revolutionary government in Spain, over the continued objection of Britain's new Foreign Secretary, George Canning. This claim's evidentiary support is weaker than the others in this package: no dedicated Verona primary document was independently curated in this pass, so it rests on continuity with the Troppau doctrine rather than direct Verona-specific evidence -- an explicit, disclosed gap."
+      }
+    ],
+    "title": "The Concert of Europe and Revolutionary Intervention, 1814-1822"
+  },
+  "relationships": [
+    {
+      "directOrInferred": "inferred",
+      "evidenceClassification": "directly_supported",
+      "evidenceLinkIds": [
+        "evidence-rel-troppau-naples-1"
+      ],
+      "fromId": "claim-troppau-doctrine",
+      "id": "rel-troppau-supports-naples",
+      "relationshipType": "establishes the doctrine invoked by",
+      "reviewStatus": "proposed",
+      "toId": "claim-naples-intervention",
+      "visibility": "public"
+    },
+    {
+      "directOrInferred": "direct",
+      "evidenceClassification": "disputed",
+      "evidenceLinkIds": [
+        "evidence-rel-castlereagh-troppau-supporting",
+        "evidence-rel-castlereagh-troppau-counter"
+      ],
+      "fromId": "claim-castlereagh-dissent",
+      "id": "rel-castlereagh-disputes-troppau",
+      "relationshipType": "disputes",
+      "reviewStatus": "disputed",
+      "toId": "claim-troppau-doctrine",
+      "visibility": "public"
+    },
+    {
+      "directOrInferred": "inferred",
+      "evidenceClassification": "indirectly_supported",
+      "evidenceLinkIds": [
+        "evidence-rel-verona-troppau-1"
+      ],
+      "fromId": "claim-verona-spain",
+      "id": "rel-verona-extends-troppau",
+      "relationshipType": "extends",
+      "reviewStatus": "proposed",
+      "toId": "claim-troppau-doctrine",
+      "visibility": "public"
+    }
+  ],
+  "request": {
+    "createdAt": "2000-01-01T00:00:00Z",
+    "id": "request-concert-of-europe",
+    "rawInput": "The Concert of Europe and Revolutionary Intervention",
+    "requestType": "causal-investigation",
+    "requestedDepth": "standard"
+  },
+  "researchGaps": [],
+  "scenes": [
+    {
+      "claimIds": [
+        "claim-vienna-settlement"
+      ],
+      "curationStatus": "prototype-curated",
+      "dateRange": {
+        "earliest": "1814-09-18",
+        "label": "The Congress of Vienna",
+        "latest": "1815-06-09",
+        "precision": "range"
+      },
+      "documentIds": [
+        "document-vienna-final-act"
+      ],
+      "entityIds": [
+        "place-vienna",
+        "person-metternich",
+        "person-alexander-i",
+        "person-castlereagh"
+      ],
+      "eventIds": [
+        "event-congress-of-vienna"
+      ],
+      "id": "scene-congress-of-vienna",
+      "knowledgeStateIds": [],
+      "mapSceneId": "map-scene-vienna",
+      "narrativeBlockIds": [
+        "narrative-vienna-settlement"
+      ],
+      "passageIds": [
+        "passage-vienna-final-act-1"
+      ],
+      "placeIds": [
+        "place-vienna"
+      ],
+      "relationshipIds": [],
+      "sourceIds": [
+        "source-vienna-final-act"
+      ],
+      "title": "The Congress System Established, 1814-1815"
+    },
+    {
+      "claimIds": [
+        "claim-troppau-doctrine",
+        "claim-naples-intervention",
+        "claim-castlereagh-dissent",
+        "claim-verona-spain"
+      ],
+      "curationStatus": "prototype-curated",
+      "dateRange": {
+        "earliest": "1820-11-19",
+        "label": "Troppau to Verona",
+        "latest": "1822-12-14",
+        "precision": "range"
+      },
+      "documentIds": [
+        "document-troppau-protocol",
+        "document-castlereagh-state-paper"
+      ],
+      "entityIds": [
+        "place-troppau",
+        "place-laibach",
+        "place-naples",
+        "place-verona",
+        "person-metternich",
+        "person-alexander-i",
+        "person-castlereagh",
+        "person-canning"
+      ],
+      "eventIds": [
+        "event-troppau-protocol",
+        "event-laibach-authorization",
+        "event-naples-intervention",
+        "event-congress-of-verona"
+      ],
+      "id": "scene-principle-of-intervention",
+      "knowledgeStateIds": [],
+      "narrativeBlockIds": [
+        "narrative-troppau-doctrine",
+        "narrative-verona-spain"
+      ],
+      "passageIds": [
+        "passage-troppau-protocol-1",
+        "passage-castlereagh-state-paper-1"
+      ],
+      "placeIds": [
+        "place-troppau",
+        "place-laibach",
+        "place-naples",
+        "place-verona"
+      ],
+      "relationshipIds": [
+        "rel-troppau-supports-naples",
+        "rel-castlereagh-disputes-troppau",
+        "rel-verona-extends-troppau"
+      ],
+      "sourceIds": [
+        "source-troppau-protocol",
+        "source-castlereagh-state-paper"
+      ],
+      "title": "The Principle of Intervention, 1820-1822"
+    }
+  ],
+  "schemaVersion": "1.0.0",
+  "scope": {
+    "approvalStatus": "approved",
+    "dateRange": {
+      "earliest": "1814-09-18",
+      "label": "The Congress system, from the opening of the Congress of Vienna to the close of the Congress of Verona",
+      "latest": "1822-12-14",
+      "precision": "range"
+    },
+    "exclusions": [
+      "The 1823 French invasion of Spain itself (the Hundred Thousand Sons of Saint Louis)",
+      "The Greek War of Independence",
+      "Domestic German measures (e.g. the Carlsbad Decrees) not directly tied to the Congress system"
+    ],
+    "geographicScope": [
+      "Austrian Empire",
+      "Kingdom of Prussia",
+      "Russian Empire",
+      "United Kingdom",
+      "France",
+      "Kingdom of the Two Sicilies",
+      "Spain"
+    ],
+    "inclusions": [
+      "The Congress of Vienna (1814-1815) and its territorial settlement",
+      "The Troppau Protocol (1820) and the principle of intervention",
+      "The Congress of Laibach (1821) and the Austrian intervention in Naples",
+      "The Congress of Verona (1822) and the authorization of French intervention in Spain",
+      "Britain's dissent from the general right of intervention"
+    ],
+    "interpretedQuestion": "How did the Congress system established at Vienna in 1814-15 evolve into an explicit doctrine of collective military intervention against revolution, and how did Britain's dissent fracture that consensus by the Congress of Verona in 1822?",
+    "themes": [
+      "diplomatic history",
+      "the Concert of Europe",
+      "the principle of intervention",
+      "conservative restoration after 1815"
+    ]
+  },
+  "sources": [
+    {
+      "authorOrOrigin": "Plenipotentiaries of Austria, France, Great Britain, Portugal, Prussia, Russia, and Sweden",
+      "curationStatus": "prototype-curated",
+      "dateOfSource": {
+        "earliest": "1815-06-09",
+        "label": "9 June 1815",
+        "latest": "1815-06-09",
+        "precision": "exact"
+      },
+      "id": "source-vienna-final-act",
+      "knownLimitations": "Primary treaty text, independently located at a stable public-domain hosting. Excerpt below is a close paraphrase of the settlement's territorial provisions, not a verbatim quotation of specific article text, since no single short passage of the General Treaty summarizes them.",
+      "linkOrLocation": "https://en.wikisource.org/wiki/Final_Act_of_the_Congress_of_Vienna/General_Treaty",
+      "originalLanguage": "French (English translation cited)",
+      "rightsStatus": "public-domain",
+      "sourceType": "primary-official-diplomatic",
+      "title": "General Treaty of the Congress of Vienna"
+    },
+    {
+      "authorOrOrigin": "Plenipotentiaries of Austria, Prussia, and Russia (Metternich, Hardenberg, Bernstorff, Nesselrode, Capo d'Istria)",
+      "curationStatus": "prototype-curated",
+      "dateOfSource": {
+        "earliest": "1820-11-19",
+        "label": "19 November 1820",
+        "latest": "1820-11-19",
+        "precision": "exact"
+      },
+      "id": "source-troppau-protocol",
+      "knownLimitations": "The quoted sentence below is independently corroborated with consistent wording across multiple secondary descriptions of the Protocol (used as a direct quotation for that reason). A directly hosted full primary-text transcription was not located and verified in this curation pass \u2014 an explicit, disclosed gap, not a silently resolved one.",
+      "linkOrLocation": "https://en.wikisource.org/wiki/1911_Encyclop%C3%A6dia_Britannica/Troppau,_Congress_of",
+      "originalLanguage": "French (English translation cited)",
+      "rightsStatus": "public-domain",
+      "sourceType": "primary-official-diplomatic",
+      "title": "Protocol of the Preliminary Conference at Troppau"
+    },
+    {
+      "authorOrOrigin": "Robert Stewart, Viscount Castlereagh, British Foreign Secretary",
+      "curationStatus": "prototype-curated",
+      "dateOfSource": {
+        "earliest": "1820-05-05",
+        "label": "5 May 1820",
+        "latest": "1820-05-05",
+        "precision": "exact"
+      },
+      "id": "source-castlereagh-state-paper",
+      "knownLimitations": "A real, historically documented State Paper. The excerpt below is a paraphrase of its well-established substance, not a verbatim quotation, since an independently verifiable full-text transcription was not located in this pass.",
+      "linkOrLocation": "British and Foreign State Papers, Vol. VIII (London: James Ridgway, 1830)",
+      "originalLanguage": "English",
+      "rightsStatus": "public-domain",
+      "sourceType": "primary-official-diplomatic",
+      "title": "State Paper of 5 May 1820 (Castlereagh's Circular rejecting a general right of intervention)"
+    }
+  ],
+  "status": "partial",
+  "timeline": [
+    {
+      "eventId": "event-congress-of-vienna",
+      "id": "timeline-event-congress-of-vienna",
+      "order": 0
+    },
+    {
+      "eventId": "event-troppau-protocol",
+      "id": "timeline-event-troppau-protocol",
+      "order": 1
+    },
+    {
+      "eventId": "event-laibach-authorization",
+      "id": "timeline-event-laibach-authorization",
+      "order": 2
+    },
+    {
+      "eventId": "event-naples-intervention",
+      "id": "timeline-event-naples-intervention",
+      "order": 3
+    },
+    {
+      "eventId": "event-congress-of-verona",
+      "id": "timeline-event-congress-of-verona",
+      "order": 4
+    }
+  ],
+  "uncertainties": []
+}

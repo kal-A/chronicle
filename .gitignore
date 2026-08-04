@@ -22,6 +22,13 @@ npm-debug.log*
 .env
 .env.local
 
+# Python backend
+backend/.venv
+backend/**/__pycache__
+backend/**/*.egg-info
+backend/.pytest_cache
+backend/runs
+
 # Editor
 .vscode/*
 !.vscode/extensions.json

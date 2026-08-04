@@ -1,0 +1,849 @@
+{
+  "schemaVersion": "1.0.0",
+  "packageId": "blank-cheque-golden",
+  "packageRevision": 1,
+  "generatedAt": "2026-08-03T16:00:00.000Z",
+  "request": {
+    "id": "request-blank-cheque-golden",
+    "rawInput": "How did the German assurance of support relate to Austria-Hungary's diplomatic posture during 4–10 July 1914?",
+    "requestType": "causal-investigation",
+    "requestedDepth": "focused",
+    "createdAt": "2026-08-03T15:00:00.000Z"
+  },
+  "scope": {
+    "interpretedQuestion": "How did the German assurance of support relate to Austria-Hungary's diplomatic posture during 4–10 July 1914?",
+    "dateRange": {
+      "precision": "range",
+      "earliest": "1914-07-04",
+      "latest": "1914-07-10",
+      "label": "4–10 July 1914"
+    },
+    "geographicScope": [
+      "Berlin",
+      "Vienna"
+    ],
+    "themes": [
+      "diplomacy",
+      "decision-making",
+      "knowledge at the time"
+    ],
+    "inclusions": [
+      "Franz Joseph's appeal for German backing",
+      "the assurance reported by Szögyény",
+      "Vienna's reported ultimatum posture by 10 July",
+      "the disputed relationship between assurance and posture"
+    ],
+    "exclusions": [
+      "a complete account of the July Crisis",
+      "events after 10 July 1914",
+      "a single-cause conclusion about the outbreak of war"
+    ],
+    "approvalStatus": "approved"
+  },
+  "status": "draft",
+  "presentation": {
+    "title": "The German Assurance and Vienna’s Posture, 4–10 July 1914",
+    "synthesis": [
+      {
+        "id": "nb-1-context",
+        "order": 0,
+        "text": "In the days after the Sarajevo assassination, Austria-Hungary sought to know how far it could count on German backing before deciding how to respond to Serbia.",
+        "isMaterialAssertion": false,
+        "referencedRecordIds": []
+      },
+      {
+        "id": "nb-1b-franz-joseph-letter",
+        "order": 1,
+        "text": "Franz Joseph sent a personal letter with Szögyény, framing the assassination as Pan-Slavist aggression that threatened both empires alike — the appeal that accompanied Austria-Hungary’s request for backing.",
+        "isMaterialAssertion": true,
+        "referencedRecordIds": [
+          "claim-c0-franz-joseph-letter"
+        ],
+        "relatedEventId": "event-1-assurance-given"
+      },
+      {
+        "id": "nb-2-assurance",
+        "order": 2,
+        "text": "On 5 July, Ambassador Szögyény met with Wilhelm II in Berlin and reported back to Vienna that Germany had promised its full support.",
+        "isMaterialAssertion": true,
+        "referencedRecordIds": [
+          "claim-c1-assurance-reported"
+        ],
+        "relatedEventId": "event-1-assurance-given"
+      },
+      {
+        "id": "nb-3-known-at-time",
+        "order": 3,
+        "text": "Vienna’s leadership, including Foreign Minister Berchtold, was informed of this assurance on or shortly after 5 July — though the exact hour it was received is not established from the surviving record.",
+        "isMaterialAssertion": true,
+        "referencedRecordIds": [
+          "kat-k1-vienna-informed-of-assurance"
+        ],
+        "relatedEventId": "event-1-assurance-given"
+      },
+      {
+        "id": "nb-4-vienna-posture",
+        "order": 4,
+        "text": "By 10 July, German Ambassador Tschirschky reported from Vienna that Austria-Hungary was preparing demands on Serbia designed to be difficult to simply accept — and that Wilhelm II, reading this report, dismissed the value of further diplomatic consultation.",
+        "isMaterialAssertion": true,
+        "referencedRecordIds": [
+          "claim-c3-vienna-posture",
+          "claim-c2-wilhelm-marginal-reaction"
+        ],
+        "relatedEventId": "event-2-vienna-posture-reported"
+      },
+      {
+        "id": "nb-5-dispute",
+        "order": 5,
+        "text": "Historians disagree about how much the German assurance actually drove what followed: some read it as part of deliberate German encouragement toward war, others see the outcome as shaped by contingent choices distributed across several capitals, not by Berlin’s intent alone.",
+        "isMaterialAssertion": true,
+        "referencedRecordIds": [
+          "rel-r1-assurance-enabled-posture"
+        ],
+        "relatedEventId": "event-3-wilhelm-marginal-reaction"
+      }
+    ],
+    "findings": [
+      {
+        "id": "finding-assurance-reported",
+        "recordType": "claim",
+        "recordId": "claim-c1-assurance-reported",
+        "label": "Szögyény reported a German assurance of full support.",
+        "importance": "major"
+      },
+      {
+        "id": "finding-vienna-posture",
+        "recordType": "claim",
+        "recordId": "claim-c3-vienna-posture",
+        "label": "Vienna’s posture by 10 July was reported as resistant to easy acceptance.",
+        "importance": "supporting"
+      },
+      {
+        "id": "finding-causal-dispute",
+        "recordType": "relationship",
+        "recordId": "rel-r1-assurance-enabled-posture",
+        "label": "The causal influence of the assurance remains disputed.",
+        "importance": "major"
+      }
+    ],
+    "sceneIds": [
+      "scene-2-blank-cheque"
+    ],
+    "perspectiveIds": []
+  },
+  "entities": [
+    {
+      "id": "place-berlin",
+      "entityType": "place",
+      "canonicalName": "Berlin",
+      "reviewStatus": "proposed",
+      "coordinates": {
+        "lat": 52.52,
+        "lng": 13.405
+      },
+      "periodRecords": [
+        {
+          "periodLabel": "July Crisis, 1914",
+          "nameAtTime": "Berlin",
+          "controllingPolity": "German Empire",
+          "precision": "city"
+        }
+      ]
+    },
+    {
+      "id": "place-vienna",
+      "entityType": "place",
+      "canonicalName": "Vienna",
+      "reviewStatus": "proposed",
+      "coordinates": {
+        "lat": 48.2082,
+        "lng": 16.3738
+      },
+      "periodRecords": [
+        {
+          "periodLabel": "July Crisis, 1914",
+          "nameAtTime": "Vienna",
+          "controllingPolity": "Austro-Hungarian Empire",
+          "precision": "city"
+        }
+      ]
+    },
+    {
+      "id": "person-wilhelm-ii",
+      "entityType": "person",
+      "canonicalName": "Wilhelm II",
+      "alsoKnownAs": [
+        "Kaiser Wilhelm II",
+        "German Emperor"
+      ],
+      "description": "German Emperor; gives the verbal assurance of support and later annotates Tschirschky’s 10 July report.",
+      "reviewStatus": "proposed"
+    },
+    {
+      "id": "person-franz-joseph",
+      "entityType": "person",
+      "canonicalName": "Franz Joseph I",
+      "alsoKnownAs": [
+        "Emperor Franz Joseph"
+      ],
+      "description": "Austro-Hungarian Emperor; sender of the personal letter Szögyény delivered to Wilhelm II.",
+      "reviewStatus": "proposed"
+    },
+    {
+      "id": "person-berchtold",
+      "entityType": "person",
+      "canonicalName": "Leopold Berchtold",
+      "alsoKnownAs": [
+        "Count Berchtold"
+      ],
+      "description": "Austro-Hungarian Foreign Minister; recipient of Szögyény’s telegram; his ultimatum-planning posture is reported by Tschirschky on 10 July.",
+      "reviewStatus": "proposed"
+    },
+    {
+      "id": "person-szogyeny",
+      "entityType": "person",
+      "canonicalName": "László Szögyény-Marich",
+      "alsoKnownAs": [
+        "Szögyény"
+      ],
+      "description": "Austro-Hungarian Ambassador to Berlin; delivers Franz Joseph’s letter and reports Wilhelm II’s assurance in telegram no. 237.",
+      "reviewStatus": "proposed"
+    },
+    {
+      "id": "person-tschirschky",
+      "entityType": "person",
+      "canonicalName": "Heinrich von Tschirschky",
+      "alsoKnownAs": [
+        "Tschirschky"
+      ],
+      "description": "German Ambassador to Vienna; reports Austro-Hungarian ultimatum deliberations to Jagow on 10 July in telegram no. 85.",
+      "reviewStatus": "proposed"
+    },
+    {
+      "id": "person-jagow",
+      "entityType": "person",
+      "canonicalName": "Gottlieb von Jagow",
+      "alsoKnownAs": [
+        "Jagow"
+      ],
+      "description": "German Foreign Secretary; recipient of Tschirschky’s 10 July report.",
+      "reviewStatus": "proposed"
+    }
+  ],
+  "events": [
+    {
+      "id": "event-1-assurance-given",
+      "title": "Szögyény meets Wilhelm II in Berlin; the assurance is given",
+      "placeId": "place-berlin",
+      "eventTime": {
+        "precision": "exact",
+        "earliest": "1914-07-05",
+        "latest": "1914-07-05"
+      },
+      "relatedRecordIds": [
+        "claim-c0-franz-joseph-letter",
+        "claim-c1-assurance-reported",
+        "kat-k1-vienna-informed-of-assurance"
+      ],
+      "evidenceLinkIds": [
+        "evidence-event-1-assurance-given-1",
+        "evidence-event-1-assurance-given-2"
+      ],
+      "reviewStatus": "proposed",
+      "visibility": "public"
+    },
+    {
+      "id": "event-2-vienna-posture-reported",
+      "title": "Tschirschky reports Vienna's ultimatum deliberations to Berlin",
+      "placeId": "place-vienna",
+      "eventTime": {
+        "precision": "exact",
+        "earliest": "1914-07-10",
+        "latest": "1914-07-10"
+      },
+      "relatedRecordIds": [
+        "claim-c3-vienna-posture"
+      ],
+      "evidenceLinkIds": [
+        "evidence-event-2-vienna-posture-reported-1"
+      ],
+      "reviewStatus": "proposed",
+      "visibility": "public"
+    },
+    {
+      "id": "event-3-wilhelm-marginal-reaction",
+      "title": "Wilhelm II annotates the report, dismissing further consultation",
+      "placeId": "place-berlin",
+      "eventTime": {
+        "precision": "exact",
+        "earliest": "1914-07-10",
+        "latest": "1914-07-10"
+      },
+      "relatedRecordIds": [
+        "claim-c2-wilhelm-marginal-reaction",
+        "rel-r1-assurance-enabled-posture"
+      ],
+      "evidenceLinkIds": [
+        "evidence-event-3-wilhelm-marginal-reaction-1"
+      ],
+      "reviewStatus": "proposed",
+      "visibility": "public"
+    }
+  ],
+  "decisions": [],
+  "communications": [],
+  "knowledgeStates": [
+    {
+      "id": "kat-k1-vienna-informed-of-assurance",
+      "personOrInstitutionId": "person-berchtold",
+      "fact": "the German assurance of support conveyed by Wilhelm II on 5 July 1914",
+      "asOfDate": {
+        "precision": "approximate",
+        "earliest": "1914-07-05",
+        "latest": "1914-07-06",
+        "label": "on or shortly after 5 July 1914 (exact received-time not established)"
+      },
+      "awareness": "known",
+      "evidenceLinkIds": [
+        "evidence-kat-k1-vienna-informed-of-assurance-1"
+      ],
+      "reviewStatus": "proposed",
+      "visibility": "public"
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim-c0-franz-joseph-letter",
+      "statement": "Franz Joseph’s letter framed the Sarajevo assassination as the result of Pan-Slavist agitation aimed at weakening the Triple Alliance and destroying Austria-Hungary, seeking German backing on that basis.",
+      "directOrInferred": "direct",
+      "reviewStatus": "proposed",
+      "evidenceLinkIds": [
+        "evidence-claim-c0-franz-joseph-letter-1"
+      ],
+      "visibility": "public"
+    },
+    {
+      "id": "claim-c1-assurance-reported",
+      "statement": "Szögyény reported that Wilhelm II stated Austria-Hungary could count on Germany’s full support.",
+      "directOrInferred": "direct",
+      "reviewStatus": "proposed",
+      "evidenceLinkIds": [
+        "evidence-claim-c1-assurance-reported-1"
+      ],
+      "visibility": "public"
+    },
+    {
+      "id": "claim-c2-wilhelm-marginal-reaction",
+      "statement": "Wilhelm II reacted to Tschirschky’s 10 July report by dismissing the value of further diplomatic consultation, quoting Frederick the Great against councils of war.",
+      "directOrInferred": "direct",
+      "reviewStatus": "proposed",
+      "evidenceLinkIds": [
+        "evidence-claim-c2-wilhelm-marginal-reaction-1"
+      ],
+      "visibility": "public"
+    },
+    {
+      "id": "claim-c3-vienna-posture",
+      "statement": "By 10 July 1914, Vienna’s diplomatic posture, as reported by Tschirschky, was oriented toward demands not designed to be simply accepted.",
+      "directOrInferred": "inferred",
+      "reviewStatus": "proposed",
+      "evidenceLinkIds": [
+        "evidence-claim-c3-vienna-posture-1"
+      ],
+      "visibility": "public"
+    }
+  ],
+  "relationships": [
+    {
+      "id": "rel-r1-assurance-enabled-posture",
+      "relationshipType": "causal-influence",
+      "fromId": "claim-c1-assurance-reported",
+      "toId": "claim-c3-vienna-posture",
+      "directOrInferred": "inferred",
+      "evidenceClassification": "disputed",
+      "evidenceLinkIds": [
+        "evidence-rel-r1-assurance-enabled-posture-1",
+        "evidence-rel-r1-assurance-enabled-posture-2"
+      ],
+      "reviewStatus": "proposed",
+      "visibility": "public"
+    }
+  ],
+  "perspectives": [],
+  "conflicts": [],
+  "uncertainties": [],
+  "researchGaps": [],
+  "sources": [
+    {
+      "id": "jc-src-001",
+      "title": "Szögyény-Marich to Berchtold, \"The Blank Check,\" telegram no. 237",
+      "sourceType": "primary-official-diplomatic",
+      "authorOrOrigin": "László Szögyény-Marich",
+      "dateOfSource": {
+        "precision": "exact",
+        "earliest": "1914-07-05",
+        "latest": "1914-07-05"
+      },
+      "originalLanguage": "German (English translation consulted)",
+      "rightsStatus": "public-domain",
+      "curationStatus": "passages-extracted",
+      "knownLimitations": "GHDI web transcription of a translated edition, not the original-language archival document; translation choices are an interpretive layer.",
+      "linkOrLocation": "https://germanhistorydocs.org/en/wilhelmine-germany-and-the-first-world-war-1890-1918/ghdi:document-800"
+    },
+    {
+      "id": "jc-src-002",
+      "title": "Tschirschky to Jagow, \"Germany and the Ultimatum,\" telegram no. 85",
+      "sourceType": "primary-official-diplomatic",
+      "authorOrOrigin": "Heinrich von Tschirschky",
+      "dateOfSource": {
+        "precision": "exact",
+        "earliest": "1914-07-10",
+        "latest": "1914-07-10"
+      },
+      "originalLanguage": "German (English translation consulted)",
+      "rightsStatus": "public-domain",
+      "curationStatus": "passages-extracted",
+      "knownLimitations": "Marginal notes are reproduced by the 1922 documentary edition’s editors, not independently re-verified by Chronicle against the original.",
+      "linkOrLocation": "https://germanhistorydocs.org/en/wilhelmine-germany-and-the-first-world-war-1890-1918/germany-and-the-ultimatum-heinrich-von-tschirschky-and-boegendorff-vienna-to-gottlieb-von-jagow-july-10-1914"
+    },
+    {
+      "id": "jc-src-020",
+      "title": "The Historiography of the Origins of the First World War",
+      "sourceType": "secondary-specialist",
+      "authorOrOrigin": "John F. V. Keiger",
+      "dateOfSource": {
+        "precision": "exact",
+        "earliest": "2016-01-01",
+        "latest": "2016-01-01"
+      },
+      "originalLanguage": "English",
+      "rightsStatus": "public-domain",
+      "curationStatus": "passages-extracted",
+      "knownLimitations": "Characterizes the Fischer/Clark dispute rather than being direct passages from either book; stands in for jc-src-016/jc-src-013, which remain unacquired at passage level.",
+      "linkOrLocation": "https://encyclopedia.1914-1918-online.net/article/the-historiography-of-the-origins-of-the-first-world-war/"
+    },
+    {
+      "id": "jc-src-021",
+      "title": "Autograph Letter of Franz Joseph to the Kaiser",
+      "sourceType": "primary-personal",
+      "authorOrOrigin": "Franz Joseph I",
+      "dateOfSource": {
+        "precision": "approximate",
+        "earliest": "1914-07-01",
+        "latest": "1914-07-05",
+        "label": "composed shortly before its 5 July 1914 delivery in Berlin"
+      },
+      "originalLanguage": "German (English translation consulted)",
+      "rightsStatus": "public-domain",
+      "curationStatus": "passages-extracted",
+      "knownLimitations": "World War I Document Archive (BYU) transcription; the hosting archive itself gives inconsistent dates for this letter (its own page title says 2 July, its metadata says 5 July) — recorded here as an approximate range rather than resolved by assumption. Delivery to Wilhelm II in Berlin on 5 July, alongside Szögyény’s visit, is corroborated by jc-src-001.",
+      "linkOrLocation": "https://wwi.lib.byu.edu/index.php/Autograph_Letter_of_Franz_Joseph_to_the_Kaiser"
+    }
+  ],
+  "documents": [
+    {
+      "id": "doc-jc-src-001",
+      "sourceId": "jc-src-001",
+      "editionCitation": "Bittner et al., Österreich-Ungarns Aussenpolitik, vol. 8, no. 10,058; reprinted in Geiss, Julikrise und Kriegsausbruch 1914, vol. 1, pp. 83–84.",
+      "translationCredit": "GHDI translation by Adam Blauhut",
+      "visibility": "public",
+      "knownLimitations": "Received-time in Vienna is not established in this edition."
+    },
+    {
+      "id": "doc-jc-src-002",
+      "sourceId": "jc-src-002",
+      "editionCitation": "Schücking and Montgelas, eds., Die Deutschen Dokumente zum Kriegsausbruch, vol. 5, p. 29.",
+      "translationCredit": "GHDI translation by Adam Blauhut",
+      "visibility": "public",
+      "knownLimitations": "Exact annotation date for Wilhelm II’s marginal note is not separately established."
+    },
+    {
+      "id": "doc-jc-src-020",
+      "sourceId": "jc-src-020",
+      "editionCitation": "1914-1918-online: International Encyclopedia of the First World War",
+      "visibility": "public",
+      "knownLimitations": "A historiographical survey, not a primary account of July 1914 itself."
+    },
+    {
+      "id": "doc-jc-src-021",
+      "sourceId": "jc-src-021",
+      "editionCitation": "World War I Document Archive (Brigham Young University), English translation",
+      "visibility": "public",
+      "knownLimitations": "Composition date inconsistently recorded by the hosting archive; see Source-level limitations."
+    }
+  ],
+  "passages": [
+    {
+      "id": "jc-src-001-p1",
+      "documentId": "doc-jc-src-001",
+      "excerpt": "Szögyény reports Wilhelm II stated Austria-Hungary \"could count on Germany’s full support,\" Germany taking Austria-Hungary’s side \"in line with its customary loyalty.\"",
+      "locator": "Bittner et al. vol. 8, no. 10,058; Geiss vol. 1, pp. 83–84",
+      "sentTime": {
+        "precision": "exact",
+        "earliest": "1914-07-05",
+        "latest": "1914-07-05"
+      },
+      "gapNote": "Exact received-time in Vienna is not established in this edition."
+    },
+    {
+      "id": "jc-src-002-p1",
+      "documentId": "doc-jc-src-002",
+      "excerpt": "Tschirschky reports \"concrete demands had to be made of Serbia\" and that Serbian acceptance would be \"very disagreeable\" to Count Berchtold.",
+      "locator": "Schücking/Montgelas vol. 5, p. 29",
+      "sentTime": {
+        "precision": "exact",
+        "earliest": "1914-07-10",
+        "latest": "1914-07-10"
+      },
+      "gapNote": "Exact received-time is not established in this edition."
+    },
+    {
+      "id": "jc-src-002-p2",
+      "documentId": "doc-jc-src-002",
+      "excerpt": "Wilhelm II’s marginal note quotes Frederick the Great: \"I am against councils of war and counseling, especially since the more timid party always gains the upper hand.\"",
+      "locator": "Schücking/Montgelas vol. 5, p. 29 (marginalia)",
+      "gapNote": "Annotation date is not separately established from the report’s 10 July send date."
+    },
+    {
+      "id": "jc-src-020-p1",
+      "documentId": "doc-jc-src-020",
+      "excerpt": "Characterizes Fischer’s thesis: German leaders \"planned a war of aggression\" from late 1912 onward, reducing the interpretive weight placed on the international system.",
+      "locator": "Keiger, \"The Historiography of the Origins of the First World War\" (2016)"
+    },
+    {
+      "id": "jc-src-020-p2",
+      "documentId": "doc-jc-src-020",
+      "excerpt": "Characterizes Clark’s The Sleepwalkers as \"saturated with agency,\" focused on \"how\" rather than \"why,\" reading German behavior as relatively calm through the crisis and distributing causal weight across multiple powers’ contingent choices.",
+      "locator": "Keiger, \"The Historiography of the Origins of the First World War\" (2016)"
+    },
+    {
+      "id": "jc-src-021-p1",
+      "documentId": "doc-jc-src-021",
+      "excerpt": "Franz Joseph writes that the Sarajevo assassination was \"the direct consequence of the agitation carried on by the Russian and Serbian Pan-Slavists whose sole aim is the weakening of the Triple Alliance and the destruction of my Empire.\"",
+      "locator": "World War I Document Archive (BYU), \"Autograph Letter of Franz Joseph to the Kaiser\"",
+      "gapNote": "Exact composition date is inconsistently recorded by the hosting archive; delivery to Wilhelm II in Berlin on 5 July 1914 is the well-corroborated fact this passage supports."
+    }
+  ],
+  "evidenceLinks": [
+    {
+      "id": "evidence-claim-c0-franz-joseph-letter-1",
+      "targetType": "claim",
+      "targetId": "claim-c0-franz-joseph-letter",
+      "passageId": "jc-src-021-p1",
+      "role": "counterevidence"
+    },
+    {
+      "id": "evidence-claim-c1-assurance-reported-1",
+      "targetType": "claim",
+      "targetId": "claim-c1-assurance-reported",
+      "passageId": "jc-src-001-p1",
+      "role": "supporting"
+    },
+    {
+      "id": "evidence-claim-c2-wilhelm-marginal-reaction-1",
+      "targetType": "claim",
+      "targetId": "claim-c2-wilhelm-marginal-reaction",
+      "passageId": "jc-src-002-p2",
+      "role": "supporting"
+    },
+    {
+      "id": "evidence-claim-c3-vienna-posture-1",
+      "targetType": "claim",
+      "targetId": "claim-c3-vienna-posture",
+      "passageId": "jc-src-002-p1",
+      "role": "supporting"
+    },
+    {
+      "id": "evidence-rel-r1-assurance-enabled-posture-1",
+      "targetType": "relationship",
+      "targetId": "rel-r1-assurance-enabled-posture",
+      "passageId": "jc-src-020-p1",
+      "role": "supporting",
+      "reviewerNote": "Fischer-aligned reading: the assurance as part of deliberate German encouragement toward war."
+    },
+    {
+      "id": "evidence-rel-r1-assurance-enabled-posture-2",
+      "targetType": "relationship",
+      "targetId": "rel-r1-assurance-enabled-posture",
+      "passageId": "jc-src-020-p2",
+      "role": "counterevidence",
+      "reviewerNote": "Clark-aligned reading: causal weight distributed across multiple powers’ contingent choices, resisting a single-cause account."
+    },
+    {
+      "id": "evidence-kat-k1-vienna-informed-of-assurance-1",
+      "targetType": "knownAtTime",
+      "targetId": "kat-k1-vienna-informed-of-assurance",
+      "passageId": "jc-src-001-p1",
+      "role": "supporting"
+    },
+    {
+      "id": "evidence-event-1-assurance-given-1",
+      "targetType": "event",
+      "targetId": "event-1-assurance-given",
+      "passageId": "jc-src-001-p1",
+      "role": "supporting"
+    },
+    {
+      "id": "evidence-event-1-assurance-given-2",
+      "targetType": "event",
+      "targetId": "event-1-assurance-given",
+      "passageId": "jc-src-021-p1",
+      "role": "context"
+    },
+    {
+      "id": "evidence-event-2-vienna-posture-reported-1",
+      "targetType": "event",
+      "targetId": "event-2-vienna-posture-reported",
+      "passageId": "jc-src-002-p1",
+      "role": "supporting"
+    },
+    {
+      "id": "evidence-event-3-wilhelm-marginal-reaction-1",
+      "targetType": "event",
+      "targetId": "event-3-wilhelm-marginal-reaction",
+      "passageId": "jc-src-002-p2",
+      "role": "supporting"
+    }
+  ],
+  "claimLedgers": [
+    {
+      "id": "ledger-claim-c0-franz-joseph-letter",
+      "claimId": "claim-c0-franz-joseph-letter",
+      "evidenceLinkIds": [
+        "evidence-claim-c0-franz-joseph-letter-1"
+      ],
+      "conclusion": "supported",
+      "limitations": [
+        "The claim is limited to what the cited passage directly reports."
+      ]
+    },
+    {
+      "id": "ledger-claim-c1-assurance-reported",
+      "claimId": "claim-c1-assurance-reported",
+      "evidenceLinkIds": [
+        "evidence-claim-c1-assurance-reported-1"
+      ],
+      "conclusion": "supported",
+      "limitations": [
+        "The claim is limited to what the cited passage directly reports."
+      ]
+    },
+    {
+      "id": "ledger-claim-c2-wilhelm-marginal-reaction",
+      "claimId": "claim-c2-wilhelm-marginal-reaction",
+      "evidenceLinkIds": [
+        "evidence-claim-c2-wilhelm-marginal-reaction-1"
+      ],
+      "conclusion": "supported",
+      "limitations": [
+        "The claim is limited to what the cited passage directly reports."
+      ]
+    },
+    {
+      "id": "ledger-claim-c3-vienna-posture",
+      "claimId": "claim-c3-vienna-posture",
+      "evidenceLinkIds": [
+        "evidence-claim-c3-vienna-posture-1"
+      ],
+      "conclusion": "qualified",
+      "limitations": [
+        "The claim is an inference and should not be read as a direct quotation."
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "id": "timeline-event-1-assurance-given",
+      "eventId": "event-1-assurance-given",
+      "order": 0
+    },
+    {
+      "id": "timeline-event-2-vienna-posture-reported",
+      "eventId": "event-2-vienna-posture-reported",
+      "order": 1
+    },
+    {
+      "id": "timeline-event-3-wilhelm-marginal-reaction",
+      "eventId": "event-3-wilhelm-marginal-reaction",
+      "order": 2
+    }
+  ],
+  "mapAssets": [
+    {
+      "id": "map-asset-blank-cheque",
+      "imagePath": "/maps/july-crisis/shepherd-europe-1911.jpg",
+      "bounds": {
+        "topLeft": {
+          "lat": 72,
+          "lng": -30
+        },
+        "topRight": {
+          "lat": 72,
+          "lng": 75
+        },
+        "bottomRight": {
+          "lat": 33,
+          "lng": 75
+        },
+        "bottomLeft": {
+          "lat": 33,
+          "lng": -30
+        }
+      },
+      "defaultView": {
+        "center": {
+          "lat": 50.3,
+          "lng": 14.9
+        },
+        "zoom": 4.3
+      },
+      "periodLabel": "Europe, 1911–1914 (pre-war alliance system)",
+      "sourceCitation": "William R. Shepherd, Historical Atlas (New York: Henry Holt and Company, 1911), pp. 166–167, \"Europe at the Present Time.\"",
+      "attribution": "Perry–Castañeda Library Map Collection, University of Texas Libraries",
+      "license": "Public domain (US publication, 1911)",
+      "georeferencingNote": "Corner coordinates are an approximate rectangular fit read from the plate's printed graticule, not measured to survey-grade precision. The plate reflects political boundaries current at its 1911 publication; the German Empire/Austria-Hungary boundaries shown are unchanged through July 1914, but the Balkans/Ottoman boundaries on this plate predate the 1912–13 Balkan Wars and do not reflect July 1914 — the map's default view is constrained to Germany/Austria-Hungary for this reason.",
+      "rightsStatus": "public-domain",
+      "periodFitDecision": "conditional",
+      "georeferencingPrecision": "approximate"
+    }
+  ],
+  "mapScenes": [
+    {
+      "id": "map-scene-blank-cheque",
+      "sceneId": "scene-2-blank-cheque",
+      "mapAssetId": "map-asset-blank-cheque",
+      "markers": [
+        {
+          "placeId": "place-berlin",
+          "precision": "city"
+        },
+        {
+          "placeId": "place-vienna",
+          "precision": "city"
+        }
+      ]
+    }
+  ],
+  "scenes": [
+    {
+      "id": "scene-2-blank-cheque",
+      "title": "Vienna and Berlin: The Blank Cheque",
+      "curationStatus": "prototype-curated",
+      "dateRange": {
+        "precision": "range",
+        "earliest": "1914-07-04",
+        "latest": "1914-07-10",
+        "label": "4–10 July 1914"
+      },
+      "placeIds": [
+        "place-berlin",
+        "place-vienna"
+      ],
+      "entityIds": [
+        "place-berlin",
+        "place-vienna",
+        "person-wilhelm-ii",
+        "person-franz-joseph",
+        "person-berchtold",
+        "person-szogyeny",
+        "person-tschirschky",
+        "person-jagow"
+      ],
+      "sourceIds": [
+        "jc-src-001",
+        "jc-src-002",
+        "jc-src-020",
+        "jc-src-021"
+      ],
+      "documentIds": [
+        "doc-jc-src-001",
+        "doc-jc-src-002",
+        "doc-jc-src-020",
+        "doc-jc-src-021"
+      ],
+      "passageIds": [
+        "jc-src-001-p1",
+        "jc-src-002-p1",
+        "jc-src-002-p2",
+        "jc-src-020-p1",
+        "jc-src-020-p2",
+        "jc-src-021-p1"
+      ],
+      "eventIds": [
+        "event-1-assurance-given",
+        "event-2-vienna-posture-reported",
+        "event-3-wilhelm-marginal-reaction"
+      ],
+      "claimIds": [
+        "claim-c0-franz-joseph-letter",
+        "claim-c1-assurance-reported",
+        "claim-c2-wilhelm-marginal-reaction",
+        "claim-c3-vienna-posture"
+      ],
+      "relationshipIds": [
+        "rel-r1-assurance-enabled-posture"
+      ],
+      "knowledgeStateIds": [
+        "kat-k1-vienna-informed-of-assurance"
+      ],
+      "narrativeBlockIds": [
+        "nb-1-context",
+        "nb-1b-franz-joseph-letter",
+        "nb-2-assurance",
+        "nb-3-known-at-time",
+        "nb-4-vienna-posture",
+        "nb-5-dispute"
+      ],
+      "mapSceneId": "map-scene-blank-cheque"
+    }
+  ],
+  "interactionSpec": {
+    "defaultSceneId": "scene-2-blank-cheque",
+    "focusKinds": [
+      "scene",
+      "event",
+      "entity",
+      "claim",
+      "relationship",
+      "source",
+      "passage",
+      "timeRange"
+    ],
+    "enabledFacets": [
+      "narrative",
+      "timeline",
+      "map",
+      "graph",
+      "evidence"
+    ],
+    "omittedCapabilities": [
+      "live source discovery",
+      "automated source acquisition",
+      "model-generated synthesis",
+      "independent historical peer review"
+    ]
+  },
+  "generationReport": {
+    "outcome": "complete",
+    "stages": [
+      {
+        "id": "legacy-fixture-migration",
+        "status": "passed"
+      }
+    ],
+    "omissions": [
+      "This package was migrated from the hand-curated prototype and was not generated by a live model pipeline."
+    ],
+    "warnings": [
+      "Prototype-curated, owner-reviewed content only; not independently reviewed historical content.",
+      "The historical map is conditionally suitable and has a documented post-1911 Balkans boundary limitation."
+    ],
+    "verificationChecks": [
+      {
+        "id": "legacy-content-preservation",
+        "status": "passed",
+        "message": "All original scene records and evidence references were retained during normalization."
+      }
+    ]
+  }
+}
