@@ -1,6 +1,8 @@
 # Investigation Layout
 
-## Primary Layout (Desktop)
+> **Superseded as the default layout starting Phase D.** This document describes the article-first layout Phases 1-3/A-C actually built (`InvestigationLayout.tsx`) and which now ships as **Inspector** mode — still accurate for that mode, not deleted. The default Explore presentation is the map-first workspace: persistent map canvas, docked (desktop, `~360-420px`, resizable/collapsible)/bottom-sheet (mobile) assistant panel with Ask/Explore/Evidence/Sources tabs — not the "floating entry point, opens as overlay" assistant described below. See `docs/product/map-first-workspace-instructions.md` §7-9 for the current default layout and `docs/decisions/ADR-002-map-first-workspace.md` for the decision record.
+
+## Primary Layout (Desktop) — Inspector mode
 
 A persistent-but-collapsible layout, not a modal-heavy one: narrative takes primary reading width; timeline is a persistent strip (top or bottom); map and graph share a secondary region the user can toggle between (not both crammed on-screen at once, to avoid the "unreadable graph" failure mode in `docs/product/product-principles.md`); evidence opens as a panel driven by selection, not a permanent quarter of the screen.
 

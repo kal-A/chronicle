@@ -41,9 +41,10 @@ Chronicle is a standard three-tier web application plus a bounded, persisted gen
 ## Active Sequencing
 
 - **Phase A/B:** preserve the frontend, define `GeneratedInvestigation`, and render the Blank Cheque golden JSON generically.
-- **Phase C:** deterministic Python CLI and mock providers produce a second valid package.
-- **Phase D–H:** add real discovery/acquisition, corpus, extraction, criticism, timeline, and geographic generation incrementally.
-- **Phase I–K:** generation-first web UX, assistant, and private enrichment.
+- **Phase C:** deterministic Python CLI and mock/curated providers produce further valid packages (mock + real Concert of Europe).
+- **Phase D:** map-first investigation workspace (persistent map canvas, docked/sheet assistant panel, lenses, `InvestigationExperiencePlan`, Inspector mode) — see `docs/decisions/ADR-002-map-first-workspace.md`.
+- **Phase E–I:** add real discovery/acquisition, corpus, extraction, criticism, timeline, and geographic generation incrementally.
+- **Phase J–L:** generation-first web UX, assistant, and private enrichment.
 
 See `docs/delivery/revised-development-phases.md`.
 

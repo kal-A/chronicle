@@ -1,5 +1,7 @@
 # Generation-First User Experience
 
+> **Phase D update:** the sequence below is superseded in its *canvas* step (§4) by the map-first workspace — see `docs/product/map-first-workspace-instructions.md` and `docs/decisions/ADR-002-map-first-workspace.md`. Steps 1-3 (Request, Scope Proposal, Visible Workflow) and §5 (Grounded Assistant) still describe the correct behavior; they simply now transition into a map-first canvas instead of the progressive-disclosure order in §4, and the assistant panel persists from step 1 through the canvas rather than appearing only once a package exists. §4's progressive-disclosure content (synthesis, key factors, sequence, perspectives, evidence, limitations) is preserved as Inspector content, reachable from the workspace, not deleted.
+
 ## Experience Sequence
 
 ### 1. Investigation Request

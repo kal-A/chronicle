@@ -23,6 +23,7 @@ Applies to every vertical slice, at whatever phase it ships in. Restates and exp
 - [ ] A manual test flow has been walked through and works.
 - [ ] Loading, empty, and failure states exist for any new UI (`docs/design/investigation-layout.md`).
 - [ ] Accessibility: keyboard reachability and axe-core check pass for new UI (`docs/design/accessibility.md`).
+- [ ] Any new panel/sheet/dock or animated transition respects `prefers-reduced-motion` and has a documented keyboard path (resize, collapse, reopen) — required starting Phase D (`docs/decisions/ADR-002-map-first-workspace.md`).
 - [ ] No raw SQL string interpolation; authz checks are server-side; no secrets committed (`AGENTS.md` §7).
 - [ ] Public read paths verified not to leak `proposed`/`rejected`/`private` content, if the slice touches the Evidence or Review service.
 - [ ] New evidence cannot mutate active narrative text; any text impact follows `source-to-narrative-enrichment.md` through an immutable draft revision and explicit publication.

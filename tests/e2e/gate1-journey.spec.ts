@@ -7,12 +7,18 @@ import { test, expect } from '@playwright/test'
  * the content correctly. Comprehension can only be established by the
  * actual 5-participant human test; see
  * docs/delivery/validation/phase-1-gate-1-template.md for that gap.
+ *
+ * Phase D: this journey exercises Inspector mode, where the full narrative/
+ * evidence reading experience Gate 1 was designed around still lives
+ * unchanged (docs/decisions/ADR-002-map-first-workspace.md) — the map-first
+ * workspace that's now the default has its own, separate journey coverage
+ * in workspace-journey.spec.ts.
  */
 
 test('Gate 1 happy path: explain, locate, open evidence, distinguish fact from dispute, cross-facet select, navigate back, find a limitation', async ({
   page,
 }) => {
-  await page.goto('/')
+  await page.goto('/investigations/blank-cheque-golden/scenes/scene-2-blank-cheque/inspector')
 
   // Task 1 — explain what decision/exchange the scene centers on.
   await expect(

@@ -26,6 +26,13 @@ Target WCAG 2.2 AA as the baseline for all Explore surfaces. Studio (Phase 6+, i
 - Automated: axe-core (or equivalent) integrated into the Vitest/RTL component suite and/or Playwright runs, catching regressions on every PR, not just at phase boundaries.
 - Manual: at minimum one full keyboard-only pass and one screen-reader pass (e.g., NVDA or VoiceOver) per phase that ships new UI, logged in that phase's manual test flow (`docs/delivery/development-phases.md`).
 
+## Map-First Workspace Additions (Phase D)
+
+- **Panel resize/collapse** — the docked panel's divider is a keyboard-operable `role="separator"` (focusable, arrow-key adjustable, with a documented reset/collapse/reopen shortcut set); focus moves to the collapse toggle on collapse and back to the panel on reopen (`docs/product/map-first-workspace-instructions.md` §8.1).
+- **Bottom sheet** (mobile/tablet-portrait) — collapsed/half/expanded states are keyboard- and screen-reader-operable, not gesture-only; the drag handle has an accessible name and state (`docs/product/map-first-workspace-instructions.md` §9.1).
+- **Lenses** — every lens has a required text-fallback equivalent (an ordered list of what the lens currently shows, e.g. a numbered sequence with dates), not just a visual map/graph state (`docs/product/map-first-workspace-instructions.md` §17.1); this is the same "canvas is a progressive enhancement, the accessible list is the real interaction" pattern already implemented for `MapView`'s place list and `GraphView`'s claims/relationships list — extended to every lens, not a new pattern.
+- **Reduced motion** — this is the first real implementation of `prefers-reduced-motion` in this codebase (sheet transitions, lens transitions, any map fly-to); prior facet-sync "easing" described above was never actually gated on it.
+
 ## Explicitly Deferred
 
 - Full WCAG AAA compliance.

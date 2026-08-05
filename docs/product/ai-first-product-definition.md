@@ -28,6 +28,10 @@ User request
 
 Deterministic software owns permissions, workflow state, persistence, citation resolution, source visibility, rights gates, date validation, geographic precision, package validation, and publication. Models handle ambiguous language and bounded proposals. No model output bypasses validation.
 
+## Map-First Workspace (Phase D)
+
+The primary Explore interaction surface is a map-first workspace, not the article-first single-scene renderer Phases A-C built: a persistent bounded historical map as the canvas, with a docked (desktop) or bottom-sheet (mobile) assistant panel beside it (Ask/Explore/Evidence/Sources), driven by an optional, generated `InvestigationExperiencePlan` and historical "lenses" (Sequence/Positions/Knowledge/Systems/Sources/Uncertainty). See `docs/product/map-first-workspace-instructions.md` for the full specification and `docs/decisions/ADR-002-map-first-workspace.md` for the decision record. The article-first renderer described below is preserved as "Inspector" — the deep evidence/provenance mode — not replaced.
+
 ## Current Prototype
 
 The Blank Cheque experience is retained as:
@@ -35,7 +39,8 @@ The Blank Cheque experience is retained as:
 - a renderer and evidence-inspection prototype;
 - a golden valid investigation fixture;
 - a regression test for package validation and cross-facet interactions;
-- a historical-integrity reference case.
+- a historical-integrity reference case;
+- (Phase D+) the Inspector-mode implementation, reachable from the map-first workspace rather than the sole default view.
 
 It is not the product's manually authored content template. No additional hand-authored scenes should be added before the generic package contract and deterministic mock generation pipeline exist.
 

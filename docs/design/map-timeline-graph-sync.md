@@ -2,6 +2,8 @@
 
 This is the concrete interaction contract implied by `interaction-principles.md` #1 and `information-architecture.md`'s focus model. It exists so Phase 1's mock implementation and Phase 3's full implementation agree on the same contract without a rewrite.
 
+**Phase D update:** this `Focus` contract (implemented as `FocusValue` in `src/features/investigation/model/focus.ts`) is extended, not replaced, by the map-first workspace — both the workspace and Inspector read/write the same shared focus. The workspace additionally introduces an **active lens** (Sequence/Positions/Knowledge/Systems/Sources/Uncertainty) as a second, orthogonal piece of state: focus selects *what*, the lens selects *which question the canvas is currently answering about it*. The already-defined-but-previously-unwired feedback-loop `source` tag this document specifies (§"Feedback-Loop Rule") gets its first real consumer in the workspace's timeline/map synchronization. See `docs/product/map-first-workspace-instructions.md` §10-12 and `docs/decisions/ADR-002-map-first-workspace.md`.
+
 ## Shared Focus State
 
 ```ts

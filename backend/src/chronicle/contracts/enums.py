@@ -190,3 +190,23 @@ class VerificationCheckStatus(str, Enum):
     PASSED = "passed"
     FAILED = "failed"
     ABSTAINED = "abstained"
+
+
+# --- experiencePlan.ts-only enums (Phase D, ADR-002) --------------------
+
+class PanelTab(str, Enum):
+    ASK = "ask"
+    EXPLORE = "explore"
+    EVIDENCE = "evidence"
+    SOURCES = "sources"
+
+
+class EvidenceDepth(str, Enum):
+    SHALLOW = "shallow"
+    STANDARD = "standard"
+    DEEP = "deep"
+
+
+class LensVisualization(str, Enum):
+    MAP = "map"
+    GRAPH = "graph"

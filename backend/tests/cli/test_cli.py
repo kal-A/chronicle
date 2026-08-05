@@ -118,7 +118,7 @@ def test_generate_with_concert_of_europe_provider_set_produces_real_content(tmp_
 
     inspect_out = io.StringIO()
     commands.cmd_inspect(store, run_id, out=inspect_out)
-    assert "provider set version: c3-concert-of-europe-v1" in inspect_out.getvalue()
+    assert "provider set version: d0.4-concert-of-europe-v2" in inspect_out.getvalue()
 
     package_path = store.load_run(run_id).outputPackagePath
     assert package_path is not None

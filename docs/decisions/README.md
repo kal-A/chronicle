@@ -16,3 +16,4 @@ ADRs capture architecturally-significant decisions — ones that are expensive t
 
 - [ADR-001: Explore-First Sequencing](ADR-001-explore-first.md) — accepted
 - [ADR: AI Generation Is the Product Core](ADR-ai-generation-is-the-product-core.md) — accepted; supersedes ADR-001 phase sequencing
+- [ADR-002: Map-First Investigation Workspace](ADR-002-map-first-workspace.md) — accepted; inserts Phase D, shifts former Phases D-K to E-L

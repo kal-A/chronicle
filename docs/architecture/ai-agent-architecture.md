@@ -51,6 +51,8 @@ User question
 
 The query planner and verification pass are the two places most likely to need iteration; both are deterministic checks wrapping the LLM call, not additional LLM calls trusted blindly.
 
+**Phase D update:** the assistant's UI-action output is now the typed `AssistantAction` union (`docs/product/map-first-workspace-instructions.md` §15, `docs/decisions/ADR-002-map-first-workspace.md`) — `FOCUS_LOCATION`, `FOCUS_EVENT`, `SET_TIME`, `SET_TIME_RANGE`, `ACTIVATE_LENS`, `HIGHLIGHT_EVENTS`, `HIGHLIGHT_RELATIONSHIP`, `SHOW_SYSTEM_PATH`, `COMPARE_ACTORS`, `OPEN_EVIDENCE`, `OPEN_SOURCE`, `RESET_VIEW`, superseding this section's looser "focus timeline/map/graph, open evidence" phrasing with a concrete, package-ID-validated action set. The assistant panel is also the initial (pre-generation) Ask entry surface, not only a post-generation feature — the query planner's first classification step now includes "this is a new investigation request," not just in-investigation question types.
+
 ## Tool Contracts
 
 Each bounded tool above has a typed Pydantic input/output schema, defined and versioned in the backend's AI orchestration layer (`backend-architecture.md`). Tool schemas are documented alongside their implementation, not duplicated here — this file defines the *shape* of the system, not the current field-level schemas.

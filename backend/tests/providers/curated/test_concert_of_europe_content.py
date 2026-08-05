@@ -6,7 +6,10 @@ covers exhaustively."""
 
 import json
 
-from chronicle.providers.curated.concert_of_europe.registry import CONCERT_OF_EUROPE_STAGE_FNS
+from chronicle.providers.curated.concert_of_europe.registry import (
+    CONCERT_OF_EUROPE_PROVIDER_SET_VERSION,
+    CONCERT_OF_EUROPE_STAGE_FNS,
+)
 from chronicle.storage.run_store import RunStore
 from chronicle.workflow.engine import generate
 
@@ -15,7 +18,7 @@ TOPIC = "The Concert of Europe and Revolutionary Intervention"
 
 def _generate_package(tmp_path):
     store = RunStore(tmp_path)
-    run = generate(store, TOPIC, CONCERT_OF_EUROPE_STAGE_FNS, "c3-concert-of-europe-v1")
+    run = generate(store, TOPIC, CONCERT_OF_EUROPE_STAGE_FNS, CONCERT_OF_EUROPE_PROVIDER_SET_VERSION)
     return json.loads(open(run.outputPackagePath, encoding="utf-8").read())
 
 

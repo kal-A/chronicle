@@ -14,6 +14,7 @@
 - **Combined-format value is unproven.** The entire product bets that narrative+timeline+map+graph+evidence synchronization is genuinely more understandable than existing formats. Phase 1 exists specifically to test this before further investment — if it fails, the roadmap after Phase 1 should be revisited, not pushed through regardless.
 - **Scope creep toward "model all of history."** Explicitly rejected in `AGENTS.md` §8 and `docs/product/product-principles.md`, but worth naming as an ongoing discipline risk given the shared-evidence-network's inherent appeal to expand — Phase 7 deliberately caps at two investigations to guard against this.
 - **Assistant becoming the de facto whole product.** Explicitly guarded against (`AGENTS.md` §4, `docs/design/interaction-principles.md` #5) but is a natural gravitational pull for any LLM-forward product; revisit if usage data (once it exists) shows the assistant dominating engagement at the expense of direct exploration.
+- **Map-first redesign (Phase D) regresses the article-first experience it's replacing as the default.** `docs/decisions/ADR-002-map-first-workspace.md` deliberately preserves the current renderer as Inspector rather than deleting it, and D0.3's plan calls for adapting (not silently dropping) `gate1-journey.spec.ts`/`InvestigationSync.test.tsx` — but a UI restructure this large is exactly the kind of change where accessibility or synchronization regressions are easy to miss; treat every sub-plan's verification step as load-bearing, not a formality.
 
 ## Historical-Research Risks
 

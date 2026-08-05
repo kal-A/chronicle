@@ -9,12 +9,13 @@ from .composition import compose_investigation
 from .corpus import assemble_corpus
 from .entities import extract_entities
 from .events import extract_events
+from .experience_plan import attach_experience_plan
 from .geography import assemble_geography
 from .relationships import propose_relationships
 from .sources import assess_sources, discover_source_candidates, prepare_discovery_queries, propose_scope
 from .timeline import build_timeline
 
-CONCERT_OF_EUROPE_PROVIDER_SET_VERSION = "c3-concert-of-europe-v1"
+CONCERT_OF_EUROPE_PROVIDER_SET_VERSION = "d0.4-concert-of-europe-v2"
 
 
 def _compose(*fns):
@@ -35,6 +36,6 @@ CONCERT_OF_EUROPE_STAGE_FNS = {
     StageName.HISTORICAL_MODEL_ASSEMBLED: _compose(
         extract_entities, extract_events, extract_claims, propose_relationships, build_timeline, assemble_geography
     ),
-    StageName.INVESTIGATION_COMPOSED: compose_investigation,
+    StageName.INVESTIGATION_COMPOSED: _compose(compose_investigation, attach_experience_plan),
     StageName.VERIFIED: verify_investigation,
 }

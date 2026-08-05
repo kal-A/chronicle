@@ -11,14 +11,17 @@ export function TimelineView({
   scene,
   focus,
   onSelectFocus,
+  eventIds,
 }: {
   scene: Scene
   focus: FocusValue
   onSelectFocus: (focus: FocusValue) => void
+  /** Phase D workspace: restrict to the active lens's visible events. Omitted (Inspector) shows every event in the scene, unchanged. */
+  eventIds?: Set<string>
 }) {
-  const events = [...scene.events].sort(
-    (a, b) => (a.eventTime.earliest < b.eventTime.earliest ? -1 : 1),
-  )
+  const events = [...scene.events]
+    .filter((event) => !eventIds || eventIds.has(event.id))
+    .sort((a, b) => (a.eventTime.earliest < b.eventTime.earliest ? -1 : 1))
 
   if (events.length === 0) {
     return (

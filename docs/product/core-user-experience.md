@@ -1,6 +1,6 @@
 # Core User Experience
 
-> This document defines the investigation-canvas capabilities. The generation-first request/scope/workflow experience that now precedes the canvas is defined in `generation-first-user-experience.md`.
+> This document defines the investigation-canvas capabilities. The generation-first request/scope/workflow experience that now precedes the canvas is defined in `generation-first-user-experience.md`. Starting Phase D, the canvas itself is map-first (persistent map + docked/sheet assistant panel + lenses), with items 1/3/6/7/8 below primarily surfaced through the panel's Explore/Evidence tabs or the Inspector rather than a single scrolling article — see `docs/product/map-first-workspace-instructions.md`.
 
 Chronicle's value proposition is defined by ten things a user should be able to do that static articles, generic chatbots, and ordinary timelines don't do well. Every feature should map back to at least one of these.
 

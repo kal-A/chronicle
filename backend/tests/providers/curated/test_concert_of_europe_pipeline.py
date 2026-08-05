@@ -6,7 +6,10 @@ for the real, curated (not mock) provider set."""
 import json
 
 from chronicle.contracts.validation import validate_generated_investigation
-from chronicle.providers.curated.concert_of_europe.registry import CONCERT_OF_EUROPE_STAGE_FNS
+from chronicle.providers.curated.concert_of_europe.registry import (
+    CONCERT_OF_EUROPE_PROVIDER_SET_VERSION,
+    CONCERT_OF_EUROPE_STAGE_FNS,
+)
 from chronicle.storage.run_store import RunStore
 from chronicle.workflow.engine import generate
 from chronicle.workflow.stages import STAGE_ORDER
@@ -16,7 +19,7 @@ TOPIC = "The Concert of Europe and Revolutionary Intervention"
 
 def test_generate_produces_a_schema_valid_package(tmp_path):
     store = RunStore(tmp_path)
-    run = generate(store, TOPIC, CONCERT_OF_EUROPE_STAGE_FNS, "c3-concert-of-europe-v1")
+    run = generate(store, TOPIC, CONCERT_OF_EUROPE_STAGE_FNS, CONCERT_OF_EUROPE_PROVIDER_SET_VERSION)
 
     assert run.completedStages == STAGE_ORDER
     assert run.outputPackagePath is not None
@@ -31,8 +34,8 @@ def test_identical_topic_produces_byte_identical_packages(tmp_path):
     store_a = RunStore(tmp_path / "a")
     store_b = RunStore(tmp_path / "b")
 
-    run_a = generate(store_a, TOPIC, CONCERT_OF_EUROPE_STAGE_FNS, "c3-concert-of-europe-v1")
-    run_b = generate(store_b, TOPIC, CONCERT_OF_EUROPE_STAGE_FNS, "c3-concert-of-europe-v1")
+    run_a = generate(store_a, TOPIC, CONCERT_OF_EUROPE_STAGE_FNS, CONCERT_OF_EUROPE_PROVIDER_SET_VERSION)
+    run_b = generate(store_b, TOPIC, CONCERT_OF_EUROPE_STAGE_FNS, CONCERT_OF_EUROPE_PROVIDER_SET_VERSION)
 
     assert run_a.runId != run_b.runId
     package_a = json.loads(open(run_a.outputPackagePath, encoding="utf-8").read())

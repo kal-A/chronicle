@@ -1,5 +1,7 @@
 # Information Architecture
 
+> **Superseded as the default IA starting Phase D.** Narrative is no longer the default entry point — the map-first workspace is, with narrative reading preserved as Inspector content. See `docs/product/map-first-workspace-instructions.md` §1 and `docs/decisions/ADR-002-map-first-workspace.md`. The Selection/Focus Model section below (a single `focus` concept every facet projects) remains accurate and unchanged — the workspace and Inspector share it.
+
 ## Top-Level Structure
 
 ```text

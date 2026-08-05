@@ -385,7 +385,7 @@
     {
       "id": "evidence-claim-verona-spain-1",
       "passageId": "passage-troppau-protocol-1",
-      "reviewerNote": "Supported only indirectly, via continuity with the Troppau doctrine \u2014 no dedicated Verona primary document was independently curated in this pass. See generationReport.omissions.",
+      "reviewerNote": "Supported only indirectly, via continuity with the Troppau doctrine — no dedicated Verona primary document was independently curated in this pass. See generationReport.omissions.",
       "role": "supporting",
       "targetId": "claim-verona-spain",
       "targetType": "claim"
@@ -419,6 +419,244 @@
       "targetType": "relationship"
     }
   ],
+  "experiencePlan": {
+    "contextualPrompts": [],
+    "inspector": {
+      "defaultEvidenceDepth": "standard",
+      "exposeGenerationReport": true,
+      "exposeRejectedSources": false
+    },
+    "lenses": [
+      {
+        "applicableTimeRange": {
+          "earliest": "1814-09-18",
+          "latest": "1822-12-14",
+          "precision": "range"
+        },
+        "evidenceReferences": [
+          "evidence-event-vienna-1"
+        ],
+        "historicalQuestion": "What happened, where, and in what order?",
+        "id": "lens-sequence",
+        "label": "Sequence",
+        "legend": [],
+        "limitations": [],
+        "purpose": "Show what happened, where, and in what order.",
+        "textFallback": [
+          "1. Vienna — Congress of Vienna, 18 September 1814 to 9 June 1815",
+          "2. Troppau — Troppau Protocol signed, 19 November 1820",
+          "3. Laibach — Austrian intervention in Naples authorized, early 1821",
+          "4. Naples — Austrian forces suppress the constitutional government, March 1821",
+          "5. Verona — French intervention in Spain authorized, 20 October to 14 December 1822"
+        ],
+        "visibleEvents": [
+          "event-congress-of-vienna",
+          "event-troppau-protocol",
+          "event-laibach-authorization",
+          "event-naples-intervention",
+          "event-congress-of-verona"
+        ],
+        "visibleLocations": [
+          "place-vienna",
+          "place-troppau",
+          "place-laibach",
+          "place-naples",
+          "place-verona"
+        ],
+        "visibleRegions": [],
+        "visibleRelationships": [],
+        "visualizationType": "map"
+      },
+      {
+        "applicableTimeRange": {
+          "earliest": "1820-11-19",
+          "latest": "1822-12-14",
+          "precision": "range"
+        },
+        "evidenceReferences": [
+          "evidence-claim-troppau-doctrine-1"
+        ],
+        "historicalQuestion": "What mechanisms and relationships connected the selected events?",
+        "id": "lens-systems",
+        "label": "Systems",
+        "legend": [],
+        "limitations": [
+          "The Verona extension is supported only indirectly, via continuity with the Troppau doctrine."
+        ],
+        "purpose": "Show the mechanism connecting Troppau's doctrine to Naples, Britain's dissent, and its weaker extension to Verona.",
+        "textFallback": [
+          "Troppau doctrine — establishes the doctrine invoked by — Naples intervention",
+          "Castlereagh's dissent — disputes — Troppau doctrine",
+          "Verona/Spain — extends (indirectly supported) — Troppau doctrine"
+        ],
+        "visibleEvents": [],
+        "visibleLocations": [],
+        "visibleRegions": [],
+        "visibleRelationships": [
+          "rel-troppau-supports-naples",
+          "rel-castlereagh-disputes-troppau",
+          "rel-verona-extends-troppau"
+        ],
+        "visualizationType": "graph"
+      },
+      {
+        "applicableTimeRange": {
+          "earliest": "1822-10-20",
+          "latest": "1822-12-14",
+          "precision": "range"
+        },
+        "evidenceReferences": [],
+        "historicalQuestion": "Which parts remain weak, approximate, disputed, or unsupported?",
+        "id": "lens-uncertainty",
+        "label": "Uncertainty",
+        "legend": [],
+        "limitations": [
+          "No dedicated Congress of Verona primary document was independently curated in this pass.",
+          "No period-accurate map is attached to this scene — the only curated plate documents the 1815 Vienna settlement."
+        ],
+        "purpose": "Show which parts of this investigation remain weak, approximate, or unsupported.",
+        "textFallback": [
+          "Weak: the Verona/Spain claim rests on continuity with Troppau, not a dedicated Verona source.",
+          "Absent: no period map for 1820-1822 — disclosed, not hidden."
+        ],
+        "visibleEvents": [
+          "event-congress-of-verona"
+        ],
+        "visibleLocations": [
+          "place-verona"
+        ],
+        "visibleRegions": [],
+        "visibleRelationships": [
+          "rel-verona-extends-troppau"
+        ],
+        "visualizationType": "map"
+      }
+    ],
+    "limitations": [],
+    "opening": {
+      "evidenceCoverageSummary": "Three primary diplomatic sources, with two disclosed sourcing gaps.",
+      "leadAnswer": "The intervention principle moved from declaration at Troppau to practical application at Laibach and Naples, while Britain rejected its use as a general licence to police revolutions. Its later extension through Verona is less directly supported in the current corpus.",
+      "question": "How did the Concert of Europe respond to revolutionary movements?",
+      "scopeSummary": "Vienna, Troppau, Laibach, Naples, and Verona, 1814-1822."
+    },
+    "perspectiveComparisons": [
+      {
+        "claimIds": [
+          "claim-troppau-doctrine",
+          "claim-castlereagh-dissent"
+        ],
+        "entityIds": [
+          "person-metternich",
+          "person-castlereagh"
+        ],
+        "id": "comparison-metternich-castlereagh",
+        "summary": "Austria asserted a general right of intervention; Britain rejected it as unmoored from the 1815 Alliance's original purpose.",
+        "title": "Metternich vs. Castlereagh on intervention"
+      }
+    ],
+    "recommendedSelections": [],
+    "storySequences": [
+      {
+        "defaultLensId": "lens-sequence",
+        "defaultTimeRange": {
+          "earliest": "1820-11-19",
+          "latest": "1821-03-24",
+          "precision": "range"
+        },
+        "id": "story-troppau-to-naples",
+        "stepIds": [
+          "event-troppau-protocol",
+          "event-laibach-authorization",
+          "event-naples-intervention"
+        ],
+        "summary": "The Troppau Protocol, its authorization at Laibach, and its execution in Naples.",
+        "title": "From doctrine to intervention"
+      }
+    ],
+    "systemPaths": [
+      {
+        "id": "path-intervention-doctrine",
+        "lensId": "lens-systems",
+        "limitations": [
+          "The Verona edge is indirectly supported only."
+        ],
+        "nodeIds": [
+          "claim-troppau-doctrine",
+          "claim-naples-intervention",
+          "claim-castlereagh-dissent",
+          "claim-verona-spain"
+        ],
+        "relationshipIds": [
+          "rel-troppau-supports-naples",
+          "rel-castlereagh-disputes-troppau",
+          "rel-verona-extends-troppau"
+        ],
+        "summary": "Troppau establishes the doctrine invoked at Naples; Britain disputes it; Verona extends it with weaker support.",
+        "title": "The intervention doctrine"
+      }
+    ],
+    "workspace": {
+      "defaultPanelWidth": 380,
+      "initialLensId": "lens-sequence",
+      "initialMapScope": {
+        "bounds": {
+          "bottomLeft": {
+            "lat": 36.0,
+            "lng": -2.0
+          },
+          "bottomRight": {
+            "lat": 36.0,
+            "lng": 27.0
+          },
+          "topLeft": {
+            "lat": 60.0,
+            "lng": -2.0
+          },
+          "topRight": {
+            "lat": 60.0,
+            "lng": 27.0
+          }
+        },
+        "contextRegions": [
+          {
+            "id": "region-southern-europe",
+            "label": "Southern Europe"
+          }
+        ],
+        "focusRegions": [
+          {
+            "id": "region-central-europe",
+            "label": "Central Europe"
+          }
+        ],
+        "geographicLimitations": [
+          "The only curated period map (Shepherd, 1815) is scoped to the Vienna scene only — see docs/research/concert-of-europe-map-source.md."
+        ],
+        "geographicRationale": "Vienna, Troppau, Laibach, Naples, and Verona are the five active locations.",
+        "initialViewport": {
+          "center": {
+            "lat": 48.2082,
+            "lng": 16.3738
+          },
+          "zoom": 4.0
+        },
+        "maximumZoom": 8.0,
+        "minimumZoom": 3.0,
+        "representedPeriod": {
+          "earliest": "1814-09-18",
+          "latest": "1822-12-14",
+          "precision": "range"
+        },
+        "unavailableHistoricalBoundaries": []
+      },
+      "initialPanelTab": "explore",
+      "initialTimeRange": {
+        "earliest": "1814-09-18",
+        "latest": "1822-12-14",
+        "precision": "range"
+      }
+    }
+  },
   "generatedAt": "2000-01-01T00:00:00Z",
   "generationReport": {
     "omissions": [
@@ -465,7 +703,7 @@
       }
     ],
     "warnings": [
-      "This package is real, hand-researched content curated for Phase C3 \u2014 unlike Phase C2's mock packages, it is not synthetic, but it is a prototype curation pass (see each Source's knownLimitations and this report's omissions), not independently peer-reviewed scholarship."
+      "This package is real, hand-researched content curated for Phase C3 — unlike Phase C2's mock packages, it is not synthetic, but it is a prototype curation pass (see each Source's knownLimitations and this report's omissions), not independently peer-reviewed scholarship."
     ]
   },
   "interactionSpec": {
@@ -855,7 +1093,7 @@
         "precision": "exact"
       },
       "id": "source-troppau-protocol",
-      "knownLimitations": "The quoted sentence below is independently corroborated with consistent wording across multiple secondary descriptions of the Protocol (used as a direct quotation for that reason). A directly hosted full primary-text transcription was not located and verified in this curation pass \u2014 an explicit, disclosed gap, not a silently resolved one.",
+      "knownLimitations": "The quoted sentence below is independently corroborated with consistent wording across multiple secondary descriptions of the Protocol (used as a direct quotation for that reason). A directly hosted full primary-text transcription was not located and verified in this curation pass — an explicit, disclosed gap, not a silently resolved one.",
       "linkOrLocation": "https://en.wikisource.org/wiki/1911_Encyclop%C3%A6dia_Britannica/Troppau,_Congress_of",
       "originalLanguage": "French (English translation cited)",
       "rightsStatus": "public-domain",

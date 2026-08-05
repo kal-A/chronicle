@@ -24,6 +24,8 @@ The assistant operates only over an approved generated package and its permitted
 
 Read tools enforce package/workspace/visibility boundaries. UI tools return typed actions that the frontend validates; the model never emits arbitrary JavaScript.
 
+**Phase D update:** the four UI tools above (`focus_timeline`, `focus_map`, `highlight_relationship_path`, `open_evidence`) are the assistant-facing subset of the broader typed `AssistantAction` union the map-first workspace dispatches (`docs/product/map-first-workspace-instructions.md` §15) — `SET_TIME`/`SET_TIME_RANGE`, `ACTIVATE_LENS`, `HIGHLIGHT_EVENTS`, `SHOW_SYSTEM_PATH`, `COMPARE_ACTORS`, `OPEN_SOURCE`, and `RESET_VIEW` are new siblings, all executing by calling the same frontend selection/focus state the existing four tools already target — not a second, parallel action system. See `docs/decisions/ADR-002-map-first-workspace.md`.
+
 ## First Question Classes
 
 1. Explain an event or connection.

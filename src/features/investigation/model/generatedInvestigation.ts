@@ -16,6 +16,10 @@ import {
   VisibilitySchema,
   type EvidenceLink,
 } from './schema'
+import {
+  InvestigationExperiencePlanSchema,
+  validateExperiencePlanReferences,
+} from './experiencePlan'
 
 export const SUPPORTED_GENERATED_INVESTIGATION_VERSION = '1.0.0'
 
@@ -265,6 +269,13 @@ export const GeneratedInvestigationSchema = z.object({
   scenes: z.array(InvestigationSceneSchema).min(1),
   interactionSpec: InteractionSpecificationSchema,
   generationReport: GenerationReportSchema,
+  /**
+   * Phase D, optional/additive (docs/decisions/ADR-002-map-first-workspace.md)
+   * — existing packages remain valid without one; a package that has one
+   * gets it cross-reference-validated below, same discipline as every other
+   * field.
+   */
+  experiencePlan: InvestigationExperiencePlanSchema.optional(),
 })
 export type GeneratedInvestigation = z.infer<
   typeof GeneratedInvestigationSchema
@@ -277,7 +288,7 @@ export class GeneratedInvestigationValidationError extends Error {
   }
 }
 
-function fail(message: string): never {
+export function fail(message: string): never {
   throw new GeneratedInvestigationValidationError(message)
 }
 
@@ -285,7 +296,7 @@ function idsOf(records: { id: string }[]) {
   return new Set(records.map((record) => record.id))
 }
 
-function requireReference(
+export function requireReference(
   ids: Set<string>,
   id: string,
   owner: string,
@@ -386,6 +397,35 @@ export function validateGeneratedInvestigation(
     { name: 'scenes', records: investigation.scenes },
     { name: 'synthesis', records: investigation.presentation.synthesis },
     { name: 'findings', records: investigation.presentation.findings },
+    ...(investigation.experiencePlan
+      ? [
+          { name: 'lenses', records: investigation.experiencePlan.lenses },
+          {
+            name: 'storySequences',
+            records: investigation.experiencePlan.storySequences,
+          },
+          {
+            name: 'systemPaths',
+            records: investigation.experiencePlan.systemPaths,
+          },
+          {
+            name: 'perspectiveComparisons',
+            records: investigation.experiencePlan.perspectiveComparisons,
+          },
+          {
+            name: 'contextualPrompts',
+            records: investigation.experiencePlan.contextualPrompts,
+          },
+          {
+            name: 'recommendedSelections',
+            records: investigation.experiencePlan.recommendedSelections,
+          },
+          {
+            name: 'limitations',
+            records: investigation.experiencePlan.limitations,
+          },
+        ]
+      : []),
   ])
 
   const entityIds = idsOf(investigation.entities)
@@ -736,6 +776,36 @@ export function validateGeneratedInvestigation(
         fail(`Published package Document "${document.id}" must be public`)
       }
     }
+  }
+
+  if (investigation.experiencePlan) {
+    const anyRecordIds = new Set([
+      ...entityIds,
+      ...eventIds,
+      ...claimIds,
+      ...relationshipIds,
+      ...knowledgeStateIds,
+      ...idsOf(investigation.decisions),
+      ...idsOf(investigation.communications),
+      ...sourceIds,
+      ...documentIds,
+    ])
+    validateExperiencePlanReferences(
+      investigation.experiencePlan,
+      {
+        placeIds,
+        eventIds,
+        claimIds,
+        relationshipIds,
+        entityIds,
+        sourceIds,
+        passageIds,
+        sceneIds,
+        evidenceLinkIds: new Set(linksById.keys()),
+        anyRecordIds,
+      },
+      { requireReference },
+    )
   }
 
   return investigation

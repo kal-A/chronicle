@@ -12,6 +12,10 @@ Every geographic reference carries a precision tag: `building` / `city` / `regio
 
 MapLibre GL JS on the frontend. Base map layers are tagged with the historical period(s) they are valid for; a modern reference basemap may be shown as a subdued, explicitly labelled orientation layer. Period political boundaries are rendered only when sourced historical geometry exists. When it does not, Chronicle uses a neutral/border-suppressed base rather than substituting modern political borders (`historical-methodology.md`).
 
+## MapScope (Phase D)
+
+Starting Phase D, every investigation's map-first workspace opens to a bounded `MapScope` (`docs/product/map-first-workspace-instructions.md` §3, `docs/decisions/ADR-002-map-first-workspace.md`) — `bounds`, `focusRegions`, `contextRegions`, an `initialViewport`/zoom range, a `geographicRationale`, the `representedPeriod`, and disclosed `unavailableHistoricalBoundaries`/`geographicLimitations`. The map must never default to a whole-world view: it includes the locations required to understand the investigation plus enough surrounding geography for orientation, and excludes irrelevant global space. This is generated content on the `InvestigationExperiencePlan`, validated the same way every other package reference is (rule additions to `validateGeneratedInvestigation`/`validate_generated_investigation`), not client-computed from raw scene bounds — consistent with this document's existing precision/period-fit discipline, just applied one level up (workspace viewport, not just individual place markers).
+
 ## Scope for July Crisis (Phase 1–3)
 
 The July Crisis spans a small number of capitals and specific sites over five weeks in 1914. Phase 1–3 does not require political polygons to test city-level movement between scenes. A small hand-curated set of period-accurate place records, correctly named and labelled for 1914, is sufficient; the map uses a border-suppressed orientation base. Complex historical or disputed-geography polygons are explicitly out of scope until an investigation requires them (`AGENTS.md` §12).

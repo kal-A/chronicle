@@ -17,6 +17,8 @@ EXPECTED_MESSAGE_FRAGMENTS = {
     "claim-without-supporting-evidence": "requires a supporting EvidenceLink",
     "disputed-relationship-missing-counterevidence": "requires supporting and counterevidence links",
     "overprecise-map-marker": "exceeds Place",
+    "experience-plan-unknown-location": "unknown Place",
+    "experience-plan-unknown-initial-lens": "unknown InvestigationLens",
 }
 
 

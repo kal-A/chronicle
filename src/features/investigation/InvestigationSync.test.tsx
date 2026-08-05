@@ -9,6 +9,12 @@ import { InvestigationPage } from './InvestigationPage'
  * Plan 4 requirement: "Make selection in each facet update every other
  * facet through the central Focus contract" — tested end to end here rather
  * than trusted from the unit-level Focus tests alone.
+ *
+ * Phase D: this exercises Inspector mode specifically, since Inspector is
+ * where the narrative/map/graph/evidence five-facet sync this test proves
+ * still lives unchanged (docs/decisions/ADR-002-map-first-workspace.md) —
+ * the map-first workspace built in D0.3 has its own, simpler sync (lens +
+ * map/timeline + shallow panel tabs), not this five-facet mechanism.
  */
 function renderPage() {
   const queryClient = new QueryClient({
@@ -24,7 +30,7 @@ function renderPage() {
         <Routes>
           <Route
             path="/investigations/:packageId/scenes/:sceneId"
-            element={<InvestigationPage />}
+            element={<InvestigationPage mode="inspector" />}
           />
         </Routes>
       </MemoryRouter>

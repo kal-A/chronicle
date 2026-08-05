@@ -8,17 +8,21 @@ React + TypeScript + Vite, Tailwind CSS for styling, TanStack Query for server s
 
 The frontend accepts a validated, supported-version `GeneratedInvestigation` package, normalizes it, and renders a progressive investigation canvas. Narrative, timeline, map, graph, and evidence remain synchronized through a single Focus state. The renderer contains no event-specific imports or generated code.
 
+**Phase D update (map-first workspace, see `docs/decisions/ADR-002-map-first-workspace.md`):** this principle is extended, not replaced. The map becomes the persistent primary canvas with a docked/bottom-sheet assistant panel beside it, driven by an optional `InvestigationExperiencePlan` and a lens registry; the original article-first narrative/evidence/numbered-graph renderer is preserved as an "Inspector" mode rather than deleted. The single shared Focus state remains the synchronization mechanism for both the workspace and Inspector — no second, parallel selection system.
+
 ```text
 src/
   features/
-    generation/           # request, scope approval, workflow/report UI (Phase I)
+    generation/           # request, scope approval, workflow/report UI (Phase J)
     investigation/        # package loader + synchronized canvas/facets
-      narrative/
-      timeline/
-      map/
-      graph/
-      evidence/
-      assistant/           # typed package/corpus tools (Phase J)
+      narrative/           # Inspector-hosted
+      timeline/            # shared base; workspace/timeline/ extends it
+      map/                 # shared base; workspace/canvas/ extends it
+      graph/               # Inspector-hosted (numbered claim/relationship graph)
+      evidence/            # Inspector-hosted (full evidence/provenance view)
+      workspace/           # Phase D: map-first shell, docked/sheet panel, lenses
+      inspector/           # Phase D: rehosts narrative/evidence/graph as a mode
+      assistant/           # typed package/corpus tools (Phase K)
     studio/                # later review/enrichment UI
   shared/
     api/                   # typed API client generated/derived from backend OpenAPI schema

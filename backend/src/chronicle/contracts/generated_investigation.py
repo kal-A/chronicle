@@ -41,6 +41,7 @@ from .enums import (
     VerificationCheckStatus,
     Visibility,
 )
+from .experience_plan import InvestigationExperiencePlan
 from .shared import (
     Document,
     Entity,
@@ -298,3 +299,6 @@ class GeneratedInvestigation(BaseModel):
     scenes: list[InvestigationScene] = Field(min_length=1)
     interactionSpec: InteractionSpecification
     generationReport: GenerationReport
+    # Phase D, optional/additive (docs/decisions/ADR-002-map-first-workspace.md)
+    # -- existing packages remain valid without one.
+    experiencePlan: InvestigationExperiencePlan | None = None

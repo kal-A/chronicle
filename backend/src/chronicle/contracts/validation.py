@@ -12,6 +12,7 @@ from typing import Any, Iterable
 
 from pydantic import ValidationError
 
+from .experience_plan import InvestigationExperiencePlan
 from .generated_investigation import (
     SUPPORTED_GENERATED_INVESTIGATION_VERSION,
     GeneratedInvestigation,
@@ -55,6 +56,94 @@ def _ensure_unique_ids(collections: list[tuple[str, list[Any]]]) -> None:
             owners[record.id] = name
 
 
+def _validate_experience_plan_references(
+    plan: InvestigationExperiencePlan,
+    place_ids: set[str],
+    event_ids: set[str],
+    claim_ids: set[str],
+    relationship_ids: set[str],
+    entity_ids: set[str],
+    source_ids: set[str],
+    passage_ids: set[str],
+    scene_ids: set[str],
+    evidence_link_ids: set[str],
+    any_record_ids: set[str],
+) -> None:
+    """Mirrors validateExperiencePlanReferences() in experiencePlan.ts —
+    cross-reference validation for the optional InvestigationExperiencePlan,
+    same discipline as every other package reference."""
+    lens_ids = {lens.id for lens in plan.lenses}
+
+    for lens in plan.lenses:
+        for record_id in lens.visibleLocations:
+            _require_reference(place_ids, record_id, f'Lens "{lens.id}"', "Place")
+        for record_id in lens.visibleEvents:
+            _require_reference(event_ids, record_id, f'Lens "{lens.id}"', "Event")
+        for record_id in lens.visibleRelationships:
+            _require_reference(relationship_ids, record_id, f'Lens "{lens.id}"', "Relationship")
+        for record_id in lens.evidenceReferences:
+            _require_reference(evidence_link_ids, record_id, f'Lens "{lens.id}"', "EvidenceLink")
+
+    _require_reference(
+        lens_ids, plan.workspace.initialLensId, "InvestigationExperiencePlan.workspace", "InvestigationLens"
+    )
+
+    for sequence in plan.storySequences:
+        for step_id in sequence.stepIds:
+            _require_reference(event_ids, step_id, f'StorySequence "{sequence.id}"', "Event")
+        _require_reference(
+            lens_ids, sequence.defaultLensId, f'StorySequence "{sequence.id}"', "InvestigationLens"
+        )
+
+    for path in plan.systemPaths:
+        _require_reference(lens_ids, path.lensId, f'SystemPath "{path.id}"', "InvestigationLens")
+        for node_id in path.nodeIds:
+            _require_reference(any_record_ids, node_id, f'SystemPath "{path.id}"', "record")
+        for relationship_id in path.relationshipIds:
+            _require_reference(relationship_ids, relationship_id, f'SystemPath "{path.id}"', "Relationship")
+
+    for comparison in plan.perspectiveComparisons:
+        for entity_id in comparison.entityIds:
+            _require_reference(entity_ids, entity_id, f'PerspectiveComparison "{comparison.id}"', "Entity")
+        for claim_id in comparison.claimIds:
+            _require_reference(claim_ids, claim_id, f'PerspectiveComparison "{comparison.id}"', "Claim")
+
+    for prompt_set in plan.contextualPrompts:
+        for prompt in prompt_set.prompts:
+            if prompt.targetLensId:
+                _require_reference(
+                    lens_ids,
+                    prompt.targetLensId,
+                    f'ContextualPromptSet "{prompt_set.id}" prompt "{prompt.id}"',
+                    "InvestigationLens",
+                )
+
+    selection_targets = {
+        "scene": scene_ids,
+        "event": event_ids,
+        "entity": entity_ids,
+        "claim": claim_ids,
+        "relationship": relationship_ids,
+        "source": source_ids,
+        "passage": passage_ids,
+    }
+    for selection in plan.recommendedSelections:
+        if selection.kind.value == "timeRange":
+            continue
+        _require_reference(
+            selection_targets[selection.kind.value],
+            selection.recordId,
+            f'SelectionTarget "{selection.id}"',
+            selection.kind.value,
+        )
+
+    for limitation in plan.limitations:
+        for lens_id in limitation.affectedLensIds:
+            _require_reference(
+                lens_ids, lens_id, f'InvestigationLimitation "{limitation.id}"', "InvestigationLens"
+            )
+
+
 def _evidence_for(
     record: Any,
     expected_type: str,
@@ -91,6 +180,19 @@ def validate_generated_investigation(data: Any) -> GeneratedInvestigation:
         )
 
     # Rule 2: global ID uniqueness across every collection.
+    experience_plan_collections: list[tuple[str, list[Any]]] = []
+    if investigation.experiencePlan is not None:
+        plan = investigation.experiencePlan
+        experience_plan_collections = [
+            ("lenses", plan.lenses),
+            ("storySequences", plan.storySequences),
+            ("systemPaths", plan.systemPaths),
+            ("perspectiveComparisons", plan.perspectiveComparisons),
+            ("contextualPrompts", plan.contextualPrompts),
+            ("recommendedSelections", plan.recommendedSelections),
+            ("limitations", plan.limitations),
+        ]
+
     _ensure_unique_ids([
         ("entities", investigation.entities),
         ("events", investigation.events),
@@ -114,6 +216,7 @@ def validate_generated_investigation(data: Any) -> GeneratedInvestigation:
         ("scenes", investigation.scenes),
         ("synthesis", investigation.presentation.synthesis),
         ("findings", investigation.presentation.findings),
+        *experience_plan_collections,
     ])
 
     entity_ids = _ids_of(investigation.entities)
@@ -295,5 +398,32 @@ def validate_generated_investigation(data: Any) -> GeneratedInvestigation:
         for document in investigation.documents:
             if document.visibility.value != "public":
                 _fail(f'Published package Document "{document.id}" must be public')
+
+    # Rule 21: InvestigationExperiencePlan cross-references (optional, Phase D).
+    if investigation.experiencePlan is not None:
+        any_record_ids = (
+            entity_ids
+            | event_ids
+            | claim_ids
+            | relationship_ids
+            | knowledge_state_ids
+            | _ids_of(investigation.decisions)
+            | _ids_of(investigation.communications)
+            | source_ids
+            | document_ids
+        )
+        _validate_experience_plan_references(
+            investigation.experiencePlan,
+            place_ids=place_ids,
+            event_ids=event_ids,
+            claim_ids=claim_ids,
+            relationship_ids=relationship_ids,
+            entity_ids=entity_ids,
+            source_ids=source_ids,
+            passage_ids=passage_ids,
+            scene_ids=scene_ids,
+            evidence_link_ids=set(links_by_id.keys()),
+            any_record_ids=any_record_ids,
+        )
 
     return investigation

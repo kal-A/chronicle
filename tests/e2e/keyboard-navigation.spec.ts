@@ -8,10 +8,24 @@ import { test, expect } from '@playwright/test'
  * docs/delivery/validation/phase-1-gate-1-template.md for what remains
  * manual — but it does guard against the most common regression: an
  * interactive element that's mouse-only.
+ *
+ * Phase D: the timeline test below still exercises the map-first workspace
+ * (its default lens includes every event, same as before). The Map/Graph
+ * tab and narrative-button tests exercise mechanics that now live in
+ * Inspector mode only (docs/decisions/ADR-002-map-first-workspace.md) — see
+ * workspace-journey.spec.ts for the new panel-tab keyboard-navigation
+ * equivalent in the workspace itself.
+ *
+ * Phase D0.5: `/` is now the Ask entry surface (ask-entry-journey.spec.ts),
+ * not an automatic redirect into the workspace, so this timeline test goes
+ * straight to the workspace URL it actually needs.
  */
 
+const WORKSPACE_URL = '/investigations/blank-cheque-golden/scenes/scene-2-blank-cheque'
+const INSPECTOR_URL = '/investigations/blank-cheque-golden/scenes/scene-2-blank-cheque/inspector'
+
 test('a timeline event is reachable and activatable by keyboard alone', async ({ page }) => {
-  await page.goto('/')
+  await page.goto(WORKSPACE_URL)
   const eventButton = page.getByRole('button', {
     name: /vienna's ultimatum deliberations/i,
   })
@@ -24,10 +38,10 @@ test('a timeline event is reachable and activatable by keyboard alone', async ({
   await expect(eventButton).toHaveAttribute('aria-current', 'true')
 })
 
-test('the map/graph toggle supports arrow-key navigation per the ARIA tabs pattern', async ({
+test('Inspector: the map/graph toggle supports arrow-key navigation per the ARIA tabs pattern', async ({
   page,
 }) => {
-  await page.goto('/')
+  await page.goto(INSPECTOR_URL)
   const mapTab = page.getByRole('tab', { name: 'Map' })
   const graphTab = page.getByRole('tab', { name: 'Relationships' })
   await mapTab.waitFor()
@@ -45,8 +59,8 @@ test('the map/graph toggle supports arrow-key navigation per the ARIA tabs patte
   await expect(mapTab).toHaveAttribute('aria-selected', 'true')
 })
 
-test('keyboard focus is visibly indicated', async ({ page }) => {
-  await page.goto('/')
+test('Inspector: keyboard focus is visibly indicated', async ({ page }) => {
+  await page.goto(INSPECTOR_URL)
   const firstNarrativeButton = page.getByRole('button', {
     name: /szögyény met with wilhelm/i,
   })

@@ -24,13 +24,17 @@ export function MapView({
   scene,
   focus,
   onSelectFocus,
+  placeIds,
 }: {
   scene: Scene
   focus: FocusValue
   onSelectFocus: (focus: FocusValue) => void
+  /** Phase D workspace: restrict to the active lens's visible places. Omitted (Inspector) shows every place in the scene, unchanged. */
+  placeIds?: Set<string>
 }) {
   const places = scene.entities.filter(
-    (e): e is PlaceEntity => e.entityType === 'place',
+    (e): e is PlaceEntity =>
+      e.entityType === 'place' && (!placeIds || placeIds.has(e.id)),
   )
 
   return (

@@ -23,6 +23,8 @@ Phase 4 ships four of these, polished, rather than all ten shallowly: *explain t
 
 An answer may focus the timeline, move the map to relevant locations, highlight graph nodes/relationships, open source passages, compare interpretations, or suggest a guided path through the investigation. The assistant is a navigation layer over the other four views, not a fifth, separate surface.
 
+**Phase D update:** the assistant's UI surface is now the docked/bottom-sheet panel's persistent Ask tab, present from the initial (pre-generation) Ask entry surface through the full map-first workspace — not a feature reachable only after a package exists. Its actions are formalized as a typed `AssistantAction` union (`FOCUS_LOCATION`, `FOCUS_EVENT`, `SET_TIME`, `SET_TIME_RANGE`, `ACTIVATE_LENS`, `HIGHLIGHT_EVENTS`, `HIGHLIGHT_RELATIONSHIP`, `SHOW_SYSTEM_PATH`, `COMPARE_ACTORS`, `OPEN_EVIDENCE`, `OPEN_SOURCE`, `RESET_VIEW`) — every referenced ID must exist in the validated package, and the assistant never generates arbitrary code or map commands. See `docs/product/map-first-workspace-instructions.md` §15 and `docs/decisions/ADR-002-map-first-workspace.md`.
+
 ## Hard Constraints
 
 The assistant must not:

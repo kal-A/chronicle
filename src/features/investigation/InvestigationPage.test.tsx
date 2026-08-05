@@ -8,7 +8,7 @@ import { expectNoA11yViolations } from '../../test/axe'
 const GOLDEN_ROUTE =
   '/investigations/blank-cheque-golden/scenes/scene-2-blank-cheque'
 
-function renderPage(path = GOLDEN_ROUTE) {
+function renderPage(mode: 'workspace' | 'inspector' = 'workspace', path = GOLDEN_ROUTE) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -18,7 +18,7 @@ function renderPage(path = GOLDEN_ROUTE) {
         <Routes>
           <Route
             path="/investigations/:packageId/scenes/:sceneId"
-            element={<InvestigationPage />}
+            element={<InvestigationPage mode={mode} />}
           />
         </Routes>
       </MemoryRouter>
@@ -26,8 +26,8 @@ function renderPage(path = GOLDEN_ROUTE) {
   )
 }
 
-describe('InvestigationPage', () => {
-  it('shows a loading state, then the scene heading once data resolves', async () => {
+describe('InvestigationPage (map-first workspace, the default)', () => {
+  it('shows a loading state, then the workspace once data resolves', async () => {
     renderPage()
     expect(screen.getByRole('status')).toHaveTextContent(/loading/i)
 
@@ -37,9 +37,6 @@ describe('InvestigationPage', () => {
       ).toBeInTheDocument(),
     )
     expect(
-      screen.getByRole('heading', { level: 2, name: /blank cheque/i }),
-    ).toBeInTheDocument()
-    expect(
       screen.getByText(/German Assurance and Vienna’s Posture/i),
     ).toBeInTheDocument()
     expect(document.title).toBe(
@@ -47,10 +44,14 @@ describe('InvestigationPage', () => {
     )
   })
 
-  it('renders the prototype-content notice, honoring the honest-labeling requirement', async () => {
+  it('renders a lens selector and a link to Inspector', async () => {
     renderPage()
     await waitFor(() =>
-      expect(screen.getByText(/prototype content/i)).toBeInTheDocument(),
+      expect(screen.getByLabelText(/lens/i)).toBeInTheDocument(),
+    )
+    expect(screen.getByRole('link', { name: /inspector/i })).toHaveAttribute(
+      'href',
+      '/investigations/blank-cheque-golden/scenes/scene-2-blank-cheque/inspector',
     )
   })
 
@@ -63,10 +64,34 @@ describe('InvestigationPage', () => {
   })
 
   it('shows a package-not-found state for an unknown investigation id', async () => {
-    renderPage('/investigations/unknown-package/scenes/scene-any')
+    renderPage('workspace', '/investigations/unknown-package/scenes/scene-any')
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /investigation could not be found/i,
     )
+  })
+})
+
+describe('InvestigationPage (Inspector mode — the preserved article-first renderer)', () => {
+  it('renders the scene heading and prototype-content notice', async () => {
+    renderPage('inspector')
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { level: 2, name: /blank cheque/i }),
+      ).toBeInTheDocument(),
+    )
+    expect(screen.getByText(/prototype content/i)).toBeInTheDocument()
+    expect(document.title).toBe(
+      'The German Assurance and Vienna’s Posture, 4–10 July 1914 · Inspector · Chronicle',
+    )
+  })
+
+  it('has no detectable accessibility violations once loaded', async () => {
+    const { container } = renderPage('inspector')
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument(),
+    )
+    await expectNoA11yViolations(container)
   })
 })
