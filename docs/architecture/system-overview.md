@@ -43,8 +43,9 @@ Chronicle is a standard three-tier web application plus a bounded, persisted gen
 - **Phase A/B:** preserve the frontend, define `GeneratedInvestigation`, and render the Blank Cheque golden JSON generically.
 - **Phase C:** deterministic Python CLI and mock/curated providers produce further valid packages (mock + real Concert of Europe).
 - **Phase D:** map-first investigation workspace (persistent map canvas, docked/sheet assistant panel, lenses, `InvestigationExperiencePlan`, Inspector mode) — see `docs/decisions/ADR-002-map-first-workspace.md`.
-- **Phase E–I:** add real discovery/acquisition, corpus, extraction, criticism, timeline, and geographic generation incrementally.
-- **Phase J–L:** generation-first web UX, assistant, and private enrichment.
+- **Phase E:** real LLM agent core — four bounded agents (Planner/Analyst/Critic/Guide), typed tools over existing corpora, real (local, Ollama-based) model calls for the first time — see `docs/decisions/ADR-003-llm-agent-system-is-product-core.md`.
+- **Phase F–G:** autonomous source discovery, then document acquisition and a RAG corpus (the former Phase E/F content, resequenced behind the AI core).
+- **Phase H–K:** AI-driven historical model generation, a fine-tuned Chronicle task-model experiment, an AI geographic/experience composer, and full autonomous investigation end to end.
 
 See `docs/delivery/revised-development-phases.md`.
 

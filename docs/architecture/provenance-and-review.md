@@ -2,6 +2,8 @@
 
 This is the enforcement mechanism behind `AGENTS.md` §3 and §13, and the mechanism that makes `docs/product/shared-evidence-network.md`'s "no silent public updates" rule real rather than aspirational.
 
+**Phase E note:** everything below describes the target system for the Review service, `ImpactReview`, and the Shared Evidence Network (Phase L before ADR-002's relettering, now absorbed into Phase K, `docs/decisions/ADR-003-llm-agent-system-is-product-core.md`) — as of Phase E, **none of it is built**. There is no database, no Postgres/pgvector, and no review-status persistence anywhere in the running system; only file-based `RunStore` persistence exists (`backend/src/chronicle/storage/run_store.py`, Phase C1). Phase E's corpus service (E2) queries the fields already embedded in an already-generated `GeneratedInvestigation` package (its `reviewStatus`/`visibility` fields exist in the contract and are validated, but nothing here — the state-machine transitions, the query-layer enforcement, the Review service itself — has an implementation yet). Treat this document as the schema/behavior contract a future Review service must satisfy, not a description of current backend capability.
+
 ## Review Status State Machine
 
 Applies to Claim, Relationship, KnownAtTime, and any AI-extracted candidate Entity/Event/Decision:

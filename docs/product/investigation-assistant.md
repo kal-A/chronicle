@@ -25,6 +25,8 @@ An answer may focus the timeline, move the map to relevant locations, highlight 
 
 **Phase D update:** the assistant's UI surface is now the docked/bottom-sheet panel's persistent Ask tab, present from the initial (pre-generation) Ask entry surface through the full map-first workspace — not a feature reachable only after a package exists. Its actions are formalized as a typed `AssistantAction` union (`FOCUS_LOCATION`, `FOCUS_EVENT`, `SET_TIME`, `SET_TIME_RANGE`, `ACTIVATE_LENS`, `HIGHLIGHT_EVENTS`, `HIGHLIGHT_RELATIONSHIP`, `SHOW_SYSTEM_PATH`, `COMPARE_ACTORS`, `OPEN_EVIDENCE`, `OPEN_SOURCE`, `RESET_VIEW`) — every referenced ID must exist in the validated package, and the assistant never generates arbitrary code or map commands. See `docs/product/map-first-workspace-instructions.md` §15 and `docs/decisions/ADR-002-map-first-workspace.md`.
 
+**Phase E update:** this is now the product core, not one feature among several (`docs/decisions/ADR-003-llm-agent-system-is-product-core.md`) — the historical domain exists to give this assistant something real to be evaluated against, not the reverse. "Phase 4" above refers to the pre-AI-first phase numbering (`docs/delivery/development-phases.md`, now historical context per `docs/delivery/revised-development-phases.md`'s header note); the current, active sequencing for this feature is Phase E's sub-plans E1-E6 (`docs/ai-core-instructions/05_PHASE_E_AI_CORE_IMPLEMENTATION_PLAN.md`), ending with E6 replacing the docked panel's disclosed-placeholder Ask tab (`src/features/investigation/workspace/panel/AskTab.tsx`) with this real behavior. The four question classes named in that Phase 4 reference are unchanged as the initial target set.
+
 ## Hard Constraints
 
 The assistant must not:

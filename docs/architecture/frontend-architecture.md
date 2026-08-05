@@ -13,7 +13,9 @@ The frontend accepts a validated, supported-version `GeneratedInvestigation` pac
 ```text
 src/
   features/
-    generation/           # request, scope approval, workflow/report UI (Phase J)
+    generation/           # request, scope approval, workflow/report UI (pre-AI-first roadmap;
+                          # superseded by the Phase E-K AI-core sequence, see
+                          # docs/decisions/ADR-003-llm-agent-system-is-product-core.md)
     investigation/        # package loader + synchronized canvas/facets
       narrative/           # Inspector-hosted
       timeline/            # shared base; workspace/timeline/ extends it
@@ -22,7 +24,9 @@ src/
       evidence/            # Inspector-hosted (full evidence/provenance view)
       workspace/           # Phase D: map-first shell, docked/sheet panel, lenses
       inspector/           # Phase D: rehosts narrative/evidence/graph as a mode
-      assistant/           # typed package/corpus tools (Phase K)
+      assistant/           # typed package/corpus tools (Phase E6 — real Ask-panel
+                          # integration, replacing workspace/panel/AskTab.tsx's
+                          # placeholder; docs/ai-core-instructions/05_PHASE_E_AI_CORE_IMPLEMENTATION_PLAN.md)
     studio/                # later review/enrichment UI
   shared/
     api/                   # typed API client generated/derived from backend OpenAPI schema
