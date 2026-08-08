@@ -42,4 +42,14 @@ The assistant must not:
 
 ## Architectural Shape
 
-The assistant is query planning → bounded tool calls against reviewed data (source search, source comparison, reviewed-relationship tracing, timeline context, map context, actor-knowledge reconstruction, evidence-gap detection) → answer composition → verification pass before the answer reaches the user. See `docs/architecture/ai-agent-architecture.md` for the tool contracts and `docs/architecture/provenance-and-review.md` for what "reviewed data" means. This is deliberately not an open-ended agent loop — see `AGENTS.md` §4.
+The assistant is query planning → bounded tool calls against stored,
+status-labelled corpus data (source search, source comparison, relationship
+tracing, timeline context, map context, actor-knowledge reconstruction,
+evidence-gap detection) → answer composition → deterministic verification of
+citation existence, review eligibility, and visibility before the answer
+reaches the user. E2 retrieval preserves proposed, rejected, disputed, and
+private records so the evidence ledger remains inspectable; those records are
+not thereby eligible for public factual claims. See
+`docs/architecture/ai-agent-architecture.md` for the tool contracts and
+`docs/architecture/provenance-and-review.md` for the eligibility policy. This
+is deliberately not an open-ended agent loop — see `AGENTS.md` §4.

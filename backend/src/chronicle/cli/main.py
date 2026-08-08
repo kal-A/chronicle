@@ -51,6 +51,27 @@ def build_parser() -> argparse.ArgumentParser:
     p_validate = subparsers.add_parser("validate", help="Validate a GeneratedInvestigation package JSON file")
     p_validate.add_argument("package_path")
 
+    p_corpus = subparsers.add_parser("corpus", help="Inspect and search registered corpora (Phase E2)")
+    corpus_sub = p_corpus.add_subparsers(dest="corpus_command", required=True)
+    corpus_sub.add_parser("list", help="List registered corpora")
+    p_corpus_inspect = corpus_sub.add_parser("inspect", help="Show a corpus's manifest and record counts")
+    p_corpus_inspect.add_argument("corpus_id")
+    p_corpus_search = corpus_sub.add_parser("search", help="Run search_passages against a corpus")
+    p_corpus_search.add_argument("corpus_id")
+    p_corpus_search.add_argument("query")
+
+    p_tools = subparsers.add_parser("tools", help="Inspect and invoke the typed tool registry (Phase E2)")
+    tools_sub = p_tools.add_subparsers(dest="tools_command", required=True)
+    tools_sub.add_parser("list", help="List registered tools")
+    p_tools_invoke = tools_sub.add_parser("invoke", help="Invoke a tool by name")
+    p_tools_invoke.add_argument("tool_name")
+    p_tools_invoke.add_argument("--corpus-id", required=True)
+    p_tools_invoke.add_argument(
+        "--input",
+        required=True,
+        help="JSON input for the tool (corpusId filled in from --corpus-id if omitted)",
+    )
+
     return parser
 
 
@@ -60,6 +81,20 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "validate":
         return commands.cmd_validate(args.package_path)
+
+    if args.command == "corpus":
+        if args.corpus_command == "list":
+            return commands.cmd_corpus_list()
+        if args.corpus_command == "inspect":
+            return commands.cmd_corpus_inspect(args.corpus_id)
+        if args.corpus_command == "search":
+            return commands.cmd_corpus_search(args.corpus_id, args.query)
+
+    if args.command == "tools":
+        if args.tools_command == "list":
+            return commands.cmd_tools_list()
+        if args.tools_command == "invoke":
+            return commands.cmd_tools_invoke(args.tool_name, args.corpus_id, args.input)
 
     store = RunStore(Path(args.runs_dir))
     if args.command == "generate":

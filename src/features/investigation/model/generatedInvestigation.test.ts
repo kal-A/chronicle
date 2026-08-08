@@ -311,6 +311,27 @@ describe('GeneratedInvestigation contract', () => {
       /marker.*precision/i,
     )
   })
+
+  it('rejects a top-level EvidenceLink omitted by its target record', () => {
+    const broken = makeValidPackage()
+    broken.evidenceLinks.push({
+      ...broken.evidenceLinks[0],
+      id: 'evidence-orphaned-from-target',
+    })
+
+    expect(() => validateGeneratedInvestigation(broken)).toThrow(
+      /not listed by its target record/i,
+    )
+  })
+
+  it('rejects duplicate EvidenceLink ids on a target record', () => {
+    const broken = makeValidPackage()
+    broken.claims[0].evidenceLinkIds.push(broken.claims[0].evidenceLinkIds[0])
+
+    expect(() => validateGeneratedInvestigation(broken)).toThrow(
+      /duplicate EvidenceLink/i,
+    )
+  })
 })
 
 describe('Blank Cheque golden investigation', () => {

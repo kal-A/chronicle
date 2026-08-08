@@ -454,6 +454,23 @@ export function validateGeneratedInvestigation(
   const linksById = new Map(
     investigation.evidenceLinks.map((link) => [link.id, link]),
   )
+  const targetEvidenceLinkIds = new Map<string, Set<string>>()
+  for (const [targetType, records] of [
+    ['claim', investigation.claims],
+    ['relationship', investigation.relationships],
+    ['knownAtTime', investigation.knowledgeStates],
+    ['event', investigation.events],
+  ] as const) {
+    for (const record of records) {
+      if (new Set(record.evidenceLinkIds).size !== record.evidenceLinkIds.length) {
+        fail(`Target record "${record.id}" contains a duplicate EvidenceLink id`)
+      }
+      targetEvidenceLinkIds.set(
+        `${targetType}:${record.id}`,
+        new Set(record.evidenceLinkIds),
+      )
+    }
+  }
 
   for (const document of investigation.documents) {
     requireReference(
@@ -492,6 +509,12 @@ export function validateGeneratedInvestigation(
       `EvidenceLink "${link.id}"`,
       link.targetType,
     )
+    if (!targetEvidenceLinkIds.get(`${link.targetType}:${link.targetId}`)?.has(link.id)) {
+      fail(
+        `EvidenceLink "${link.id}" is not listed by its target record ` +
+          `"${link.targetId}"`,
+      )
+    }
   }
 
   for (const claim of investigation.claims) {

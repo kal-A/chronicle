@@ -38,18 +38,25 @@ A bounded pipeline, not a free agent loop:
 User question
   → query planner (classifies question into one of the supported question types,
      docs/product/investigation-assistant.md)
-  → bounded tool calls against REVIEWED data only:
+  → bounded tool calls against stored, status-labelled corpus data:
        source_search, source_compare, relationship_trace,
        timeline_context, map_context, actor_knowledge_reconstruction,
        evidence_gap_detection
   → answer composition (must cite the specific Claims/Passages/Relationships used)
   → verification pass (checks every citation in the draft answer actually
-     resolves to reviewed data returned by a tool call in this run — reject/
-     retry if not)
+     resolves to data returned by a tool call in this run and is eligible for
+     the intended use under its review status and visibility — reject/retry
+     if not)
   → answer + UI actions (focus timeline/map/graph, open evidence)
 ```
 
 The query planner and verification pass are the two places most likely to need iteration; both are deterministic checks wrapping the LLM call, not additional LLM calls trusted blindly.
+
+Phase E2 retrieval deliberately preserves proposed, disputed, rejected, and
+private records instead of silently erasing the evidence ledger. Tool outputs
+surface review and visibility metadata; the E3/E4 orchestration and validation
+layers must deterministically prevent ineligible records from being cited or
+published as reviewed fact.
 
 **Phase D update:** the assistant's UI-action output is now the typed `AssistantAction` union (`docs/product/map-first-workspace-instructions.md` §15, `docs/decisions/ADR-002-map-first-workspace.md`) — `FOCUS_LOCATION`, `FOCUS_EVENT`, `SET_TIME`, `SET_TIME_RANGE`, `ACTIVATE_LENS`, `HIGHLIGHT_EVENTS`, `HIGHLIGHT_RELATIONSHIP`, `SHOW_SYSTEM_PATH`, `COMPARE_ACTORS`, `OPEN_EVIDENCE`, `OPEN_SOURCE`, `RESET_VIEW`, superseding this section's looser "focus timeline/map/graph, open evidence" phrasing with a concrete, package-ID-validated action set. The assistant panel is also the initial (pre-generation) Ask entry surface, not only a post-generation feature — the query planner's first classification step now includes "this is a new investigation request," not just in-investigation question types.
 

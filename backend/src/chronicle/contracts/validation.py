@@ -255,6 +255,27 @@ def validate_generated_investigation(data: Any) -> GeneratedInvestigation:
         }[link.targetType.value]
         _require_reference(targets, link.targetId, f'EvidenceLink "{link.id}"', link.targetType.value)
 
+    # Rule 5b: top-level EvidenceLinks are canonical, while each target's
+    # evidenceLinkIds is a required exact reverse index. This prevents the
+    # corpus from surfacing evidence that the target record does not retain.
+    targets_by_type = {
+        "claim": {record.id: record for record in investigation.claims},
+        "relationship": {record.id: record for record in investigation.relationships},
+        "knownAtTime": {record.id: record for record in investigation.knowledgeStates},
+        "event": {record.id: record for record in investigation.events},
+    }
+    for records in targets_by_type.values():
+        for target in records.values():
+            if len(target.evidenceLinkIds) != len(set(target.evidenceLinkIds)):
+                _fail(f'Target record "{target.id}" contains a duplicate EvidenceLink id')
+    for link in investigation.evidenceLinks:
+        target = targets_by_type[link.targetType.value][link.targetId]
+        if link.id not in target.evidenceLinkIds:
+            _fail(
+                f'EvidenceLink "{link.id}" is not listed by its target record '
+                f'"{link.targetId}"'
+            )
+
     # Rule 6: every Claim needs >=1 supporting EvidenceLink.
     for claim in investigation.claims:
         links = _evidence_for(claim, "claim", links_by_id)

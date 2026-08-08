@@ -13,7 +13,7 @@ The assistant operates only over an approved generated package and its permitted
 - `compare_perspectives`
 - `get_timeline_context`
 - `get_actor_knowledge_state`
-- `trace_reviewed_relationships`
+- `trace_relationships`
 - `get_map_context`
 - `find_conflicts`
 - `find_research_gaps`
@@ -38,4 +38,3 @@ Read tools enforce package/workspace/visibility boundaries. UI tools return type
 ## Verification
 
 Every material statement maps to claim IDs returned by tools in that run. Every citation maps to permitted Passages. The answer verifier checks classification wording, dispute preservation, knowledge-state support, and action references. Failure yields retry within a cap or abstention. Unreviewed material is labelled and cannot be presented as published fact.
-
