@@ -13,6 +13,8 @@ import type { PanelTab } from '../../model/experiencePlan'
  * fixing, not repeating, SourceDetail's missing focus-management gap.
  */
 export function DockedPanel({
+  question,
+  scopeSummary,
   ask,
   explore,
   evidence,
@@ -21,6 +23,8 @@ export function DockedPanel({
   defaultWidth,
   workspaceWidthPx,
 }: {
+  question: string
+  scopeSummary?: string
   ask: ReactNode
   explore: ReactNode
   evidence: ReactNode
@@ -77,13 +81,13 @@ export function DockedPanel({
 
   if (collapsed) {
     return (
-      <div className="hidden flex-none lg:flex">
+      <div className="chronicle-dock-rail hidden flex-none lg:flex">
         <button
           ref={reopenButtonRef}
           type="button"
           aria-label="Reopen investigation panel"
           aria-expanded="false"
-          className="flex w-10 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800"
+          className="chronicle-panel-reopen"
           onClick={handleReopen}
         >
           <span aria-hidden="true">«</span>
@@ -95,7 +99,7 @@ export function DockedPanel({
   const panelContent: Record<PanelTab, ReactNode> = { ask, explore, evidence, sources }
 
   return (
-    <div className="hidden flex-none lg:flex" style={{ width }}>
+    <div className="chronicle-dock hidden flex-none lg:flex" style={{ width }}>
       <div
         ref={separatorRef}
         role="separator"
@@ -105,7 +109,7 @@ export function DockedPanel({
         aria-valuemin={MIN_PANEL_WIDTH}
         aria-valuemax={maxWidth}
         tabIndex={0}
-        className="w-1.5 flex-none cursor-col-resize touch-none rounded-full bg-neutral-200 hover:bg-blue-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 dark:bg-neutral-800"
+        className="chronicle-panel-resizer"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -115,13 +119,13 @@ export function DockedPanel({
       <section
         aria-label="Investigation panel"
         aria-expanded="true"
-        className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
+        className="chronicle-panel-shell"
       >
-        <div className="flex flex-none justify-end border-b border-neutral-200 px-1 dark:border-neutral-800">
+        <div className="chronicle-panel-utility">
           <button
             type="button"
             aria-label="Collapse investigation panel"
-            className="px-2 py-1 text-xs text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+            className="chronicle-panel-collapse"
             onClick={() => {
               collapse()
               requestAnimationFrame(() => reopenButtonRef.current?.focus())
@@ -129,6 +133,11 @@ export function DockedPanel({
           >
             Collapse »
           </button>
+        </div>
+        <div className="chronicle-panel-question">
+          <p>{question}</p>
+          {scopeSummary ? <span>{scopeSummary}</span> : null}
+          <strong>Investigation ready</strong>
         </div>
         <PanelTabs activeTab={tab} onSelectTab={setTab}>
           {panelContent[tab]}

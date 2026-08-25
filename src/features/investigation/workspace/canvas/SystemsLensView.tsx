@@ -105,22 +105,22 @@ export function SystemsLensView({
                 label: 'data(label)',
                 'font-size': 11,
                 'font-weight': 'bold',
-                color: '#ffffff',
+                color: '#f0e7d5',
                 'text-valign': 'center',
                 'text-halign': 'center',
                 'text-wrap': 'wrap',
                 'text-max-width': '80px',
-                'background-color': '#2563eb',
+                'background-color': '#173f56',
                 width: 90,
                 height: 90,
                 shape: 'round-rectangle',
                 'border-width': 2,
-                'border-color': '#1d4ed8',
+                'border-color': '#72a8b5',
               },
             },
             {
               selector: 'node.focused',
-              style: { 'border-width': 4, 'border-color': '#f59e0b' },
+              style: { 'border-width': 3, 'border-color': '#c45e3c' },
             },
             {
               selector: 'edge',
@@ -128,12 +128,12 @@ export function SystemsLensView({
                 width: 3,
                 label: 'data(label)',
                 'font-size': 10,
-                color: '#92400e',
-                'text-background-color': '#fffbeb',
+                color: '#e9dec5',
+                'text-background-color': '#06121b',
                 'text-background-opacity': 1,
-                'line-color': '#d97706',
+                'line-color': '#c45e3c',
                 'target-arrow-shape': 'triangle',
-                'target-arrow-color': '#d97706',
+                'target-arrow-color': '#c45e3c',
                 'curve-style': 'bezier',
               },
             },
@@ -181,27 +181,27 @@ export function SystemsLensView({
   }, [focus])
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="chronicle-systems-lens">
       <div>
-        <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">{systemPath.title}</h2>
-        <p className="text-xs text-neutral-500 dark:text-neutral-400">{systemPath.summary}</p>
+        <h2>{systemPath.title}</h2>
+        <p>{systemPath.summary}</p>
       </div>
       <div
         ref={canvasRef}
         aria-hidden="true"
-        className="h-64 w-full rounded-lg border border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950"
+        className="chronicle-systems-canvas"
       />
 
       <nav aria-label={`${systemPath.title}: nodes and relationships`}>
-        <ol className="flex flex-col gap-1">
+        <ol className="chronicle-system-node-list">
           {systemPath.nodeIds.map((nodeId) => (
-            <li key={nodeId} className="text-xs text-neutral-700 dark:text-neutral-300">
+            <li key={nodeId}>
               {labelForNode(scene, nodeId)}
             </li>
           ))}
         </ol>
         {relationships.length > 0 && (
-          <ul className="mt-2 flex flex-col gap-1">
+          <ul className="chronicle-system-relationships">
             {relationships.map((relationship) => {
               const isFocused = focus.kind === 'relationship' && focus.relationshipId === relationship.id
               return (
@@ -209,18 +209,14 @@ export function SystemsLensView({
                   <button
                     type="button"
                     aria-current={isFocused ? 'true' : undefined}
-                    className={`w-full rounded-lg border border-dashed p-2 text-left text-xs ${
-                      isFocused
-                        ? 'border-blue-600 border-l-4 bg-blue-50 dark:bg-blue-950/40'
-                        : 'border-amber-400 bg-amber-50/60 dark:border-amber-700 dark:bg-amber-950/20'
-                    }`}
+                    className={`chronicle-system-relationship ${isFocused ? 'is-focused' : ''}`}
                     onClick={() => onSelectFocus({ kind: 'relationship', relationshipId: relationship.id })}
                   >
                     <span className="block">
                       {labelForNode(scene, relationship.fromId)} — {relationship.relationshipType} →{' '}
                       {labelForNode(scene, relationship.toId)}
                     </span>
-                    <span className="mt-1 block font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                    <span className="chronicle-system-classification">
                       {CLASSIFICATION_LABEL[relationship.evidenceClassification]}
                     </span>
                   </button>

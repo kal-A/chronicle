@@ -2,11 +2,26 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { investigationFixtures } from '../../../content/investigationFixtures'
 import type { GeneratedInvestigation } from '../model/generatedInvestigation'
+import { AtlanticAtlas } from './AtlanticAtlas'
+import { CartographicTransition } from './CartographicTransition'
 import { GenerationProgress } from './GenerationProgress'
 import { ScopeReviewCard } from './ScopeReviewCard'
 import { matchInvestigationToQuestion } from './topicMatch'
+import { useHeroIntro } from './useHeroIntro'
+import { usePrefersReducedMotion } from './useReducedMotion'
 
-type AskState = { step: 'ask' } | { step: 'no-match' } | { step: 'scope-review' | 'generating'; investigation: GeneratedInvestigation }
+const HERO_HEADLINE = 'Where do you want to begin?'
+const HERO_INTRO =
+  'Follow an event through the places, people, sources, and arguments that shaped it.'
+const TRANSITION_DELAY_MS = 900
+
+type AskState =
+  | { step: 'ask' }
+  | { step: 'no-match' }
+  | {
+      step: 'scope-review' | 'generating' | 'transitioning'
+      investigation: GeneratedInvestigation
+    }
 
 const investigationsWithAPlan = investigationFixtures
   .map((fixture) => fixture.investigation)
@@ -28,55 +43,117 @@ export function AskEntryPage({
   const [state, setState] = useState<AskState>({ step: 'ask' })
   const [question, setQuestion] = useState('')
   const navigate = useNavigate()
+  const prefersReducedMotion = usePrefersReducedMotion()
+  const heroIntro = useHeroIntro(HERO_HEADLINE, HERO_INTRO)
+  const atlasDrawProgress = Math.min(
+    1,
+    heroIntro.headlineProgress * 0.72 + heroIntro.introProgress * 0.28,
+  )
 
   function submit(submittedQuestion: string) {
-    const match = matchInvestigationToQuestion(submittedQuestion, investigationsWithAPlan)
-    setQuestion(submittedQuestion)
+    const normalizedQuestion = submittedQuestion.trim()
+    if (!normalizedQuestion) return
+
+    const match = matchInvestigationToQuestion(normalizedQuestion, investigationsWithAPlan)
+    setQuestion(normalizedQuestion)
     setState(match ? { step: 'scope-review', investigation: match } : { step: 'no-match' })
   }
 
   function handleGenerationComplete(investigation: GeneratedInvestigation) {
-    navigate(
-      `/investigations/${encodeURIComponent(investigation.packageId)}/scenes/${encodeURIComponent(
-        investigation.interactionSpec.defaultSceneId,
-      )}`,
+    const destination = `/investigations/${encodeURIComponent(
+      investigation.packageId,
+    )}/scenes/${encodeURIComponent(investigation.interactionSpec.defaultSceneId)}`
+
+    if (prefersReducedMotion) {
+      navigate(destination, { state: { enteredFromAsk: true, question } })
+      return
+    }
+
+    setState({ step: 'transitioning', investigation })
+    window.setTimeout(
+      () => navigate(destination, { state: { enteredFromAsk: true, question } }),
+      generationStepDelayMs === undefined ? TRANSITION_DELAY_MS : 10,
     )
   }
 
   return (
-    <main className="mx-auto flex min-h-svh max-w-2xl flex-col gap-6 px-4 py-16">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
-          Chronicle
-        </h1>
-        <p className="mt-2 text-lg text-neutral-700 dark:text-neutral-300">
-          What would you like to investigate?
-        </p>
-      </div>
-
-      {state.step === 'ask' || state.step === 'no-match' ? (
-        <AskForm
-          question={question}
-          onQuestionChange={setQuestion}
-          onSubmit={submit}
-          noMatch={state.step === 'no-match'}
+    <main className={`chronicle-home ${state.step === 'transitioning' ? 'is-transitioning' : ''}`}>
+      <section className="chronicle-hero" aria-labelledby="chronicle-home-heading">
+        <AtlanticAtlas
+          reveal={1}
+          drawProgress={atlasDrawProgress}
         />
+
+        <header className="chronicle-header">
+          <a className="chronicle-brand" href="/" aria-label="Chronicle home">
+            <h1>Chronicle</h1>
+          </a>
+          <nav aria-label="Primary navigation">
+            <a href="#starting-points">Explore</a>
+            <a href="#how-chronicle-works">About</a>
+          </nav>
+        </header>
+
+        <div className="chronicle-task-plane">
+          <h2 id="chronicle-home-heading" aria-label={HERO_HEADLINE}>
+            <span aria-hidden="true">{heroIntro.headlineText}</span>
+            <span
+              className={`chronicle-type-caret ${heroIntro.isComplete ? 'is-complete' : ''}`}
+              aria-hidden="true"
+            />
+          </h2>
+          <p className="chronicle-intro">
+            <span className="sr-only">{HERO_INTRO}</span>
+            <span aria-hidden="true">{heroIntro.introText}</span>
+          </p>
+
+          {state.step === 'ask' || state.step === 'no-match' ? (
+            <AskForm
+              question={question}
+              onQuestionChange={setQuestion}
+              onSubmit={submit}
+              noMatch={state.step === 'no-match'}
+            />
+          ) : null}
+
+          {state.step === 'scope-review' ? (
+            <ScopeReviewCard
+              opening={state.investigation.experiencePlan!.opening}
+              onGenerate={() => setState({ step: 'generating', investigation: state.investigation })}
+              onAskSomethingElse={() => setState({ step: 'ask' })}
+            />
+          ) : null}
+
+          {state.step === 'generating' ? (
+            <GenerationProgress
+              onComplete={() => handleGenerationComplete(state.investigation)}
+              stepDelayMs={generationStepDelayMs}
+            />
+          ) : null}
+        </div>
+
+        <a className="chronicle-scroll-cue" href="#how-chronicle-works">
+          <span>How Chronicle works</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m7 10 5 5 5-5" />
+          </svg>
+        </a>
+      </section>
+
+      {state.step === 'transitioning' ? (
+        <CartographicTransition investigation={state.investigation} question={question} />
       ) : null}
 
-      {state.step === 'scope-review' ? (
-        <ScopeReviewCard
-          opening={state.investigation.experiencePlan!.opening}
-          onGenerate={() => setState({ step: 'generating', investigation: state.investigation })}
-          onAskSomethingElse={() => setState({ step: 'ask' })}
-        />
-      ) : null}
-
-      {state.step === 'generating' ? (
-        <GenerationProgress
-          onComplete={() => handleGenerationComplete(state.investigation)}
-          stepDelayMs={generationStepDelayMs}
-        />
-      ) : null}
+      <section id="how-chronicle-works" className="chronicle-workflow" aria-labelledby="workflow-title">
+        <div className="chronicle-workflow-heading">
+          <h2 id="workflow-title">An investigation, not an answer box.</h2>
+        </div>
+        <ol>
+          <li><span>1</span><div><h3>Frame the question</h3><p>Define the event, period, or historical problem you want to pursue.</p></div></li>
+          <li><span>2</span><div><h3>Review the scope</h3><p>See the proposed timeframe, geography, and current evidence coverage.</p></div></li>
+          <li><span>3</span><div><h3>Enter the workspace</h3><p>Move through the map, timeline, sources, and connected claims.</p></div></li>
+        </ol>
+      </section>
     </main>
   )
 }
@@ -93,13 +170,13 @@ function AskForm({
   noMatch: boolean
 }) {
   return (
-    <div className="flex flex-col gap-4">
+    <div id="starting-points" className="chronicle-ask">
       <form
         onSubmit={(event) => {
           event.preventDefault()
           onSubmit(question)
         }}
-        className="flex gap-2"
+        className="chronicle-question-form"
       >
         <label htmlFor="ask-entry-question" className="sr-only">
           Ask a historical question
@@ -110,28 +187,35 @@ function AskForm({
           value={question}
           onChange={(event) => onQuestionChange(event.target.value)}
           placeholder="Ask a historical question…"
-          className="flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+          autoComplete="off"
+          className="chronicle-question-input"
         />
         <button
           type="submit"
-          className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+          aria-label="Ask"
+          disabled={!question.trim()}
+          className="chronicle-ask-button"
         >
-          Ask
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
         </button>
+        <span className="chronicle-action-caption">Begin an investigation</span>
       </form>
 
       {noMatch ? (
-        <p role="alert" className="text-sm text-neutral-700 dark:text-neutral-300">
+        <p role="alert" className="chronicle-no-match">
           This prototype only has investigations for the topics below — nothing curated matches
           that question yet.
         </p>
       ) : null}
 
-      <div>
-        <h2 className="text-sm font-medium text-neutral-600 dark:text-neutral-400">
-          Suggested starting points
-        </h2>
-        <ul className="mt-2 flex flex-col gap-1.5">
+      <div className="chronicle-starters">
+        <div className="chronicle-starters-heading">
+          <h3>Suggested starting points</h3>
+          <p>This prototype searches two curated investigations.</p>
+        </div>
+        <ul>
           {investigationsWithAPlan.map((investigation) => {
             const startingQuestion = investigation.experiencePlan!.opening.question
             return (
@@ -139,8 +223,12 @@ function AskForm({
                 <button
                   type="button"
                   onClick={() => onSubmit(startingQuestion)}
-                  className="text-left text-sm text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                  className="chronicle-starter"
                 >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="10" cy="10" r="5.5" />
+                    <path d="m14 14 5 5" />
+                  </svg>
                   {startingQuestion}
                 </button>
               </li>

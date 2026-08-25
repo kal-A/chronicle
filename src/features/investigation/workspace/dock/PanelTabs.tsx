@@ -44,11 +44,11 @@ export function PanelTabs({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="chronicle-panel-tabs">
       <div
         role="tablist"
         aria-label="Investigation panel"
-        className="flex flex-none border-b border-neutral-200 dark:border-neutral-800"
+        className="chronicle-panel-tablist"
       >
         {TABS.map((tab) => (
           <button
@@ -62,11 +62,7 @@ export function PanelTabs({
             aria-selected={activeTab === tab.id}
             aria-controls={`panel-tabpanel-${tab.id}`}
             tabIndex={activeTab === tab.id ? 0 : -1}
-            className={`flex-1 px-2 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-600 ${
-              activeTab === tab.id
-                ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
-                : 'text-neutral-500 hover:bg-neutral-50 dark:text-neutral-400 dark:hover:bg-neutral-800'
-            }`}
+            className={`chronicle-panel-tab ${activeTab === tab.id ? 'is-active' : ''}`}
             onClick={() => focusAndSelect(tab.id)}
             onKeyDown={handleKeyDown}
           >
@@ -79,7 +75,7 @@ export function PanelTabs({
         role="tabpanel"
         aria-labelledby={`panel-tab-${activeTab}`}
         tabIndex={0}
-        className="min-h-0 flex-1 overflow-y-auto p-3"
+        className="chronicle-panel-tabcontent"
       >
         {children}
       </div>

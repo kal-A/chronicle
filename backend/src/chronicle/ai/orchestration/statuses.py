@@ -13,7 +13,10 @@ from enum import Enum
 class AgentRunStatus(str, Enum):
     CREATED = "created"
     RUNNING = "running"
-    READY = "ready"
+    ANALYSIS_READY = "analysis_ready"
+    ANSWER_READY = "answer_ready"
     PARTIAL = "partial"
     ABSTAINED = "abstained"
+    CANCELLED = "cancelled"
+    INTERRUPTED = "interrupted"
     FAILED = "failed"

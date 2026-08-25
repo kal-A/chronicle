@@ -22,12 +22,14 @@ const NEXT_STATE: Record<SheetState, SheetState> = {
  * keyboard- and screen-reader-operable per map-first-workspace-
  * instructions.md §9.1/§17.2, not just draggable. */
 export function BottomSheet({
+  question,
   ask,
   explore,
   evidence,
   sources,
   initialTab,
 }: {
+  question: string
   ask: ReactNode
   explore: ReactNode
   evidence: ReactNode
@@ -41,20 +43,26 @@ export function BottomSheet({
 
   return (
     <div
-      className={`flex flex-none flex-col overflow-hidden rounded-t-lg border border-neutral-200 bg-white transition-[height] duration-200 motion-reduce:transition-none lg:hidden ${HEIGHT_CLASS[sheetState]} dark:border-neutral-800 dark:bg-neutral-900`}
+      className={`chronicle-bottom-sheet lg:hidden ${HEIGHT_CLASS[sheetState]}`}
     >
       <button
         type="button"
-        className="flex flex-none items-center justify-center py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
+        className="chronicle-bottom-sheet__handle"
         aria-label={`Investigation panel is ${sheetState}. Activate to show more or less.`}
         onClick={() => setSheetState((current) => NEXT_STATE[current])}
       >
-        <span aria-hidden="true" className="h-1 w-10 rounded-full bg-neutral-300 dark:bg-neutral-700" />
+        <span aria-hidden="true" />
       </button>
       {sheetState !== 'collapsed' && (
-        <PanelTabs activeTab={tab} onSelectTab={setTab}>
-          {panelContent[tab]}
-        </PanelTabs>
+        <>
+          <div className="chronicle-panel-question chronicle-panel-question--mobile">
+            <p>{question}</p>
+            <strong>Investigation ready</strong>
+          </div>
+          <PanelTabs activeTab={tab} onSelectTab={setTab}>
+            {panelContent[tab]}
+          </PanelTabs>
+        </>
       )}
     </div>
   )

@@ -9,9 +9,20 @@ handling around the "AI"/provider layer, not the reverse).
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .metadata import ModelCallRecord
+
 
 class ModelProviderError(Exception):
     """Base class for every typed provider failure."""
+
+    callRecord: "ModelCallRecord | None"
+
+    def __init__(self, message: str, *, call_record: "ModelCallRecord | None" = None) -> None:
+        super().__init__(message)
+        self.callRecord = call_record
 
 
 class ProviderUnavailableError(ModelProviderError):

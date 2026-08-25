@@ -24,6 +24,16 @@ class ModelCallStatus(str, Enum):
     FAILED = "failed"
 
 
+class ModelGenerationSettings(BaseModel):
+    """Provider-neutral generation controls recorded with every E3 call."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    temperature: float = Field(default=0.0, ge=0.0, le=2.0)
+    contextTokens: int | None = Field(default=None, ge=1_024, le=131_072)
+    maxCompletionTokens: int | None = Field(default=None, ge=1, le=32_768)
+
+
 class TokenUsage(BaseModel):
     """Omitted entirely (not zero-filled) on ModelCallRecord when a
     provider's response doesn't report usage -- never fabricated."""
@@ -71,6 +81,9 @@ class ModelCallRecord(BaseModel):
     modelName: str = Field(min_length=1)
     modelVersion: str | None = None
     promptVersion: str = Field(min_length=1)
+    inputHash: str = Field(min_length=1, description="Hash of the original logical prompt, schema, and settings")
+    outputHash: str | None = None
+    generationSettings: ModelGenerationSettings
     status: ModelCallStatus
     attemptCount: int = Field(ge=1)
     startedAt: datetime

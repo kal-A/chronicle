@@ -18,6 +18,7 @@ configuration, never secrets -- Ollama requires no API key.
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import time
 from dataclasses import dataclass
@@ -48,6 +49,7 @@ from .metadata import (
     CostBasis,
     ModelCallRecord,
     ModelCallStatus,
+    ModelGenerationSettings,
     ProviderCost,
     ProviderHealth,
     ProviderMetadata,
@@ -69,6 +71,23 @@ _NO_PROVIDER_CHARGE = ProviderCost(amountUsd=0.0, basis=CostBasis.NO_PROVIDER_CH
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _input_hash(
+    system_prompt: str,
+    user_prompt: str,
+    response_type: str,
+    prompt_version: str,
+    settings: ModelGenerationSettings,
+) -> str:
+    payload = {
+        "system": system_prompt,
+        "user": user_prompt,
+        "responseType": response_type,
+        "promptVersion": prompt_version,
+        "settings": settings.model_dump(mode="json"),
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
 
 
 def resolve_base_url_from_env() -> str:
@@ -112,26 +131,39 @@ class OllamaModelProvider:
         system_prompt: str,
         user_prompt: str,
         response_model: type[BaseModel],
+        response_schema: dict[str, Any] | None = None,
         prompt_version: str,
         temperature: float = 0.0,
+        generation_settings: ModelGenerationSettings | None = None,
     ) -> StructuredGenerationResult[BaseModel]:
         started_at = _utcnow()
         start_perf = time.perf_counter()
-        schema = response_model.model_json_schema()
+        schema = response_schema or response_model.model_json_schema()
         messages: list[dict[str, str]] = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
         last_error: ModelProviderError | None = None
+        settings = generation_settings or ModelGenerationSettings(temperature=temperature)
+        input_hash = _input_hash(
+            system_prompt, user_prompt, json.dumps(schema, sort_keys=True), prompt_version, settings
+        )
+        accumulated_usage: TokenUsage | None = None
 
         for attempt in range(1, MAX_STRUCTURED_OUTPUT_ATTEMPTS + 1):
             try:
-                chat_response = self._chat(messages=messages, format_schema=schema, temperature=temperature)
+                chat_response = self._chat(messages=messages, format_schema=schema, settings=settings)
             except ModelProviderError as exc:
                 if not isinstance(exc, RETRYABLE_ERROR_TYPES):
+                    self._attach_failed_record(
+                        exc, prompt_version, input_hash, settings, started_at, start_perf, attempt,
+                        accumulated_usage,
+                    )
                     raise
                 last_error = exc
                 continue
+
+            accumulated_usage = _combine_usage(accumulated_usage, chat_response.usage)
 
             try:
                 parsed = json.loads(chat_response.content)
@@ -155,19 +187,27 @@ class OllamaModelProvider:
                     providerVersion=self._provider_version,
                     modelName=self._model,
                     promptVersion=prompt_version,
+                    inputHash=input_hash,
+                    outputHash=hashlib.sha256(value.model_dump_json().encode("utf-8")).hexdigest(),
+                    generationSettings=settings,
                     status=ModelCallStatus.SUCCEEDED,
                     attemptCount=attempt,
                     startedAt=started_at,
                     completedAt=completed_at,
                     latencyMs=(time.perf_counter() - start_perf) * 1000,
-                    usage=chat_response.usage,
+                    usage=accumulated_usage,
                     cost=_NO_PROVIDER_CHARGE,
                 ),
             )
 
-        raise RetryExhaustedError(
+        error = RetryExhaustedError(
             f"Exhausted {MAX_STRUCTURED_OUTPUT_ATTEMPTS} attempt(s) generating {response_model.__name__} via Ollama"
-        ) from last_error
+        )
+        self._attach_failed_record(
+            error, prompt_version, input_hash, settings, started_at, start_perf,
+            MAX_STRUCTURED_OUTPUT_ATTEMPTS, accumulated_usage,
+        )
+        raise error from last_error
 
     def generate_text_from_verified_records(
         self,
@@ -175,6 +215,7 @@ class OllamaModelProvider:
         system_prompt: str,
         user_prompt: str,
         prompt_version: str,
+        generation_settings: ModelGenerationSettings | None = None,
     ) -> TextGenerationResult:
         started_at = _utcnow()
         start_perf = time.perf_counter()
@@ -183,12 +224,17 @@ class OllamaModelProvider:
             {"role": "user", "content": user_prompt},
         ]
         last_error: ModelProviderError | None = None
+        settings = generation_settings or ModelGenerationSettings()
+        input_hash = _input_hash(system_prompt, user_prompt, "text", prompt_version, settings)
 
         for attempt in range(1, MAX_STRUCTURED_OUTPUT_ATTEMPTS + 1):
             try:
-                chat_response = self._chat(messages=messages, format_schema=None, temperature=0.0)
+                chat_response = self._chat(messages=messages, format_schema=None, settings=settings)
             except ModelProviderError as exc:
                 if not isinstance(exc, RETRYABLE_ERROR_TYPES):
+                    self._attach_failed_record(
+                        exc, prompt_version, input_hash, settings, started_at, start_perf, attempt, None
+                    )
                     raise
                 last_error = exc
                 continue
@@ -201,6 +247,9 @@ class OllamaModelProvider:
                     providerVersion=self._provider_version,
                     modelName=self._model,
                     promptVersion=prompt_version,
+                    inputHash=input_hash,
+                    outputHash=hashlib.sha256(chat_response.content.encode("utf-8")).hexdigest(),
+                    generationSettings=settings,
                     status=ModelCallStatus.SUCCEEDED,
                     attemptCount=attempt,
                     startedAt=started_at,
@@ -211,9 +260,14 @@ class OllamaModelProvider:
                 ),
             )
 
-        raise RetryExhaustedError(
+        error = RetryExhaustedError(
             f"Exhausted {MAX_STRUCTURED_OUTPUT_ATTEMPTS} attempt(s) generating text via Ollama"
-        ) from last_error
+        )
+        self._attach_failed_record(
+            error, prompt_version, input_hash, settings, started_at, start_perf,
+            MAX_STRUCTURED_OUTPUT_ATTEMPTS, None,
+        )
+        raise error from last_error
 
     def health_check(self) -> ProviderHealth:
         try:
@@ -240,14 +294,18 @@ class OllamaModelProvider:
         *,
         messages: list[dict[str, str]],
         format_schema: dict[str, Any] | None,
-        temperature: float,
+        settings: ModelGenerationSettings,
     ) -> _ChatResponse:
         payload: dict[str, Any] = {
             "model": self._model,
             "messages": messages,
             "stream": False,
-            "options": {"temperature": temperature},
+            "options": {"temperature": settings.temperature},
         }
+        if settings.contextTokens is not None:
+            payload["options"]["num_ctx"] = settings.contextTokens
+        if settings.maxCompletionTokens is not None:
+            payload["options"]["num_predict"] = settings.maxCompletionTokens
         if format_schema is not None:
             payload["format"] = format_schema
 
@@ -280,6 +338,36 @@ class OllamaModelProvider:
 
         return _ChatResponse(content=content, usage=_extract_usage(body))
 
+    def _attach_failed_record(
+        self,
+        error: ModelProviderError,
+        prompt_version: str,
+        input_hash: str,
+        settings: ModelGenerationSettings,
+        started_at: datetime,
+        start_perf: float,
+            attempt: int,
+        usage: TokenUsage | None,
+    ) -> None:
+        completed_at = _utcnow()
+        error.callRecord = ModelCallRecord(
+            providerName="ollama",
+            providerVersion=self._provider_version,
+            modelName=self._model,
+            promptVersion=prompt_version,
+            inputHash=input_hash,
+            generationSettings=settings,
+            status=ModelCallStatus.FAILED,
+            attemptCount=attempt,
+            startedAt=started_at,
+            completedAt=completed_at,
+            latencyMs=(time.perf_counter() - start_perf) * 1000,
+            usage=usage,
+            cost=_NO_PROVIDER_CHARGE,
+            errorType=type(error).__name__,
+            errorMessage=str(error)[:500],
+        )
+
 
 def _extract_usage(body: dict[str, Any]) -> TokenUsage | None:
     prompt_tokens = body.get("prompt_eval_count")
@@ -287,6 +375,23 @@ def _extract_usage(body: dict[str, Any]) -> TokenUsage | None:
     if prompt_tokens is None and completion_tokens is None:
         return None
     return TokenUsage(promptTokens=prompt_tokens, completionTokens=completion_tokens)
+
+
+def _combine_usage(current: TokenUsage | None, addition: TokenUsage | None) -> TokenUsage | None:
+    if current is None:
+        return addition
+    if addition is None:
+        return current
+
+    def combine(left: int | None, right: int | None) -> int | None:
+        if left is None and right is None:
+            return None
+        return (left or 0) + (right or 0)
+
+    return TokenUsage(
+        promptTokens=combine(current.promptTokens, addition.promptTokens),
+        completionTokens=combine(current.completionTokens, addition.completionTokens),
+    )
 
 
 def _append_retry_feedback(

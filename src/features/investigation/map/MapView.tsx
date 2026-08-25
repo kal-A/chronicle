@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import type { Map as MapLibreMap, Marker } from 'maplibre-gl'
-import type { Scene, PlaceEntity } from '../model/schema'
+import type { EventRecord, Scene, PlaceEntity } from '../model/schema'
 import type { FocusValue } from '../model/focus'
+import { formatHistoricalDate } from '../model/formatHistoricalDate'
 
 /**
  * When a scene ships a `mapLayer` (docs/research/scene-2-map-source.md
@@ -25,49 +26,58 @@ export function MapView({
   focus,
   onSelectFocus,
   placeIds,
+  eventIds,
 }: {
   scene: Scene
   focus: FocusValue
   onSelectFocus: (focus: FocusValue) => void
   /** Phase D workspace: restrict to the active lens's visible places. Omitted (Inspector) shows every place in the scene, unchanged. */
   placeIds?: Set<string>
+  /** Workspace-only temporal window. Events after the selected moment are withheld from the map. */
+  eventIds?: Set<string>
 }) {
   const places = scene.entities.filter(
     (e): e is PlaceEntity =>
       e.entityType === 'place' && (!placeIds || placeIds.has(e.id)),
   )
+  const visibleEvents = scene.events.filter((event) => !eventIds || eventIds.has(event.id))
+  const isTemporalWorkspace = eventIds !== undefined
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="chronicle-map-view">
       {scene.mapLayer ? (
         <HistoricalMap
           scene={scene}
           places={places}
           focus={focus}
           onSelectFocus={onSelectFocus}
+          visibleEvents={visibleEvents}
+          isTemporalWorkspace={isTemporalWorkspace}
         />
       ) : (
-        <SchematicMap places={places} focus={focus} />
+        <SchematicMap places={places} focus={focus} visibleEvents={visibleEvents} />
       )}
 
-      <nav aria-label="Locations active in this scene">
-        <ul className="flex flex-col gap-1">
+      <nav className="chronicle-location-index" aria-label="Locations active in this scene">
+        <p aria-hidden="true">
+          Locations in this frame · {visibleEvents.length} event{visibleEvents.length === 1 ? '' : 's'} visible
+        </p>
+        <ul>
           {places.map((place) => {
+            const placeEvents = visibleEvents.filter((event) => event.placeId === place.id)
             const isFocused =
-              focus.kind === 'entity' &&
-              focus.entityId === place.id &&
-              focus.entityType === 'place'
+              (focus.kind === 'entity' &&
+                focus.entityId === place.id &&
+                focus.entityType === 'place') ||
+              (focus.kind === 'event' &&
+                placeEvents.some((event) => event.id === focus.eventId))
             const period = place.periodRecords[0]
             return (
               <li key={place.id}>
                 <button
                   type="button"
                   aria-current={isFocused ? 'true' : undefined}
-                  className={`w-full rounded-lg border p-2 text-left text-sm transition-colors ${
-                    isFocused
-                      ? 'border-blue-600 border-l-4 bg-blue-50 font-semibold dark:bg-blue-950/40'
-                      : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900'
-                  }`}
+                  className={`chronicle-location ${isFocused ? 'is-focused' : ''}`}
                   onClick={() =>
                     onSelectFocus({
                       kind: 'entity',
@@ -77,10 +87,28 @@ export function MapView({
                   }
                 >
                   {place.canonicalName}
-                  <span className="ml-2 text-xs font-normal text-neutral-500 dark:text-neutral-400">
-                    city precision · {period?.controllingPolity}, {period?.periodLabel}
+                  <span>
+                    {isTemporalWorkspace
+                      ? `${placeEvents.length} visible event${placeEvents.length === 1 ? '' : 's'} · ${period?.nameAtTime}`
+                      : `city precision · ${period?.controllingPolity}, ${period?.periodLabel}`}
                   </span>
                 </button>
+                {isTemporalWorkspace && placeEvents.length > 0 ? (
+                  <ol className="chronicle-location-events">
+                    {placeEvents.map((event) => (
+                      <li key={event.id}>
+                        <button
+                          type="button"
+                          aria-current={focus.kind === 'event' && focus.eventId === event.id ? 'true' : undefined}
+                          onClick={() => onSelectFocus({ kind: 'event', eventId: event.id })}
+                        >
+                          <span>{formatHistoricalDate(event.eventTime)}</span>
+                          {event.title}
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
               </li>
             )
           })}
@@ -95,11 +123,15 @@ function HistoricalMap({
   places,
   focus,
   onSelectFocus,
+  visibleEvents,
+  isTemporalWorkspace,
 }: {
   scene: Scene
   places: PlaceEntity[]
   focus: FocusValue
   onSelectFocus: (focus: FocusValue) => void
+  visibleEvents: EventRecord[]
+  isTemporalWorkspace: boolean
 }) {
   const placesRef = useRef(places)
   placesRef.current = places
@@ -108,6 +140,10 @@ function HistoricalMap({
   const markersRef = useRef<Map<string, Marker>>(new Map())
   const onSelectFocusRef = useRef(onSelectFocus)
   onSelectFocusRef.current = onSelectFocus
+  const visibleEventsRef = useRef(visibleEvents)
+  visibleEventsRef.current = visibleEvents
+  const temporalWorkspaceRef = useRef(isTemporalWorkspace)
+  temporalWorkspaceRef.current = isTemporalWorkspace
 
   useEffect(() => {
     let cancelled = false
@@ -147,7 +183,14 @@ function HistoricalMap({
                 id: 'period-basemap-layer',
                 type: 'raster',
                 source: 'period-basemap',
-                paint: { 'raster-fade-duration': 0 },
+                paint: {
+                  'raster-fade-duration': 0,
+                  'raster-opacity': 0.86,
+                  'raster-saturation': -0.48,
+                  'raster-contrast': 0.18,
+                  'raster-brightness-min': 0.05,
+                  'raster-brightness-max': 0.72,
+                },
               },
             ],
           },
@@ -180,11 +223,19 @@ function HistoricalMap({
           const el = document.createElement('div')
           el.setAttribute('role', 'presentation')
           el.setAttribute('aria-hidden', 'true')
-          el.className =
-            'h-4 w-4 rounded-full border-2 border-white shadow cursor-pointer bg-neutral-700'
-          el.addEventListener('click', () =>
-            onSelectFocusRef.current({ kind: 'entity', entityId: place.id, entityType: 'place' }),
-          )
+          el.className = 'chronicle-map-marker'
+          const count = document.createElement('span')
+          count.setAttribute('aria-hidden', 'true')
+          el.append(count)
+          el.addEventListener('click', () => {
+            const placeEvents = visibleEventsRef.current.filter((event) => event.placeId === place.id)
+            const latestEvent = placeEvents[placeEvents.length - 1]
+            if (temporalWorkspaceRef.current && latestEvent) {
+              onSelectFocusRef.current({ kind: 'event', eventId: latestEvent.id })
+              return
+            }
+            onSelectFocusRef.current({ kind: 'entity', entityId: place.id, entityType: 'place' })
+          })
           const marker = new maplibregl.Marker({ element: el })
             .setLngLat([place.coordinates.lng, place.coordinates.lat])
             .addTo(map)
@@ -208,18 +259,31 @@ function HistoricalMap({
   }, [scene])
 
   useEffect(() => {
+    const activeEventPlaceId =
+      focus.kind === 'event'
+        ? places.find((place) =>
+            visibleEvents.some(
+              (event) => event.id === focus.eventId && event.placeId === place.id,
+            ),
+          )?.id
+        : undefined
+
     for (const [placeId, marker] of markersRef.current) {
       const isFocused =
-        focus.kind === 'entity' && focus.entityId === placeId && focus.entityType === 'place'
+        (focus.kind === 'entity' && focus.entityId === placeId && focus.entityType === 'place') ||
+        activeEventPlaceId === placeId
+      const eventCount = visibleEvents.filter((event) => event.placeId === placeId).length
       const el = marker.getElement()
-      el.className = `h-4 w-4 rounded-full border-2 border-white shadow cursor-pointer ${
-        isFocused ? 'bg-blue-600 scale-125' : 'bg-neutral-700'
+      el.className = `chronicle-map-marker ${isFocused ? 'is-focused' : ''} ${
+        eventCount === 0 ? 'is-dormant' : ''
       }`
+      const count = el.querySelector('span')
+      if (count) count.textContent = eventCount > 0 ? String(eventCount) : ''
     }
-  }, [focus])
+  }, [focus, places, visibleEvents])
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="chronicle-historical-map-frame">
       {/* Progressive enhancement, not the first-class interaction (like
           GraphView's canvas) — its real pan/zoom controls can't coexist
           with an img/image role, so it's removed from the accessibility
@@ -228,13 +292,17 @@ function HistoricalMap({
       <div
         ref={containerRef}
         aria-hidden="true"
-        className="h-72 w-full overflow-hidden rounded-lg border border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900"
+        className="chronicle-historical-map"
       />
       {scene.mapLayer && (
-        <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-          {scene.mapLayer.periodLabel} — {scene.mapLayer.sourceCitation} (
-          {scene.mapLayer.attribution}, {scene.mapLayer.license})
-        </p>
+        <details className="chronicle-map-citation">
+          <summary>Map provenance &amp; limitations</summary>
+          <p>
+            {scene.mapLayer.periodLabel} — {scene.mapLayer.sourceCitation} (
+            {scene.mapLayer.attribution}, {scene.mapLayer.license})
+          </p>
+          <p>{scene.mapLayer.georeferencingNote}</p>
+        </details>
       )}
     </div>
   )
@@ -248,9 +316,11 @@ function HistoricalMap({
 function SchematicMap({
   places,
   focus,
+  visibleEvents,
 }: {
   places: PlaceEntity[]
   focus: FocusValue
+  visibleEvents: EventRecord[]
 }) {
   const hasTwoPlaces = places.length === 2
 
@@ -259,7 +329,7 @@ function SchematicMap({
       role="img"
       aria-label="Schematic orientation map (no period-accurate basemap curated for this scene yet)"
       viewBox="0 0 240 140"
-      className="w-full rounded-lg border border-neutral-200 bg-gradient-to-b from-neutral-50 to-neutral-100 dark:border-neutral-800 dark:from-neutral-950 dark:to-neutral-900"
+      className="chronicle-schematic-map"
     >
       {hasTwoPlaces && (
         <>
@@ -276,7 +346,7 @@ function SchematicMap({
             x={120}
             y={58}
             textAnchor="middle"
-            className="fill-neutral-500 text-[9px] dark:fill-neutral-400"
+            className="fill-neutral-500 text-xs dark:fill-neutral-400"
           >
             diplomatic communication
           </text>
@@ -284,10 +354,12 @@ function SchematicMap({
       )}
       {places.map((place, index) => {
         const x = 60 + index * 120
+        const placeEvents = visibleEvents.filter((event) => event.placeId === place.id)
         const isFocused =
-          focus.kind === 'entity' &&
-          focus.entityId === place.id &&
-          focus.entityType === 'place'
+          (focus.kind === 'entity' &&
+            focus.entityId === place.id &&
+            focus.entityType === 'place') ||
+          (focus.kind === 'event' && placeEvents.some((event) => event.id === focus.eventId))
         return (
           <g key={place.id}>
             <circle
@@ -311,10 +383,15 @@ function SchematicMap({
               x={x}
               y={95}
               textAnchor="middle"
-              className="fill-neutral-900 text-[13px] font-semibold dark:fill-neutral-100"
+              className="fill-neutral-900 text-sm font-semibold dark:fill-neutral-100"
             >
               {place.canonicalName}
             </text>
+            {placeEvents.length > 0 ? (
+              <text x={x} y={112} textAnchor="middle" className="chronicle-schematic-event-count">
+                {placeEvents.length} event{placeEvents.length === 1 ? '' : 's'} visible
+              </text>
+            ) : null}
           </g>
         )
       })}

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { InvestigationPage } from './InvestigationPage'
@@ -33,12 +33,13 @@ describe('InvestigationPage (map-first workspace, the default)', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByRole('heading', { level: 1, name: 'Chronicle' }),
+        screen.getByRole('heading', {
+          level: 1,
+          name: /German Assurance and Vienna’s Posture/i,
+        }),
       ).toBeInTheDocument(),
     )
-    expect(
-      screen.getByText(/German Assurance and Vienna’s Posture/i),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Chronicle' })).toBeInTheDocument()
     expect(document.title).toBe(
       'The German Assurance and Vienna’s Posture, 4–10 July 1914 · Chronicle',
     )
@@ -53,6 +54,26 @@ describe('InvestigationPage (map-first workspace, the default)', () => {
       'href',
       '/investigations/blank-cheque-golden/scenes/scene-2-blank-cheque/inspector',
     )
+  })
+
+  it('uses the time control to reveal only events available by the selected moment', async () => {
+    renderPage()
+    const slider = await screen.findByRole('slider', { name: /historical event position/i })
+
+    expect(slider).toHaveValue('2')
+    expect(screen.getByText(/3 events visible/i)).toBeInTheDocument()
+
+    fireEvent.change(slider, { target: { value: '0' } })
+
+    expect(slider).toHaveValue('0')
+    expect(slider).toHaveAttribute(
+      'aria-valuetext',
+      expect.stringMatching(/Szögyény meets Wilhelm II/i),
+    )
+    expect(screen.getByText(/1 event visible/i)).toBeInTheDocument()
+    expect(
+      screen.getAllByText(/Szögyény meets Wilhelm II in Berlin/i).length,
+    ).toBeGreaterThan(0)
   })
 
   it('has no detectable accessibility violations once loaded', async () => {

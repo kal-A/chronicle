@@ -8,6 +8,8 @@ export function WorkspaceHeader({
   onSelectLens,
   inspectorHref,
   focusDescription,
+  canClearFocus,
+  onClearFocus,
 }: {
   investigationTitle: string
   lenses: InvestigationLens[]
@@ -15,27 +17,27 @@ export function WorkspaceHeader({
   onSelectLens: (lensId: string) => void
   inspectorHref: string
   focusDescription: string
+  canClearFocus: boolean
+  onClearFocus: () => void
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
-          Chronicle
-        </h1>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">{investigationTitle}</p>
+    <div className="chronicle-workspace-header">
+      <div className="chronicle-workspace-identity">
+        <Link to="/" className="chronicle-workspace-wordmark">Chronicle</Link>
+        <h1>{investigationTitle}</h1>
       </div>
-      <div className="flex flex-col items-end gap-2">
+      <div className="chronicle-workspace-controls">
         <p
           role="status"
           aria-live="polite"
-          className="text-xs text-neutral-500 dark:text-neutral-400"
+          className="chronicle-focus-status sr-only"
         >
           {focusDescription}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="chronicle-lens-controls">
           <label
             htmlFor="workspace-lens-select"
-            className="text-xs font-medium text-neutral-600 dark:text-neutral-400"
+            className="chronicle-control-label"
           >
             Lens
           </label>
@@ -43,7 +45,7 @@ export function WorkspaceHeader({
             id="workspace-lens-select"
             value={activeLensId}
             onChange={(event) => onSelectLens(event.target.value)}
-            className="rounded border border-neutral-300 bg-white px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-900"
+            className="chronicle-lens-select"
           >
             {lenses.map((lens) => (
               <option key={lens.id} value={lens.id}>
@@ -51,9 +53,18 @@ export function WorkspaceHeader({
               </option>
             ))}
           </select>
+          {canClearFocus ? (
+            <button
+              type="button"
+              className="chronicle-return-to-scene"
+              onClick={onClearFocus}
+            >
+              Show all events
+            </button>
+          ) : null}
           <Link
             to={inspectorHref}
-            className="rounded border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            className="chronicle-inspector-link"
           >
             Inspector →
           </Link>

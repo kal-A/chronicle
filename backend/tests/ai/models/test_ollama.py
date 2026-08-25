@@ -61,6 +61,28 @@ def test_request_includes_the_json_schema_and_model_name():
     assert payload["messages"][1] == {"role": "user", "content": "usr"}
 
 
+def test_request_uses_an_explicit_response_schema_override():
+    captured = {}
+    strict_schema = _SampleAnswer.model_json_schema()
+    strict_schema["required"] = list(strict_schema["properties"])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["payload"] = json.loads(request.content)
+        return _ok_chat_response(json.dumps({"summary": "ok", "confidence": 1.0}))
+
+    provider = _provider_with_handler(handler)
+    result = provider.generate_structured(
+        system_prompt="sys",
+        user_prompt="usr",
+        response_model=_SampleAnswer,
+        response_schema=strict_schema,
+        prompt_version="v1",
+    )
+
+    assert result.value.summary == "ok"
+    assert captured["payload"]["format"] == strict_schema
+
+
 def test_valid_structured_response_parses_and_records_usage():
     def handler(request: httpx.Request) -> httpx.Response:
         return _ok_chat_response(

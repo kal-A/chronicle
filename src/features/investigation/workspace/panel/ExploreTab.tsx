@@ -15,30 +15,30 @@ export function ExploreTab({
   const plan = investigation.experiencePlan
 
   return (
-    <div className="flex flex-col gap-4 text-sm">
+    <div className="chronicle-panel-stack">
       {plan && (
         <div>
-          <p className="font-medium text-neutral-900 dark:text-neutral-50">{plan.opening.leadAnswer}</p>
-          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+          <p className="chronicle-panel-lead">{plan.opening.leadAnswer}</p>
+          <p className="chronicle-panel-muted">
             {plan.opening.evidenceCoverageSummary}
           </p>
         </div>
       )}
 
       <div>
-        <h2 className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+        <h2 className="chronicle-panel-section-title">
           {lens.label} lens
         </h2>
-        <p className="mt-1 text-neutral-700 dark:text-neutral-300">{lens.purpose}</p>
+        <p className="chronicle-panel-copy">{lens.purpose}</p>
       </div>
 
       <div>
-        <h2 className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+        <h2 className="chronicle-panel-section-title">
           What&rsquo;s visible
         </h2>
-        <ol className="mt-1 flex flex-col gap-1">
+        <ol className="chronicle-panel-list">
           {lens.textFallback.map((line) => (
-            <li key={line} className="text-neutral-700 dark:text-neutral-300">
+            <li key={line}>
               {line}
             </li>
           ))}
@@ -47,12 +47,12 @@ export function ExploreTab({
 
       {lens.limitations.length > 0 && (
         <div>
-          <h2 className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+          <h2 className="chronicle-panel-section-title chronicle-panel-section-title--warning">
             Limitations
           </h2>
-          <ul className="mt-1 flex flex-col gap-1">
+          <ul className="chronicle-panel-list chronicle-panel-list--warning">
             {lens.limitations.map((limitation) => (
-              <li key={limitation} className="text-amber-800 dark:text-amber-300">
+              <li key={limitation}>
                 {limitation}
               </li>
             ))}

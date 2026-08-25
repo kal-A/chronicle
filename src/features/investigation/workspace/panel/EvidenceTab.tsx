@@ -49,17 +49,17 @@ export function EvidenceTab({
   const hasAnything = claims.length > 0 || relationships.length > 0
 
   return (
-    <div className="flex flex-col gap-3 text-sm">
+    <div className="chronicle-panel-stack">
       {!hasAnything && (
-        <p className="text-neutral-500 dark:text-neutral-400">
+        <p className="chronicle-panel-muted">
           No reviewed or prototype-curated evidence is linked to this selection yet.
         </p>
       )}
 
       {claims.map((claim) => (
-        <div key={claim.id} className="rounded-lg border border-neutral-200 p-2 dark:border-neutral-800">
-          <p className="font-medium text-neutral-900 dark:text-neutral-50">{claim.statement}</p>
-          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+        <div key={claim.id} className="chronicle-panel-record">
+          <p className="chronicle-panel-lead">{claim.statement}</p>
+          <p className="chronicle-panel-muted">
             {claim.directOrInferred === 'direct' ? 'Direct' : 'Inferred'} claim
           </p>
         </div>
@@ -68,19 +68,19 @@ export function EvidenceTab({
       {relationships.map((relationship) => (
         <div
           key={relationship.id}
-          className="rounded-lg border border-dashed border-amber-400 bg-amber-50/60 p-2 dark:border-amber-700 dark:bg-amber-950/20"
+          className="chronicle-panel-record chronicle-panel-record--caution"
         >
-          <p className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+          <p className="chronicle-panel-section-title chronicle-panel-section-title--warning">
             {relationship.evidenceClassification.replace('_', ' ')}
           </p>
-          <p className="text-xs text-neutral-600 dark:text-neutral-400">{relationship.relationshipType}</p>
+          <p className="chronicle-panel-muted">{relationship.relationshipType}</p>
         </div>
       ))}
 
       {hasAnything && (
         <button
           type="button"
-          className="self-start text-xs font-semibold text-blue-700 hover:underline dark:text-blue-400"
+          className="chronicle-panel-link"
           onClick={onOpenInspector}
         >
           Open full evidence in Inspector →

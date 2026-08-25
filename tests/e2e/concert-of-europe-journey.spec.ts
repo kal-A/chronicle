@@ -24,10 +24,13 @@ test('Concert of Europe workspace: the Vienna scene renders its Sequence lens wi
 }) => {
   await page.goto(VIENNA_SCENE_URL)
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Chronicle' })).toBeVisible()
   await expect(
-    page.getByText('The Concert of Europe and Revolutionary Intervention'),
+    page.getByRole('heading', {
+      level: 1,
+      name: 'The Concert of Europe and Revolutionary Intervention',
+    }),
   ).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Chronicle' })).toBeVisible()
 
   // The default lens (Sequence, map-type) shows a real period map — not the
   // schematic fallback — for this scene specifically.

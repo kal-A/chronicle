@@ -16,66 +16,81 @@ import pytest
 from pydantic import ValidationError
 
 from chronicle.ai.orchestration import run_models, statuses
-from chronicle.ai.orchestration.run_models import AgentRunRecord, AgentRunRequest
+from chronicle.ai.orchestration.run_models import AgentRunRecord, InvestigationRequest
 from chronicle.ai.orchestration.statuses import AgentRunStatus
 
 
-def _valid_request() -> AgentRunRequest:
-    return AgentRunRequest(
-        question="How did Troppau lead to intervention in Naples?",
-        investigationPackageId="concert-of-europe",
-        sceneId="scene-vienna",
+def _valid_request() -> InvestigationRequest:
+    return InvestigationRequest(
+        runId="run-1",
+        corpusId="concert-of-europe",
+        userQuestion="How did Troppau lead to intervention in Naples?",
+    )
+
+
+def _valid_record(**kwargs) -> AgentRunRecord:
+    return AgentRunRecord(
+        runId="run-1",
+        request=_valid_request(),
+        corpusSnapshot={
+            "corpusId": "concert-of-europe",
+            "packageId": "concert-of-europe",
+            "packageHash": "a" * 64,
+            "packageRevision": 1,
+            "schemaVersion": "1.0.0",
+        },
+        **kwargs,
     )
 
 
 def test_valid_scaffold_record_parses():
-    record = AgentRunRecord(runId="run-1", request=_valid_request())
+    record = _valid_record()
 
     assert record.status == AgentRunStatus.CREATED
     assert record.modelCalls == []
     assert record.warnings == []
     assert record.abstentionReason is None
-    assert record.request.question.startswith("How did Troppau")
+    assert record.request.userQuestion.startswith("How did Troppau")
 
 
 @pytest.mark.parametrize(
     "field,value",
-    [("question", ""), ("investigationPackageId", ""), ("sceneId", "")],
+    [("runId", ""), ("corpusId", ""), ("userQuestion", "")],
 )
 def test_request_rejects_empty_required_fields(field, value):
     kwargs = {
-        "question": "q",
-        "investigationPackageId": "concert-of-europe",
-        "sceneId": "scene-vienna",
+        "runId": "run-1",
+        "corpusId": "concert-of-europe",
+        "userQuestion": "q",
     }
     kwargs[field] = value
     with pytest.raises(ValidationError):
-        AgentRunRequest(**kwargs)
+        InvestigationRequest(**kwargs)
 
 
 def test_request_rejects_missing_required_fields():
     with pytest.raises(ValidationError):
-        AgentRunRequest(question="q")
+        InvestigationRequest(userQuestion="q")
 
 
 def test_record_rejects_unknown_fields():
     with pytest.raises(ValidationError):
-        AgentRunRecord(runId="run-1", request=_valid_request(), unexpectedField="nope")
+        _valid_record(unexpectedField="nope")
 
 
 @pytest.mark.parametrize("status", list(AgentRunStatus))
 def test_status_enum_accepts_every_supported_state(status):
-    record = AgentRunRecord(runId="run-1", request=_valid_request(), status=status)
+    record = _valid_record(status=status)
     assert record.status is status
 
 
 def test_status_rejects_an_unsupported_value():
     with pytest.raises(ValidationError):
-        AgentRunRecord(runId="run-1", request=_valid_request(), status="not-a-real-status")
+        _valid_record(status="not-a-real-status")
 
 
 def test_touch_advances_updated_at_without_changing_created_at():
-    record = AgentRunRecord(runId="run-1", request=_valid_request())
+    record = _valid_record()
     created_at = record.createdAt
     updated_before = record.updatedAt
 

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
 import {
   fetchInvestigationScene,
   InvestigationPackageLoadError,
@@ -18,6 +18,12 @@ import { InspectorView } from './inspector/InspectorView'
  */
 export function InvestigationPage({ mode = 'workspace' }: { mode?: 'workspace' | 'inspector' }) {
   const { packageId = '', sceneId = '' } = useParams()
+  const location = useLocation()
+  const enteredFromAsk = Boolean(
+    (location.state as { enteredFromAsk?: boolean } | null)?.enteredFromAsk,
+  )
+  const submittedQuestion =
+    (location.state as { question?: string } | null)?.question?.trim() || undefined
   const { data, isPending, isError, error } = useQuery({
     queryKey: ['investigation', packageId, 'scene', sceneId],
     queryFn: () => fetchInvestigationScene(packageId, sceneId),
@@ -25,8 +31,8 @@ export function InvestigationPage({ mode = 'workspace' }: { mode?: 'workspace' |
 
   if (isPending) {
     return (
-      <main className="flex min-h-svh items-center justify-center bg-neutral-50 p-6 dark:bg-neutral-950">
-        <p role="status" className="text-neutral-500 dark:text-neutral-400">
+      <main className="chronicle-investigation-state">
+        <p role="status">
           Loading investigation…
         </p>
       </main>
@@ -43,8 +49,8 @@ export function InvestigationPage({ mode = 'workspace' }: { mode?: 'workspace' |
             ? 'This investigation failed to load. Please try again.'
           : 'Something went wrong loading this investigation.'
     return (
-      <main className="flex min-h-svh items-center justify-center bg-neutral-50 p-6 dark:bg-neutral-950">
-        <p role="alert" className="text-red-700 dark:text-red-400">
+      <main className="chronicle-investigation-state chronicle-investigation-state--error">
+        <p role="alert">
           {message}
         </p>
       </main>
@@ -60,7 +66,12 @@ export function InvestigationPage({ mode = 'workspace' }: { mode?: 'workspace' |
           workspaceHref={`/investigations/${encodeURIComponent(packageId)}/scenes/${encodeURIComponent(sceneId)}`}
         />
       ) : (
-        <InvestigationWorkspace investigation={data.investigation} scene={data.scene} />
+        <InvestigationWorkspace
+          investigation={data.investigation}
+          scene={data.scene}
+          enteredFromAsk={enteredFromAsk}
+          submittedQuestion={submittedQuestion}
+        />
       )}
     </FocusProvider>
   )

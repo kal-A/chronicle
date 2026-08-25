@@ -8,7 +8,9 @@ The existing July Crisis Blank Cheque slice is the first golden renderer fixture
 
 ## Status
 
-AI-first pivot, Phase B complete. Chronicle now loads a versioned, validated `GeneratedInvestigation` JSON package and renders it through a generic package/scene route. The migrated Blank Cheque package remains `prototype-curated`; no live retrieval or model calls exist yet. Phase C awaits approval. See `plans/current-phase.md`.
+Chronicle is a local pre-alpha on the `phase-e-ai-core` branch. The versioned package/generic renderer, deterministic Python pipeline, two package-backed benchmark investigations, map-first workspace, four bounded AI roles, typed retrieval tools, FastAPI/SSE runtime, and live investigation Ask panel are implemented. The local runtime uses Ollama with `qwen2.5:7b-instruct`; ordinary tests use a deterministic provider.
+
+Phase E6 is a working vertical slice but is not formally closed: generic-answer usefulness, semantic directionality/entailment, and CPU-only latency still need evaluation. Phase E7 is planned but not implemented. Chronicle does **not** yet provide open web/database research, document acquisition, a production database, authentication, Studio review workflows, or general new-topic generation. The landing page currently routes only to two disclosed curated packages. See [`plans/current-phase.md`](plans/current-phase.md), the [PRD](docs/product/CHRONICLE_PRODUCT_REQUIREMENTS.md), and the [engineering progress report](docs/delivery/CHRONICLE_PROJECT_PROGRESS_REPORT.md).
 
 ## Project Structure
 
@@ -46,7 +48,7 @@ Chronicle is developable and demonstrable entirely on free/open-source tooling: 
 
 ## Getting Started
 
-Frontend-only walking skeleton (no backend yet):
+Frontend:
 
 ```bash
 npm install
@@ -58,7 +60,25 @@ npm run build         # production build
 npm run test:e2e      # Playwright journey (builds + previews first)
 ```
 
-The current app renders the prototype-curated Blank Cheque content from `fixtures/blank-cheque.golden-investigation.json` through the generic route `/investigations/:packageId/scenes/:sceneId`. Its historical content remains `prototype-curated`, not independently reviewed.
+Backend and local assistant (PowerShell):
+
+```powershell
+py -3.11 -m venv backend/.venv
+backend/.venv/Scripts/python -m pip install -e "backend[test]"
+ollama pull qwen2.5:7b-instruct
+backend/.venv/Scripts/python -m uvicorn chronicle.api.app:app --app-dir backend/src --host 127.0.0.1 --port 8000
+```
+
+Run the frontend in another terminal with `npm run dev`. Vite proxies `/api` and `/health` to the local backend. Live-Ollama tests are opt-in; normal backend tests use the deterministic provider.
+
+The current packages remain `prototype-curated`, not independently reviewed historical publications.
+
+## Collaborating
+
+- GitHub: https://github.com/kal-A/chronicle
+- Start from `AGENTS.md`; Claude Code also reads `CLAUDE.md`.
+- Review the PRD and progress report above before changing architecture.
+- Do not expose the unauthenticated local API publicly or commit secrets/run artifacts.
 
 ## Contributing / Agent Workflow
 

@@ -25,7 +25,7 @@ export function TimelineView({
 
   if (events.length === 0) {
     return (
-      <p className="text-sm text-neutral-500 dark:text-neutral-400">
+      <p className="chronicle-timeline-empty">
         No events are available for this scene yet.
       </p>
     )
@@ -33,22 +33,18 @@ export function TimelineView({
 
   return (
     <nav aria-label="Timeline of events in this scene">
-      <ol className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+      <ol className="chronicle-timeline-list">
         {events.map((event) => {
           const isFocused = focus.kind === 'event' && focus.eventId === event.id
           return (
-            <li key={event.id} className="sm:flex-1 sm:basis-48">
+            <li key={event.id}>
               <button
                 type="button"
                 aria-current={isFocused ? 'true' : undefined}
-                className={`w-full rounded-lg border-l-4 border p-2 text-left text-sm transition-colors ${
-                  isFocused
-                    ? 'border-blue-600 bg-blue-50 font-semibold dark:bg-blue-950/40'
-                    : 'border-l-transparent border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900'
-                }`}
+                className={`chronicle-timeline-event ${isFocused ? 'is-focused' : ''}`}
                 onClick={() => onSelectFocus({ kind: 'event', eventId: event.id })}
               >
-                <span className="block text-xs font-medium tracking-wide text-neutral-500 dark:text-neutral-400">
+                <span className="chronicle-timeline-date">
                   {formatHistoricalDate(event.eventTime)}
                 </span>
                 <span>{event.title}</span>

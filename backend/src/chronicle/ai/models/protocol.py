@@ -15,11 +15,11 @@ choice.
 
 from __future__ import annotations
 
-from typing import Protocol, TypeVar, runtime_checkable
+from typing import Any, Protocol, TypeVar, runtime_checkable
 
 from pydantic import BaseModel
 
-from .metadata import ProviderHealth, ProviderMetadata
+from .metadata import ModelGenerationSettings, ProviderHealth, ProviderMetadata
 from ..contracts.structured_generation import StructuredGenerationResult, TextGenerationResult
 
 T = TypeVar("T", bound=BaseModel)
@@ -33,8 +33,10 @@ class ModelProvider(Protocol):
         system_prompt: str,
         user_prompt: str,
         response_model: type[T],
+        response_schema: dict[str, Any] | None = None,
         prompt_version: str,
         temperature: float = 0.0,
+        generation_settings: ModelGenerationSettings | None = None,
     ) -> StructuredGenerationResult[T]:
         """Generate a response that validates against response_model.
 
@@ -49,6 +51,7 @@ class ModelProvider(Protocol):
         system_prompt: str,
         user_prompt: str,
         prompt_version: str,
+        generation_settings: ModelGenerationSettings | None = None,
     ) -> TextGenerationResult:
         """Ordinary (non-schema-constrained) text generation. Named for its
         one sanctioned use per AGENTS.md §4: composing user-facing prose

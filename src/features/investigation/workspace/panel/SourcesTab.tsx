@@ -8,21 +8,21 @@ import type { Scene } from '../../model/schema'
 export function SourcesTab({ scene }: { scene: Scene }) {
   if (scene.sources.length === 0) {
     return (
-      <p className="text-sm text-neutral-500 dark:text-neutral-400">
+      <p className="chronicle-panel-muted">
         No sources are curated for this scene yet.
       </p>
     )
   }
 
   return (
-    <ul className="flex flex-col gap-2 text-sm">
+    <ul className="chronicle-panel-list chronicle-source-list">
       {scene.sources.map((source) => (
-        <li key={source.id} className="rounded-lg border border-neutral-200 p-2 dark:border-neutral-800">
-          <p className="font-medium text-neutral-900 dark:text-neutral-50">{source.title}</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+        <li key={source.id} className="chronicle-panel-record">
+          <p className="chronicle-panel-lead">{source.title}</p>
+          <p className="chronicle-panel-muted">
             {source.sourceType.replace(/-/g, ' ')} &middot; {source.authorOrOrigin}
           </p>
-          <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">{source.knownLimitations}</p>
+          <p className="chronicle-panel-copy">{source.knownLimitations}</p>
         </li>
       ))}
     </ul>

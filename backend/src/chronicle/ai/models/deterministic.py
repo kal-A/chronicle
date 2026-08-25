@@ -14,6 +14,8 @@ flaky model.
 from __future__ import annotations
 
 import time
+import hashlib
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -33,6 +35,7 @@ from .metadata import (
     CostBasis,
     ModelCallRecord,
     ModelCallStatus,
+    ModelGenerationSettings,
     ProviderCost,
     ProviderHealth,
     ProviderMetadata,
@@ -115,18 +118,40 @@ class DeterministicModelProvider:
         system_prompt: str,
         user_prompt: str,
         response_model: type[BaseModel],
+        response_schema: dict[str, Any] | None = None,
         prompt_version: str,
         temperature: float = 0.0,
+        generation_settings: ModelGenerationSettings | None = None,
     ) -> StructuredGenerationResult[BaseModel]:
         started_at = _utcnow()
         start_perf = time.perf_counter()
         last_error: ModelProviderError | None = None
+        settings = generation_settings or ModelGenerationSettings(temperature=temperature)
+        effective_schema = response_schema or response_model.model_json_schema()
+        input_hash = _input_hash(
+            system_prompt,
+            user_prompt,
+            json.dumps(effective_schema, sort_keys=True),
+            prompt_version,
+            settings,
+        )
 
         for attempt in range(1, MAX_STRUCTURED_OUTPUT_ATTEMPTS + 1):
-            item = self._pop()
+            try:
+                item = self._pop()
+            except ModelProviderError as exc:
+                _attach_failed_record(
+                    exc, self._provider_version, prompt_version, input_hash, settings,
+                    started_at, start_perf, attempt,
+                )
+                raise
 
             if isinstance(item, _ErrorItem):
                 if not isinstance(item.error, RETRYABLE_ERROR_TYPES):
+                    _attach_failed_record(
+                        item.error, self._provider_version, prompt_version, input_hash, settings,
+                        started_at, start_perf, attempt,
+                    )
                     raise item.error
                 last_error = item.error
                 continue
@@ -145,6 +170,9 @@ class DeterministicModelProvider:
                     providerVersion=self._provider_version,
                     modelName=DETERMINISTIC_MODEL_NAME,
                     promptVersion=prompt_version,
+                    inputHash=input_hash,
+                    outputHash=_value_hash(value),
+                    generationSettings=settings,
                     status=ModelCallStatus.SUCCEEDED,
                     attemptCount=attempt,
                     startedAt=started_at,
@@ -154,10 +182,14 @@ class DeterministicModelProvider:
                 ),
             )
 
-        completed_at = _utcnow()
-        raise RetryExhaustedError(
+        error = RetryExhaustedError(
             f"Exhausted {MAX_STRUCTURED_OUTPUT_ATTEMPTS} attempt(s) generating {response_model.__name__}"
-        ) from last_error
+        )
+        _attach_failed_record(
+            error, self._provider_version, prompt_version, input_hash, settings,
+            started_at, start_perf, MAX_STRUCTURED_OUTPUT_ATTEMPTS,
+        )
+        raise error from last_error
 
     def generate_text_from_verified_records(
         self,
@@ -165,17 +197,36 @@ class DeterministicModelProvider:
         system_prompt: str,
         user_prompt: str,
         prompt_version: str,
+        generation_settings: ModelGenerationSettings | None = None,
     ) -> TextGenerationResult:
         started_at = _utcnow()
         start_perf = time.perf_counter()
-        item = self._pop()
+        settings = generation_settings or ModelGenerationSettings()
+        input_hash = _input_hash(system_prompt, user_prompt, "text", prompt_version, settings)
+        try:
+            item = self._pop()
+        except ModelProviderError as exc:
+            _attach_failed_record(
+                exc, self._provider_version, prompt_version, input_hash, settings,
+                started_at, start_perf, 1,
+            )
+            raise
 
         if isinstance(item, _ErrorItem):
+            _attach_failed_record(
+                item.error, self._provider_version, prompt_version, input_hash, settings,
+                started_at, start_perf, 1,
+            )
             raise item.error
         if not isinstance(item, _TextItem):
-            raise InvalidConfigurationError(
+            error = InvalidConfigurationError(
                 "DeterministicModelProvider's next queued item is not a text response"
             )
+            _attach_failed_record(
+                error, self._provider_version, prompt_version, input_hash, settings,
+                started_at, start_perf, 1,
+            )
+            raise error
 
         completed_at = _utcnow()
         return TextGenerationResult(
@@ -185,6 +236,9 @@ class DeterministicModelProvider:
                 providerVersion=self._provider_version,
                 modelName=DETERMINISTIC_MODEL_NAME,
                 promptVersion=prompt_version,
+                inputHash=input_hash,
+                outputHash=hashlib.sha256(item.text.encode("utf-8")).hexdigest(),
+                generationSettings=settings,
                 status=ModelCallStatus.SUCCEEDED,
                 attemptCount=1,
                 startedAt=started_at,
@@ -224,3 +278,53 @@ class DeterministicModelProvider:
             except ValidationError as exc:
                 raise SchemaValidationError(str(exc)) from exc
         raise InvalidConfigurationError(f"Unexpected queued item type: {type(item).__name__}")
+
+
+def _input_hash(
+    system_prompt: str,
+    user_prompt: str,
+    response_type: str,
+    prompt_version: str,
+    settings: ModelGenerationSettings,
+) -> str:
+    payload = {
+        "system": system_prompt,
+        "user": user_prompt,
+        "responseType": response_type,
+        "promptVersion": prompt_version,
+        "settings": settings.model_dump(mode="json"),
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+def _value_hash(value: BaseModel) -> str:
+    return hashlib.sha256(value.model_dump_json().encode("utf-8")).hexdigest()
+
+
+def _attach_failed_record(
+    error: ModelProviderError,
+    provider_version: str,
+    prompt_version: str,
+    input_hash: str,
+    settings: ModelGenerationSettings,
+    started_at: datetime,
+    start_perf: float,
+    attempt: int,
+) -> None:
+    completed_at = _utcnow()
+    error.callRecord = ModelCallRecord(
+        providerName="deterministic",
+        providerVersion=provider_version,
+        modelName=DETERMINISTIC_MODEL_NAME,
+        promptVersion=prompt_version,
+        inputHash=input_hash,
+        generationSettings=settings,
+        status=ModelCallStatus.FAILED,
+        attemptCount=attempt,
+        startedAt=started_at,
+        completedAt=completed_at,
+        latencyMs=(time.perf_counter() - start_perf) * 1000,
+        cost=_NO_PROVIDER_CHARGE,
+        errorType=type(error).__name__,
+        errorMessage=str(error)[:500],
+    )
