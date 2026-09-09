@@ -29,5 +29,6 @@ where = ["src"]
 testpaths = ["tests"]
 markers = [
     "local_ollama_integration: requires a real local Ollama daemon reachable at CHRONICLE_OLLAMA_BASE_URL; excluded from the default run (see addopts). Invoke explicitly with `pytest -m local_ollama_integration -s`. Skips itself (does not fail) when Ollama is unreachable.",
+    "live_network_integration: hits real free source APIs (Wikipedia, Gutenberg, Internet Archive); excluded from the default run. Invoke explicitly with `pytest -m live_network_integration -s`. Skips itself (does not fail) when the network is unreachable.",
 ]
-addopts = "-m 'not local_ollama_integration'"
+addopts = "-m 'not local_ollama_integration and not live_network_integration'"

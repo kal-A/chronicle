@@ -29,7 +29,9 @@ FORBIDDEN_STRINGS = [
     "july crisis",
 ]
 
-SCANNED_PACKAGES = ["corpus", "ai/tools", "ai/orchestration"]
+# ``acquisition`` builds corpora from arbitrary topics; ``ai/orchestration`` (already
+# scanned) will hold the LangGraph control-flow graph. Both must stay topic-agnostic.
+SCANNED_PACKAGES = ["corpus", "ai/tools", "ai/orchestration", "acquisition"]
 EXCLUDED_FILES = {"corpus/manifest.py"}
 ID_NAMES = {"corpusid", "corpus_id", "packageid", "package_id", "investigation_id"}
 
