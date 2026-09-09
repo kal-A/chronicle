@@ -11,6 +11,7 @@ from chronicle.ai.agents.analyst import (
     EvidenceAnalyst,
 )
 from chronicle.ai.agents.analyst_prompt import build_analyst_prompt
+from chronicle.ai.agents.analyst_schema import build_analyst_response_schema
 from chronicle.ai.contracts.analysis import (
     AnalysisCitation,
     AnalysisDraft,
@@ -86,6 +87,201 @@ def _context():
     return plan, bundle, draft
 
 
+def _passage_only_context(tmp_path):
+    """A retrieval bundle over an auto-acquired corpus: passages + sources, but
+    no evidence-links and no directness metadata (no claims/relationships). Over
+    such a bundle only inferred synthesis can ground (see
+    grounding._validate_directness), which is what the schema must enforce. Built
+    from the real acquisition builder so the passage-only shape is faithful, not
+    hand-crafted.
+    """
+
+    import json
+    from datetime import date, datetime, timezone
+
+    from chronicle.acquisition.chunking import chunk_source
+    from chronicle.acquisition.contracts import AcquiredSource, SourceCandidate
+    from chronicle.acquisition.corpus_builder import build_corpus
+    from chronicle.contracts.enums import RightsStatus, SourceType
+    from chronicle.corpus.manifest import CorpusRegistry as _Registry, CorpusSource
+
+    body = (
+        "War broke out in the summer of 1914 after the assurance of support was "
+        "extended to Austria-Hungary during the July crisis. "
+    ) * 12
+    candidate = SourceCandidate(
+        candidateId="wikipedia:en:1",
+        connector="wikipedia",
+        title="Origins of the war",
+        sourceType=SourceType.TERTIARY_REFERENCE,
+        fullTextAvailable=True,
+        rightsStatus=RightsStatus.LICENSED,
+        url="https://example.org/origins",
+        language="en",
+    )
+    acquired = AcquiredSource(
+        candidate=candidate,
+        text=body,
+        contentType="text/plain",
+        contentSha256="hash-1",
+        charCount=len(body),
+        retrievedAt=datetime(2026, 9, 9, tzinfo=timezone.utc),
+    )
+    passages = chunk_source(acquired)
+    investigation = build_corpus(
+        topic="the outbreak of war",
+        interpreted_question="How did the war break out?",
+        geographic_scope=["Europe"],
+        date_earliest=date(1914, 1, 1),
+        date_latest=date(1914, 12, 31),
+        acquired=[acquired],
+        passages=passages,
+    )
+    package_path = tmp_path / f"{investigation.packageId}.json"
+    package_path.write_text(
+        json.dumps(investigation.model_dump(mode="json")), encoding="utf-8"
+    )
+    registry = _Registry()
+    registry.register(
+        CorpusSource(
+            corpus_id=investigation.packageId,
+            package_path=package_path,
+            title="Acquired passage-only corpus",
+            benchmark_role="test-only auto-acquired corpus",
+            expected_package_id=investigation.packageId,
+        )
+    )
+    corpus = registry.get_corpus(investigation.packageId)
+    plan = InvestigationPlan(
+        planId="plan-passages",
+        runId="run-passages",
+        corpusId=corpus.corpus_id,
+        disposition=PlanDisposition.PROCEED,
+        normalizedQuestion="How did the war break out?",
+        questionType=QuestionType.DIRECT_EVIDENCE,
+        plannedToolCalls=[
+            PlannedToolCall(
+                callId="search-call",
+                toolName="search_passages",
+                purposeCode=ToolPurpose.FIND_SUPPORT,
+                arguments={"query": "war", "maxResults": 1},
+            )
+        ],
+    )
+    bundle = InvestigationRunner(build_default_registry()).execute_initial(plan, corpus).bundle
+    return plan, bundle
+
+
+def test_analyst_schema_forces_inferred_synthesis_over_passage_only_evidence(tmp_path):
+    # The DIRECT-grounding gap: over passage-only evidence the model must not be
+    # allowed to claim EXTRACTED_RECORD/DIRECT (which cannot ground and forces an
+    # abstention). Constrain every statement variant to evidence_synthesis +
+    # inferred so the model is guided into a groundable, review-flagged synthesis.
+    _plan, bundle = _passage_only_context(tmp_path)
+    assert bundle.totalResultCount > 0  # passages were actually retrieved
+    assert not bundle.referenceIndex.evidenceLinks  # and there are no evidence-links
+
+    schema = build_analyst_response_schema(bundle)
+
+    variants = schema["$defs"]["AnalysisStatement"]["oneOf"]
+    assert variants
+    for variant in variants:
+        assert variant["properties"]["statementForm"] == {
+            "const": "evidence_synthesis",
+            "type": "string",
+        }
+        assert variant["properties"]["directness"] == {
+            "const": "inferred",
+            "type": "string",
+        }
+
+
+def test_analyst_schema_excludes_knowledge_kind_without_a_knowledge_basis(tmp_path):
+    # A KNOWLEDGE statement needs a retrieved knowledge-state / awareness record
+    # to ground (grounding._validate_knowledge). A passage-only bundle has none,
+    # so the KNOWLEDGE variant is dropped -- the model cannot emit an ungroundable
+    # knowledge claim that would only force an abstention.
+    _plan, bundle = _passage_only_context(tmp_path)
+    schema = build_analyst_response_schema(bundle)
+    kinds = {
+        variant["properties"]["statementKind"]["const"]
+        for variant in schema["$defs"]["AnalysisStatement"]["oneOf"]
+    }
+    assert "knowledge" not in kinds
+    assert kinds  # other kinds remain available
+
+
+def test_analyst_schema_requires_truncation_disclosure_when_bundle_truncated(tmp_path):
+    # grounding rejects an undisclosed truncation. When the bundle is truncated,
+    # force a truncation-disclosure limitation into the draft so the model cannot
+    # silently omit it.
+    _plan, bundle = _passage_only_context(tmp_path)
+    assert bundle.truncated or any(r.truncated for r in bundle.results)
+    schema = build_analyst_response_schema(bundle)
+    limitations = schema["properties"]["limitations"]
+    disclosure = limitations["items"]["const"]
+    assert "truncat" in disclosure.casefold()
+    assert limitations["minItems"] >= 1
+
+
+def test_analyst_schema_forbids_answered_status_when_bundle_partial(tmp_path):
+    # A partial retrieval bundle cannot support an ANSWERED status (grounding).
+    # Constrain the status enum so the model can only report partial/abstained.
+    _plan, bundle = _passage_only_context(tmp_path)
+    partial_bundle = bundle.model_copy(update={"partial": True})
+    schema = build_analyst_response_schema(partial_bundle)
+    assert "answered" not in schema["$defs"]["AnswerStatus"]["enum"]
+
+
+def test_analyst_schema_allows_direct_extraction_when_evidence_links_present():
+    # Curated corpora carrying evidence-links / directness metadata keep full
+    # EXTRACTED_RECORD/DIRECT expressivity -- the synthesis constraint triggers
+    # only when direct grounding is provably impossible.
+    _plan, bundle, _draft = _context()
+    assert bundle.referenceIndex.evidenceLinks  # this bundle has a direct basis
+
+    schema = build_analyst_response_schema(bundle)
+
+    for variant in schema["$defs"]["AnalysisStatement"]["oneOf"]:
+        assert "const" not in variant["properties"]["statementForm"]
+        assert "const" not in variant["properties"]["directness"]
+
+
+def test_analyst_grounds_an_inferred_synthesis_over_passage_only_evidence(tmp_path):
+    # The payoff: an inferred-synthesis statement citing a retrieved passage
+    # passes deterministic grounding, so a passage-only corpus yields a cited
+    # answer rather than only an abstention.
+    plan, bundle = _passage_only_context(tmp_path)
+    passage_id = bundle.referenceIndex.passageIds[0]
+    draft = AnalysisDraft(
+        analysisVersion="e3-analyst-v1",
+        runId=plan.runId,
+        planId=plan.planId,
+        corpusId=plan.corpusId,
+        status=AnswerStatus.ANSWERED,
+        statements=[
+            AnalysisStatement(
+                statementId="s1",
+                text="Read together, the retrieved passages indicate an assurance of support.",
+                statementKind=StatementKind.FACT,
+                statementForm=StatementForm.EVIDENCE_SYNTHESIS,
+                basisRecordRefs=[passage_id],
+                citations=[
+                    AnalysisCitation(toolCallId="search-call", passageId=passage_id)
+                ],
+                directness=DirectnessAssessment.INFERRED,
+                limitations=["Retrieval was truncated; reflects only returned passages."],
+            )
+        ],
+    )
+    provider = DeterministicModelProvider()
+    provider.enqueue_value(draft)
+
+    result = EvidenceAnalyst(provider).analyze("How did the war break out?", plan, bundle)
+
+    assert result == draft
+
+
 def test_analyst_uses_one_bounded_structured_call_and_returns_grounded_draft():
     plan, bundle, draft = _context()
     provider = DeterministicModelProvider()
@@ -141,11 +337,6 @@ def test_analyst_constrains_statement_fields_and_citations_to_retrieved_evidence
         for variant in statement_variants
         if variant["properties"]["statementKind"].get("const") == "fact"
     )
-    knowledge = next(
-        variant
-        for variant in statement_variants
-        if variant["properties"]["statementKind"].get("const") == "knowledge"
-    )
     assert fact["properties"]["knowledgeAwareness"] == {"type": "null"}
     assert fact["properties"]["evidenceClassification"] == {"type": "null"}
     assert fact["properties"]["geographicPrecision"] == {"type": "null"}
@@ -157,9 +348,13 @@ def test_analyst_constrains_statement_fields_and_citations_to_retrieved_evidence
         "sent_time",
         "source_date",
     }
-    assert knowledge["properties"]["knowledgeAwareness"] == {
-        "$ref": "#/$defs/Awareness"
+    # This claim-evidence bundle carries no knowledge-state / awareness record,
+    # so a KNOWLEDGE statement could never ground: the variant is excluded.
+    kinds = {
+        variant["properties"]["statementKind"].get("const")
+        for variant in statement_variants
     }
+    assert "knowledge" not in kinds
 
     link = bundle.referenceIndex.evidenceLinks[0]
     citation_variants = schema["$defs"]["AnalysisCitation"]["oneOf"]
