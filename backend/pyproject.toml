@@ -8,6 +8,10 @@ dependencies = [
     "pydantic>=2.9",
     "httpx>=0.27",
     "uvicorn>=0.35,<1",
+    # P2: orchestration migrates to an explicit LangGraph state graph (ADR-003
+    # "explicit state machines, no autonomous swarms"). OSS/local library, no
+    # paid infra -- the free-development constraint (AGENTS.md 5) still holds.
+    "langgraph>=1.2,<2",
 ]
 
 [project.optional-dependencies]

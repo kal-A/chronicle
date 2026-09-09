@@ -1,0 +1,363 @@
+"""Explicit LangGraph state graph for Chronicle's four-role investigation flow.
+
+P2(a) migrates the *control flow* of :class:`SequentialAgentWorkflow` onto a
+compiled LangGraph ``StateGraph`` while preserving every observable behavior:
+stage order, emitted :class:`WorkflowSignal`s, persisted record shape,
+resume-skipping, cancellation at safe boundaries, and the bounded failure audit.
+``tests/ai/orchestration/test_langgraph_workflow.py`` mirrors the sequential
+behavior suite against this graph to hold that parity.
+
+This is the deliberate first step of the orchestration migration (see the
+approved plan): the graph runs *inside* the current ``AgentRunManager`` as a
+drop-in ``_SequentialWorkflow`` -- same ``run(record, corpus, *, emit,
+should_cancel)`` contract -- so the manager boundary can be converged onto
+LangGraph's checkpointer + ``astream_events`` in P2(b) without any behavior
+change. Aligns with ADR-003: an explicit state machine, not an autonomous swarm.
+
+The graph currently models the four top-level phases (planner -> retrieval ->
+analyst -> finalization) with conditional edges for the abstain-after-plan and
+fail-after-retrieval branches. ``finalization`` still delegates to
+:class:`FinalizationRunner`, whose internal critic -> single follow-up -> guide
+cycle is unchanged; decomposing that cycle into first-class ``critic`` /
+``acquire_more`` / ``guide`` nodes (turning the hardcoded follow-up into a real
+loop-back edge) is the next step and is why the boundary lives here now.
+
+The substantive stage/audit helpers are imported from :mod:`sequential` to avoid
+duplication; they move here when ``sequential.py`` is retired.
+"""
+
+from __future__ import annotations
+
+from typing import TypedDict
+
+from langgraph.graph import END, START, StateGraph
+
+from ...corpus.protocol import InvestigationCorpus
+from ...storage.agent_run_store import AgentRunStore
+from ..agents import EvidenceAnalyst, InvestigationPlanner
+from ..contracts.plan import PlanDisposition
+from ..contracts.run import AgentRunRecord, AgentStageName, AgentStageStatus
+from ..tools.contracts import ToolExecutionContext
+from .finalization import FinalizationRunner
+from .runner import InvestigationRunner
+from .sequential import (
+    CancellationCheck,
+    SignalEmitter,
+    WorkflowSignal,
+    WorkflowSignalType,
+    _WorkflowCancelled,
+    _append_failure_audit,
+    _bounded_error,
+    _model_stage,
+)
+from .statuses import AgentRunStatus
+
+
+class _GraphState(TypedDict, total=False):
+    """LangGraph channel state.
+
+    ``record`` and ``corpus`` are threaded through the graph so the nodes read
+    the live objects they mutate; ``outcome`` carries a terminal branch marker
+    (``"abstained"`` / ``"failed"``) that the conditional edges route on. The
+    stage side effects themselves are performed via closures captured per run,
+    not stored in channels -- P2(b) makes them checkpointer-native.
+    """
+
+    outcome: str
+
+
+class LangGraphAgentWorkflow:
+    """Drop-in for :class:`SequentialAgentWorkflow`, backed by a state graph."""
+
+    def __init__(
+        self,
+        *,
+        planner: InvestigationPlanner,
+        retrieval_runner: InvestigationRunner,
+        analyst: EvidenceAnalyst,
+        finalization_runner: FinalizationRunner,
+        store: AgentRunStore,
+    ) -> None:
+        self.planner = planner
+        self.retrieval_runner = retrieval_runner
+        self.analyst = analyst
+        self.finalization_runner = finalization_runner
+        self.store = store
+
+    def run(
+        self,
+        record: AgentRunRecord,
+        corpus: InvestigationCorpus,
+        *,
+        emit: SignalEmitter | None = None,
+        should_cancel: CancellationCheck | None = None,
+    ) -> AgentRunRecord:
+        emitter = emit or (lambda _signal: None)
+        cancellation = should_cancel or (lambda: False)
+        if record.runId != record.request.runId or record.request.corpusId != corpus.corpus_id:
+            raise ValueError("run record and corpus identities must match")
+        if record.status in {AgentRunStatus.ANSWER_READY, AgentRunStatus.ABSTAINED}:
+            return record
+
+        record.status = AgentRunStatus.RUNNING
+        record.errorMessage = None
+        record.touch()
+        self.store.save_run(record)
+        emitter(WorkflowSignal(type=WorkflowSignalType.RUN_STARTED, message="Agent run started."))
+
+        # Progress is tracked so an unexpected failure records the phase that was
+        # active, exactly as the sequential implementation's ``active_stage`` did.
+        progress: dict[str, object] = {"stage": None, "round": 0}
+        graph = self._build_graph(record, corpus, emitter, cancellation, progress)
+        try:
+            graph.invoke({})
+            return record
+        except _WorkflowCancelled:
+            return self._cancel(record, emitter)
+        except Exception as exc:  # noqa: BLE001 - bounded, audited, re-surfaced
+            record.status = AgentRunStatus.FAILED
+            record.errorMessage = _bounded_error(exc)
+            _append_failure_audit(
+                record,
+                exc,
+                progress["stage"],  # type: ignore[arg-type]
+                int(progress["round"]),  # type: ignore[arg-type]
+            )
+            self._save(record)
+            emitter(
+                WorkflowSignal(
+                    type=WorkflowSignalType.RUN_FAILED,
+                    message="The agent run failed. Inspect the run record for the bounded error.",
+                )
+            )
+            return record
+
+    def _build_graph(
+        self,
+        record: AgentRunRecord,
+        corpus: InvestigationCorpus,
+        emitter: SignalEmitter,
+        cancellation: CancellationCheck,
+        progress: dict[str, object],
+    ):
+        def checkpoint() -> None:
+            if cancellation():
+                raise _WorkflowCancelled("cancellation requested")
+
+        def planner_node(_state: _GraphState) -> _GraphState:
+            checkpoint()
+            if record.plan is None:
+                progress["stage"] = AgentStageName.PLANNER
+                progress["round"] = 0
+                _stage_started(emitter, AgentStageName.PLANNER)
+                context = ToolExecutionContext(
+                    corpusId=corpus.corpus_id,
+                    agentRunId=record.runId,
+                    requestedByRole="planner",
+                    allowedToolNames=set(self.retrieval_runner.allowed_tool_names),
+                    maximumResults=self.retrieval_runner.policy.maxResultsPerTool,
+                    maximumOutputCharacters=self.retrieval_runner.policy.maxCharactersPerToolOutput,
+                )
+                specs = self.retrieval_runner.registry.list_specs(context, corpus)
+                record.plan = self.planner.plan(record.request, record.corpusSnapshot, specs)
+                if self.planner.last_execution is None:
+                    raise RuntimeError("Planner returned without an execution record")
+                execution = self.planner.last_execution
+                record.modelCalls.append(execution.modelCall)
+                record.stages.append(
+                    _model_stage(
+                        record.runId,
+                        AgentStageName.PLANNER,
+                        0,
+                        execution.modelCall,
+                        execution.promptMeasurement,
+                        record.plan,
+                    )
+                )
+                self._save(record)
+                _stage_completed(emitter, AgentStageName.PLANNER)
+                progress["stage"] = None
+            if record.plan.disposition is PlanDisposition.ABSTAIN:
+                record.status = AgentRunStatus.ABSTAINED
+                record.abstentionReason = record.plan.unsupportedReason
+                self._save(record)
+                emitter(
+                    WorkflowSignal(
+                        type=WorkflowSignalType.RUN_ABSTAINED,
+                        message="Planner abstained because the request is unsupported by this corpus.",
+                    )
+                )
+                return {"outcome": "abstained"}
+            return {}
+
+        def retrieval_node(_state: _GraphState) -> _GraphState:
+            checkpoint()
+            if record.retrievalBundle is None:
+                progress["stage"] = AgentStageName.RETRIEVAL
+                progress["round"] = 0
+                _stage_started(emitter, AgentStageName.RETRIEVAL)
+                retrieval = self.retrieval_runner.execute_initial(record.plan, corpus)
+                record.retrievalBundle = retrieval.bundle
+                record.stages.append(retrieval.stageRecord)
+                record.toolCalls = [item.callRecord for item in retrieval.bundle.results]
+                self._save(record)
+                _stage_completed(emitter, AgentStageName.RETRIEVAL)
+                progress["stage"] = None
+                if retrieval.stageRecord.status in {
+                    AgentStageStatus.FAILED,
+                    AgentStageStatus.REJECTED,
+                    AgentStageStatus.INTERRUPTED,
+                }:
+                    record.status = (
+                        AgentRunStatus.INTERRUPTED
+                        if retrieval.stageRecord.status is AgentStageStatus.INTERRUPTED
+                        else AgentRunStatus.FAILED
+                    )
+                    record.errorMessage = (
+                        retrieval.stageRecord.errors[0]
+                        if retrieval.stageRecord.errors
+                        else "Retrieval did not produce a usable result."
+                    )
+                    self._save(record)
+                    emitter(
+                        WorkflowSignal(
+                            type=WorkflowSignalType.RUN_FAILED,
+                            stage=AgentStageName.RETRIEVAL,
+                            message="Retrieval did not produce a usable result.",
+                        )
+                    )
+                    return {"outcome": "failed"}
+            return {}
+
+        def analyst_node(_state: _GraphState) -> _GraphState:
+            checkpoint()
+            if record.analysisDraft is None:
+                progress["stage"] = AgentStageName.ANALYST
+                progress["round"] = 0
+                _stage_started(emitter, AgentStageName.ANALYST)
+                record.analysisDraft = self.analyst.analyze(
+                    record.request.userQuestion,
+                    record.plan,
+                    record.retrievalBundle,
+                )
+                if self.analyst.last_execution is None:
+                    raise RuntimeError("Analyst returned without an execution record")
+                execution = self.analyst.last_execution
+                record.groundingValidation = execution.validationReport
+                record.modelCalls.append(execution.modelCall)
+                record.stages.append(
+                    _model_stage(
+                        record.runId,
+                        AgentStageName.ANALYST,
+                        0,
+                        execution.modelCall,
+                        execution.promptMeasurement,
+                        record.analysisDraft,
+                    )
+                )
+                self._save(record)
+                _stage_completed(emitter, AgentStageName.ANALYST)
+                progress["stage"] = None
+            return {}
+
+        def finalization_node(_state: _GraphState) -> _GraphState:
+            checkpoint()
+
+            def final_stage(stage: AgentStageName, started: bool, round_number: int) -> None:
+                if started:
+                    checkpoint()
+                    progress["stage"] = stage
+                    progress["round"] = round_number
+                    _stage_started(emitter, stage, round_number)
+                else:
+                    _stage_completed(emitter, stage, round_number)
+                    progress["stage"] = None
+                    progress["round"] = 0
+
+            self.finalization_runner.finalize(
+                record.request.userQuestion,
+                record.plan,
+                corpus,
+                record.retrievalBundle,
+                record.analysisDraft,
+                record.groundingValidation,
+                run_record=record,
+                stage_callback=final_stage,
+            )
+            signal_type = (
+                WorkflowSignalType.RUN_ABSTAINED
+                if record.status is AgentRunStatus.ABSTAINED
+                else WorkflowSignalType.RUN_COMPLETED
+            )
+            emitter(
+                WorkflowSignal(
+                    type=signal_type,
+                    message=(
+                        "The evidence was insufficient for a reliable answer."
+                        if signal_type is WorkflowSignalType.RUN_ABSTAINED
+                        else "The cited answer is ready."
+                    ),
+                )
+            )
+            return {}
+
+        graph = StateGraph(_GraphState)
+        graph.add_node("planner", planner_node)
+        graph.add_node("retrieval", retrieval_node)
+        graph.add_node("analyst", analyst_node)
+        graph.add_node("finalization", finalization_node)
+        graph.add_edge(START, "planner")
+        graph.add_conditional_edges(
+            "planner",
+            lambda state: "end" if state.get("outcome") == "abstained" else "retrieval",
+            {"end": END, "retrieval": "retrieval"},
+        )
+        graph.add_conditional_edges(
+            "retrieval",
+            lambda state: "end" if state.get("outcome") == "failed" else "analyst",
+            {"end": END, "analyst": "analyst"},
+        )
+        graph.add_edge("analyst", "finalization")
+        graph.add_edge("finalization", END)
+        return graph.compile()
+
+    def _cancel(self, record: AgentRunRecord, emitter: SignalEmitter) -> AgentRunRecord:
+        record.status = AgentRunStatus.CANCELLED
+        record.errorMessage = None
+        self._save(record)
+        emitter(
+            WorkflowSignal(
+                type=WorkflowSignalType.RUN_CANCELLED,
+                message="The run stopped at a safe stage boundary.",
+            )
+        )
+        return record
+
+    def _save(self, record: AgentRunRecord) -> None:
+        record.touch()
+        self.store.save_run(record)
+
+
+def _stage_started(emitter: SignalEmitter, stage: AgentStageName, round_number: int = 0) -> None:
+    emitter(
+        WorkflowSignal(
+            type=WorkflowSignalType.STAGE_STARTED,
+            stage=stage,
+            round=round_number,
+            message=f"{stage.value.capitalize()} started.",
+        )
+    )
+
+
+def _stage_completed(emitter: SignalEmitter, stage: AgentStageName, round_number: int = 0) -> None:
+    emitter(
+        WorkflowSignal(
+            type=WorkflowSignalType.STAGE_COMPLETED,
+            stage=stage,
+            round=round_number,
+            message=f"{stage.value.capitalize()} completed.",
+        )
+    )
+
+
+__all__ = ["LangGraphAgentWorkflow"]

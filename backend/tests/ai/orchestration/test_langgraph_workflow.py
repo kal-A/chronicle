@@ -1,0 +1,151 @@
+"""Behavior parity: the LangGraph workflow must be a drop-in for the
+hand-rolled SequentialAgentWorkflow.
+
+These scenarios mirror ``test_sequential_workflow.py`` exactly -- same fixtures,
+same deterministic provider, same assertions -- but drive
+``LangGraphAgentWorkflow``. P2(a) migrates *control flow* to an explicit
+LangGraph state graph while every observable outcome (stage order, emitted
+signals, persisted record, resume-skipping, cancellation, failure audit) stays
+identical. If these pass alongside the sequential suite, the graph is a proven
+drop-in and the manager boundary can be converged in P2(b).
+"""
+
+from __future__ import annotations
+
+from chronicle.ai.agents import (
+    EvidenceAnalyst,
+    HistoricalCritic,
+    InvestigationGuide,
+    InvestigationPlanner,
+)
+from chronicle.ai.contracts.analysis import GroundingValidationReport
+from chronicle.ai.models import DeterministicModelProvider
+from chronicle.ai.models.metadata import ModelCallStatus
+from chronicle.ai.orchestration.finalization import FinalizationRunner
+from chronicle.ai.orchestration.graph import LangGraphAgentWorkflow
+from chronicle.ai.orchestration.runner import InvestigationRunner
+from chronicle.ai.orchestration.sequential import WorkflowSignalType
+from chronicle.ai.orchestration.statuses import AgentRunStatus
+from chronicle.ai.contracts.run import AgentStageStatus
+from chronicle.storage.agent_run_store import AgentRunStore
+
+from .test_sequential_workflow import _context
+
+
+def _workflow(tmp_path, registry, provider):
+    store = AgentRunStore(tmp_path)
+    retrieval = InvestigationRunner(registry, store=store)
+    return (
+        LangGraphAgentWorkflow(
+            planner=InvestigationPlanner(provider),
+            retrieval_runner=retrieval,
+            analyst=EvidenceAnalyst(provider),
+            finalization_runner=FinalizationRunner(
+                retrieval_runner=retrieval,
+                analyst=EvidenceAnalyst(provider),
+                critic=HistoricalCritic(provider),
+                guide=InvestigationGuide(provider),
+                store=store,
+            ),
+            store=store,
+        ),
+        store,
+    )
+
+
+def test_graph_runs_and_persists_all_four_roles_in_strict_order(tmp_path):
+    corpus, registry, plan, _bundle, draft, decision, answer, record = _context()
+    provider = DeterministicModelProvider()
+    for value in (plan, draft, decision, answer):
+        provider.enqueue_value(value)
+    workflow, store = _workflow(tmp_path, registry, provider)
+    signals = []
+
+    result = workflow.run(record, corpus, emit=signals.append)
+
+    assert result.status is AgentRunStatus.ANSWER_READY
+    assert [stage.stageName.value for stage in result.stages] == [
+        "planner",
+        "retrieval",
+        "analyst",
+        "critic",
+        "guide",
+    ]
+    assert [
+        signal.stage.value
+        for signal in signals
+        if signal.type is WorkflowSignalType.STAGE_STARTED
+    ] == ["planner", "retrieval", "analyst", "critic", "guide"]
+    assert signals[0].type is WorkflowSignalType.RUN_STARTED
+    assert signals[-1].type is WorkflowSignalType.RUN_COMPLETED
+    assert len(result.modelCalls) == 4
+    assert len(result.toolCalls) == 1
+    assert result.finalAnswer.directAnswer == answer.directAnswer
+    assert store.load_run(record.runId) == result
+
+
+def test_graph_cancellation_before_planning_makes_no_model_call(tmp_path):
+    corpus, registry, _plan, _bundle, _draft, _decision, _answer, record = _context(
+        "run-cancelled"
+    )
+    provider = DeterministicModelProvider()
+    workflow, store = _workflow(tmp_path, registry, provider)
+    signals = []
+
+    result = workflow.run(
+        record,
+        corpus,
+        emit=signals.append,
+        should_cancel=lambda: True,
+    )
+
+    assert result.status is AgentRunStatus.CANCELLED
+    assert result.modelCalls == []
+    assert result.plan is None
+    assert signals[-1].type is WorkflowSignalType.RUN_CANCELLED
+    assert store.load_run(record.runId).status is AgentRunStatus.CANCELLED
+
+
+def test_graph_resume_reuses_persisted_analysis_and_only_runs_critic_and_guide(tmp_path):
+    corpus, registry, plan, bundle, draft, decision, answer, record = _context("run-resume")
+    record.status = AgentRunStatus.INTERRUPTED
+    record.plan = plan
+    record.retrievalBundle = bundle
+    record.analysisDraft = draft
+    record.groundingValidation = GroundingValidationReport(valid=True)
+    provider = DeterministicModelProvider()
+    provider.enqueue_value(decision)
+    provider.enqueue_value(answer)
+    workflow, store = _workflow(tmp_path, registry, provider)
+    store.save_run(record)
+    signals = []
+
+    result = workflow.run(record, corpus, emit=signals.append)
+
+    assert result.status is AgentRunStatus.ANSWER_READY
+    assert [stage.stageName.value for stage in result.stages] == ["critic", "guide"]
+    assert [
+        signal.stage.value
+        for signal in signals
+        if signal.type is WorkflowSignalType.STAGE_STARTED
+    ] == ["critic", "guide"]
+
+
+def test_graph_persists_failed_planner_call_and_specific_bounded_cause(tmp_path):
+    corpus, registry, _plan, _bundle, _draft, _decision, _answer, record = _context(
+        "run-planner-failure"
+    )
+    provider = DeterministicModelProvider()
+    provider.enqueue_malformed("first malformed response")
+    provider.enqueue_malformed("second malformed response")
+    workflow, store = _workflow(tmp_path, registry, provider)
+
+    result = workflow.run(record, corpus)
+
+    assert result.status is AgentRunStatus.FAILED
+    assert len(result.modelCalls) == 1
+    assert result.modelCalls[0].status is ModelCallStatus.FAILED
+    assert result.stages[-1].stageName.value == "planner"
+    assert result.stages[-1].status is AgentStageStatus.FAILED
+    assert "Configured malformed response" in result.errorMessage
+    assert store.load_run(record.runId) == result

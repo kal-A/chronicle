@@ -26,14 +26,23 @@ from ..ai.orchestration.manager import (
     AgentRunNotResumableError,
 )
 from ..ai.orchestration.policies import AgentExecutionPolicy
+from ..ai.orchestration.graph import LangGraphAgentWorkflow
 from ..ai.orchestration.runner import InvestigationRunner
-from ..ai.orchestration.sequential import SequentialAgentWorkflow
 from ..ai.orchestration.statuses import AgentRunStatus
 from ..ai.tools import build_default_registry
+from ..acquisition.build_service import CorpusBuildService
+from ..acquisition.defaults import default_pipeline
 from ..corpus import CorpusRegistry
 from ..corpus.errors import UnknownCorpusError
 from ..storage.agent_run_store import AgentRunNotFoundError, AgentRunStore
-from .contracts import AgentRunAccepted, CorpusSummary, QuestionSubmission, RunIdFactory
+from .contracts import (
+    AgentRunAccepted,
+    CorpusBuildAccepted,
+    CorpusSummary,
+    QuestionSubmission,
+    RunIdFactory,
+    TopicBuildSubmission,
+)
 
 
 _TERMINAL_STATUSES = {
@@ -49,8 +58,14 @@ def create_app(
     manager: AgentRunManager,
     corpus_registry: CorpusRegistry,
     run_id_factory: RunIdFactory | None = None,
+    build_service: CorpusBuildService | None = None,
 ) -> FastAPI:
-    """Create the HTTP app around injected runtime dependencies."""
+    """Create the HTTP app around injected runtime dependencies.
+
+    ``build_service`` is optional: when present, the topic-build endpoint can
+    acquire sources for an arbitrary topic and register a corpus on demand; when
+    absent, that endpoint reports the capability is not configured.
+    """
 
     make_run_id = run_id_factory or (lambda: f"run-{uuid4().hex}")
 
@@ -94,32 +109,66 @@ def create_app(
         except UnknownCorpusError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         run_id = make_run_id()
-        manifest = corpus.get_manifest()
-        investigation = corpus.get_investigation()
-        record = AgentRunRecord(
-            runId=run_id,
-            request=InvestigationRequest(
-                runId=run_id,
-                corpusId=corpus.corpus_id,
-                userQuestion=submission.question,
-                conversationSummary=submission.conversationSummary,
-                workspaceContext=submission.workspaceContext,
-            ),
-            corpusSnapshot=CorpusSnapshot(
-                corpusId=corpus.corpus_id,
-                packageId=investigation.packageId,
-                packageHash=manifest.packageHash,
-                packageRevision=investigation.packageRevision,
-                schemaVersion=investigation.schemaVersion,
-                capabilities=tuple(manifest.supportedCapabilities),
-                knownOmissions=tuple(manifest.knownOmissions),
-            ),
+        record = _make_run_record(
+            corpus,
+            run_id=run_id,
+            question=submission.question,
+            conversation_summary=submission.conversationSummary,
+            workspace_context=submission.workspaceContext,
         )
         try:
             manager.submit(record)
         except AgentRunAlreadyExistsError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return AgentRunAccepted.from_run(run_id, record.status)
+
+    @app.post(
+        "/api/investigations/build",
+        response_model=CorpusBuildAccepted,
+        status_code=status.HTTP_202_ACCEPTED,
+    )
+    def build_and_investigate(submission: TopicBuildSubmission) -> CorpusBuildAccepted:
+        """Acquire free/local sources for an arbitrary topic, build + register a
+        corpus, and start an investigation over it.
+
+        The build runs synchronously within this request (FastAPI runs sync
+        routes in a threadpool, so the event loop is not blocked). On CPU-only
+        hardware acquisition + embedding is minutes-scale, so the caller waits
+        for the build before the run is accepted; streaming build stages via a
+        dedicated async build job is the next increment.
+        """
+        if build_service is None:
+            raise HTTPException(
+                status_code=501,
+                detail="Topic acquisition is not configured on this deployment.",
+            )
+        outcome = build_service.build(
+            topic=submission.topic,
+            interpreted_question=submission.question,
+            geographic_scope=submission.geographicScope,
+            date_earliest=submission.dateEarliest,
+            date_latest=submission.dateLatest,
+            terms=submission.terms,
+            max_sources=submission.maxSources,
+        )
+        try:
+            corpus = corpus_registry.get_corpus(outcome.corpusId)
+        except UnknownCorpusError as exc:  # pragma: no cover - registration just happened
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        run_id = make_run_id()
+        record = _make_run_record(corpus, run_id=run_id, question=submission.question)
+        try:
+            manager.submit(record)
+        except AgentRunAlreadyExistsError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return CorpusBuildAccepted.from_build(
+            corpus_id=outcome.corpusId,
+            already_built=outcome.alreadyRegistered,
+            discovered=outcome.acquisition.discovered,
+            acquired=outcome.acquisition.acquired,
+            passages=outcome.acquisition.passages,
+            run=AgentRunAccepted.from_run(run_id, record.status),
+        )
 
     @app.get("/api/agent-runs/{run_id}", response_model=AgentRunRecord)
     def get_run(run_id: str) -> AgentRunRecord:
@@ -199,7 +248,7 @@ def create_default_app() -> FastAPI:
     policy = AgentExecutionPolicy(maxResultsPerTool=2)
     analyst = EvidenceAnalyst(provider, policy)
     retrieval = InvestigationRunner(build_default_registry(), store=store, policy=policy)
-    workflow = SequentialAgentWorkflow(
+    workflow = LangGraphAgentWorkflow(
         planner=InvestigationPlanner(
             provider,
             policy,
@@ -221,7 +270,59 @@ def create_default_app() -> FastAPI:
         store=store,
         corpus_registry=corpus_registry,
     )
-    return create_app(manager=manager, corpus_registry=corpus_registry)
+    repo_root = Path(__file__).resolve().parents[3]
+    runs_root = Path(
+        os.environ.get("CHRONICLE_ACQUISITION_DIR", str(repo_root / "runs" / "acquisition"))
+    )
+    build_service = CorpusBuildService(
+        pipeline=default_pipeline(
+            repo_root=repo_root,
+            cache_dir=runs_root / "cache",
+        ),
+        registry=corpus_registry,
+        build_dir=runs_root / "built-corpora",
+    )
+    return create_app(
+        manager=manager,
+        corpus_registry=corpus_registry,
+        build_service=build_service,
+    )
+
+
+def _make_run_record(
+    corpus,
+    *,
+    run_id: str,
+    question: str,
+    conversation_summary: str | None = None,
+    workspace_context=None,
+) -> AgentRunRecord:
+    """Assemble the run record + corpus snapshot for a question over a corpus.
+
+    Shared by the corpus-question and topic-build endpoints so both capture the
+    same immutable corpus provenance in the audit trail."""
+
+    manifest = corpus.get_manifest()
+    investigation = corpus.get_investigation()
+    return AgentRunRecord(
+        runId=run_id,
+        request=InvestigationRequest(
+            runId=run_id,
+            corpusId=corpus.corpus_id,
+            userQuestion=question,
+            conversationSummary=conversation_summary,
+            workspaceContext=workspace_context,
+        ),
+        corpusSnapshot=CorpusSnapshot(
+            corpusId=corpus.corpus_id,
+            packageId=investigation.packageId,
+            packageHash=manifest.packageHash,
+            packageRevision=investigation.packageRevision,
+            schemaVersion=investigation.schemaVersion,
+            capabilities=tuple(manifest.supportedCapabilities),
+            knownOmissions=tuple(manifest.knownOmissions),
+        ),
+    )
 
 
 def _load_run_or_404(manager: AgentRunManager, run_id: str) -> AgentRunRecord:

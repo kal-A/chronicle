@@ -18,11 +18,7 @@ import tempfile
 from datetime import date
 from pathlib import Path
 
-from chronicle.acquisition.connectors.curated_resource import CuratedResourceConnector
-from chronicle.acquisition.connectors.doc_registry_seed import DocRegistrySeedConnector
-from chronicle.acquisition.connectors.gutenberg import GutenbergConnector
-from chronicle.acquisition.connectors.internet_archive import InternetArchiveConnector
-from chronicle.acquisition.connectors.wikipedia import WikipediaConnector
+from chronicle.acquisition.defaults import default_connectors
 from chronicle.acquisition.fetch_cache import FetchCache
 from chronicle.acquisition.pipeline import AcquisitionPipeline
 from chronicle.corpus.contracts import PassageSearchRequest
@@ -42,13 +38,7 @@ def main() -> int:
     parser.add_argument("--search", default="congress", help="sample passage query to run")
     args = parser.parse_args()
 
-    connectors = [
-        WikipediaConnector(),
-        GutenbergConnector(),
-        InternetArchiveConnector(),
-        DocRegistrySeedConnector(REPO_ROOT),
-        CuratedResourceConnector(),
-    ]
+    connectors = default_connectors(REPO_ROOT)
     cache_dir = Path(tempfile.gettempdir()) / "chronicle-acquire-smoke"
     pipeline = AcquisitionPipeline(connectors, FetchCache(cache_dir), per_connector_results=3)
 
