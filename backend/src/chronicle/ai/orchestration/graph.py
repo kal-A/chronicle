@@ -34,9 +34,12 @@ from langgraph.graph import END, START, StateGraph
 
 from ...corpus.protocol import InvestigationCorpus
 from ...storage.agent_run_store import AgentRunStore
+from ...workflow.hashing import stable_json_hash
 from ..agents import EvidenceAnalyst, InvestigationPlanner
+from ..agents.analyst import AnalystValidationError
+from ..contracts.analysis import GroundingValidationReport
 from ..contracts.plan import PlanDisposition
-from ..contracts.run import AgentRunRecord, AgentStageName, AgentStageStatus
+from ..contracts.run import AgentRunRecord, AgentStageName, AgentStageRecord, AgentStageStatus
 from ..tools.contracts import ToolExecutionContext
 from .finalization import FinalizationRunner
 from .runner import InvestigationRunner
@@ -235,11 +238,41 @@ class LangGraphAgentWorkflow:
                 progress["stage"] = AgentStageName.ANALYST
                 progress["round"] = 0
                 _stage_started(emitter, AgentStageName.ANALYST)
-                record.analysisDraft = self.analyst.analyze(
-                    record.request.userQuestion,
-                    record.plan,
-                    record.retrievalBundle,
-                )
+                try:
+                    record.analysisDraft = self.analyst.analyze(
+                        record.request.userQuestion,
+                        record.plan,
+                        record.retrievalBundle,
+                    )
+                except AnalystValidationError as exc:
+                    # A schema-valid but ungroundable draft is an
+                    # insufficient-evidence outcome (common over thin,
+                    # auto-acquired corpora), not a system error: abstain with an
+                    # audited rejected stage rather than hard-fail. Genuine
+                    # boundary errors (bad identities/lengths) carry no model
+                    # attempt and are re-raised to the failure path.
+                    if exc.validationReport is None or exc.modelCall is None:
+                        raise
+                    record.groundingValidation = exc.validationReport
+                    record.modelCalls.append(exc.modelCall)
+                    record.stages.append(_grounding_rejected_stage(record.runId, exc))
+                    _stage_completed(emitter, AgentStageName.ANALYST)
+                    progress["stage"] = None
+                    record.status = AgentRunStatus.ABSTAINED
+                    record.abstentionReason = _grounding_abstention_reason(
+                        exc.validationReport
+                    )
+                    self._save(record)
+                    emitter(
+                        WorkflowSignal(
+                            type=WorkflowSignalType.RUN_ABSTAINED,
+                            message=(
+                                "The retrieved evidence could not ground an analysis; "
+                                "Chronicle abstained rather than assert unsupported claims."
+                            ),
+                        )
+                    )
+                    return {"outcome": "abstained"}
                 if self.analyst.last_execution is None:
                     raise RuntimeError("Analyst returned without an execution record")
                 execution = self.analyst.last_execution
@@ -317,7 +350,11 @@ class LangGraphAgentWorkflow:
             lambda state: "end" if state.get("outcome") == "failed" else "analyst",
             {"end": END, "analyst": "analyst"},
         )
-        graph.add_edge("analyst", "finalization")
+        graph.add_conditional_edges(
+            "analyst",
+            lambda state: "end" if state.get("outcome") == "abstained" else "finalization",
+            {"end": END, "finalization": "finalization"},
+        )
         graph.add_edge("finalization", END)
         return graph.compile()
 
@@ -336,6 +373,42 @@ class LangGraphAgentWorkflow:
     def _save(self, record: AgentRunRecord) -> None:
         record.touch()
         self.store.save_run(record)
+
+
+def _grounding_rejected_stage(run_id: str, exc: AnalystValidationError) -> AgentStageRecord:
+    """Audit the analyst attempt that produced an ungroundable draft."""
+
+    model_call = exc.modelCall
+    assert model_call is not None  # guarded by caller
+    output_hash = (
+        stable_json_hash(exc.proposedDraft.model_dump(mode="json"))
+        if exc.proposedDraft is not None
+        else None
+    )
+    return AgentStageRecord(
+        runId=run_id,
+        stageName=AgentStageName.ANALYST,
+        round=0,
+        status=AgentStageStatus.REJECTED,
+        startedAt=model_call.startedAt,
+        completedAt=model_call.completedAt,
+        latencyMs=model_call.latencyMs,
+        inputHash=model_call.inputHash,
+        outputHash=output_hash,
+        promptMeasurement=exc.promptMeasurement,
+        modelCalls=[model_call],
+        errors=[_grounding_abstention_reason(exc.validationReport)],
+    )
+
+
+def _grounding_abstention_reason(report: GroundingValidationReport | None) -> str:
+    messages = [issue.message for issue in report.issues][:3] if report is not None else []
+    detail = "; ".join(messages) if messages else "no traceable grounding"
+    reason = (
+        "The analysis could not be grounded in the retrieved evidence "
+        f"({detail}); Chronicle abstained rather than assert unsupported claims."
+    )
+    return reason[:500]
 
 
 def _stage_started(emitter: SignalEmitter, stage: AgentStageName, round_number: int = 0) -> None:

@@ -131,6 +131,41 @@ def test_graph_resume_reuses_persisted_analysis_and_only_runs_critic_and_guide(t
     ] == ["critic", "guide"]
 
 
+def test_graph_abstains_when_analyst_draft_cannot_be_grounded(tmp_path):
+    # An acquired/thin corpus often yields a schema-valid but ungroundable
+    # analysis. That is an insufficient-evidence outcome, not a system error:
+    # the run must ABSTAIN (audited), never hard-fail, and never run Critic/Guide.
+    corpus, registry, plan, _bundle, draft, _decision, _answer, record = _context(
+        "run-ungrounded"
+    )
+    bad_citation = draft.statements[0].citations[0].model_copy(
+        update={"toolCallId": "no-such-call"}
+    )
+    bad_statement = draft.statements[0].model_copy(update={"citations": [bad_citation]})
+    ungroundable = draft.model_copy(update={"statements": [bad_statement]})
+    provider = DeterministicModelProvider()
+    provider.enqueue_value(plan)
+    provider.enqueue_value(ungroundable)
+    workflow, store = _workflow(tmp_path, registry, provider)
+    signals = []
+
+    result = workflow.run(record, corpus, emit=signals.append)
+
+    assert result.status is AgentRunStatus.ABSTAINED
+    assert result.abstentionReason
+    assert result.groundingValidation is not None
+    assert result.groundingValidation.valid is False
+    assert result.finalAnswer is None
+    assert [stage.stageName.value for stage in result.stages] == [
+        "planner",
+        "retrieval",
+        "analyst",
+    ]
+    assert result.stages[-1].status is AgentStageStatus.REJECTED
+    assert signals[-1].type is WorkflowSignalType.RUN_ABSTAINED
+    assert store.load_run(record.runId).status is AgentRunStatus.ABSTAINED
+
+
 def test_graph_persists_failed_planner_call_and_specific_bounded_cause(tmp_path):
     corpus, registry, _plan, _bundle, _draft, _decision, _answer, record = _context(
         "run-planner-failure"
