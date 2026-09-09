@@ -84,3 +84,34 @@ def hybrid_search(
     """Fuse a lexical ranking and a semantic ranking into the top-k passage ids."""
     fused = reciprocal_rank_fusion([lexical_ids, semantic_ids], k=rrf_k)
     return [item_id for item_id, _ in fused[:k]]
+
+
+class SemanticReranker:
+    """Reorder a lexical candidate id list by fusing it with a local-semantic
+    ranking over the same corpus's precomputed passage vectors.
+
+    Deliberately id-only: it takes the candidate passage ids a lexical search
+    already produced and returns them reordered, so it composes with the corpus
+    layer (HybridCorpus) without depending on the rich PassageSearchHit
+    projection. Candidates the vector store has never seen are preserved (they
+    simply gain no semantic contribution), and an empty store is a no-op -- so a
+    corpus without a semantic index degrades to pure lexical retrieval.
+    """
+
+    def __init__(self, embedder: SupportsEmbedding, store: PassageVectorStore) -> None:
+        self._embedder = embedder
+        self._store = store
+
+    def order(self, query: str, candidate_ids: list[str], *, rrf_k: int = DEFAULT_RRF_K) -> list[str]:
+        if not candidate_ids or self._store.count() == 0:
+            return list(candidate_ids)
+        semantic = semantic_search(query, self._embedder, self._store, k=self._store.count())
+        candidate_set = set(candidate_ids)
+        semantic_ids = [passage_id for passage_id, _ in semantic if passage_id in candidate_set]
+        fused = reciprocal_rank_fusion([list(candidate_ids), semantic_ids], k=rrf_k)
+        ordered = [passage_id for passage_id, _ in fused if passage_id in candidate_set]
+        # Any candidate missing from the fusion (should not happen, since the
+        # lexical lane contains them all) is appended in its original order.
+        seen = set(ordered)
+        ordered.extend(passage_id for passage_id in candidate_ids if passage_id not in seen)
+        return ordered

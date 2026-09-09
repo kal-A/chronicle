@@ -112,6 +112,19 @@ class CorpusRegistry:
             )
         return self._loaded[corpus_id]
 
+    def preload(self, corpus_id: str, corpus: PackageBackedCorpus) -> None:
+        """Seed the loaded-corpus cache with an already-constructed instance.
+
+        Used when a corpus needs to be returned wrapped (e.g. a HybridCorpus
+        adding semantic re-ranking) rather than plain-loaded from its file. The
+        corpus_id must already be registered (so listing/manifest resolution
+        still works); this only substitutes the cached instance ``get_corpus``
+        returns. Structural typing: any InvestigationCorpus is accepted."""
+
+        if corpus_id not in self._sources:
+            raise UnknownCorpusError(f'No corpus registered with id "{corpus_id}"')
+        self._loaded[corpus_id] = corpus
+
     def get_manifest(self, corpus_id: str) -> CorpusManifest:
         return self.get_corpus(corpus_id).get_manifest()
 

@@ -27,7 +27,10 @@ from typing import Protocol
 
 from ..contracts.enums import RequestedDepth, RequestType
 from ..corpus.manifest import CorpusRegistry, CorpusSource
+from .hybrid_corpus import HybridCorpus
 from .pipeline import AcquisitionResult
+from .retrieval import SemanticReranker, SupportsEmbedding, index_passages
+from .vector_store import PassageVectorStore
 
 
 class SupportsAcquisitionRun(Protocol):
@@ -52,10 +55,18 @@ class CorpusBuildResult:
     acquisition: AcquisitionResult
     #: True when the deterministic corpus already existed and was reused.
     alreadyRegistered: bool
+    #: True when a semantic index was built and the corpus is served hybrid.
+    semantic: bool = False
 
 
 class CorpusBuildService:
-    """Run acquisition for a topic, persist the package, and register it."""
+    """Run acquisition for a topic, persist the package, and register it.
+
+    When an ``embedder`` is supplied, the built passages are also embedded into a
+    local vector store beside the package and the corpus is registered as a
+    :class:`HybridCorpus` (lexical + semantic re-ranked search). With no embedder
+    the corpus is served lexical-only, so no local embedding model is required.
+    """
 
     def __init__(
         self,
@@ -63,10 +74,12 @@ class CorpusBuildService:
         pipeline: SupportsAcquisitionRun,
         registry: CorpusRegistry,
         build_dir: Path | str,
+        embedder: SupportsEmbedding | None = None,
     ) -> None:
         self._pipeline = pipeline
         self._registry = registry
         self._build_dir = Path(build_dir)
+        self._embedder = embedder
 
     def build(
         self,
@@ -131,12 +144,30 @@ class CorpusBuildService:
                 expected_package_id=corpus_id,
             )
         )
+
+        semantic = self._maybe_index_semantically(corpus_id, package_path, investigation.passages)
+
         return CorpusBuildResult(
             corpusId=corpus_id,
             packagePath=package_path,
             acquisition=result,
             alreadyRegistered=False,
+            semantic=semantic,
         )
+
+    def _maybe_index_semantically(self, corpus_id: str, package_path: Path, passages) -> bool:
+        """Embed the built passages and serve the corpus hybrid. No-op without an
+        embedder; returns whether a semantic index was attached."""
+
+        if self._embedder is None:
+            return False
+        store = PassageVectorStore(package_path.with_suffix(".vectors.db"))
+        index_passages(list(passages), self._embedder, store)
+        inner = self._registry.get_corpus(corpus_id)
+        self._registry.preload(
+            corpus_id, HybridCorpus(inner, SemanticReranker(self._embedder, store))
+        )
+        return True
 
 
 def _title_for(topic: str) -> str:

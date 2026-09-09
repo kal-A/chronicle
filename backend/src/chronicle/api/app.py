@@ -32,6 +32,7 @@ from ..ai.orchestration.statuses import AgentRunStatus
 from ..ai.tools import build_default_registry
 from ..acquisition.build_service import CorpusBuildService
 from ..acquisition.defaults import default_pipeline
+from ..acquisition.embeddings import OllamaEmbedder
 from ..corpus import CorpusRegistry
 from ..corpus.errors import UnknownCorpusError
 from ..storage.agent_run_store import AgentRunNotFoundError, AgentRunStore
@@ -274,6 +275,10 @@ def create_default_app() -> FastAPI:
     runs_root = Path(
         os.environ.get("CHRONICLE_ACQUISITION_DIR", str(repo_root / "runs" / "acquisition"))
     )
+    # Semantic re-ranking is opt-in: it needs a local embedding model
+    # (nomic-embed-text) pulled into Ollama. Off by default so the lexical build
+    # path always works; set CHRONICLE_ENABLE_SEMANTIC=1 once the model is present.
+    embedder = OllamaEmbedder() if _env_flag("CHRONICLE_ENABLE_SEMANTIC") else None
     build_service = CorpusBuildService(
         pipeline=default_pipeline(
             repo_root=repo_root,
@@ -281,12 +286,17 @@ def create_default_app() -> FastAPI:
         ),
         registry=corpus_registry,
         build_dir=runs_root / "built-corpora",
+        embedder=embedder,
     )
     return create_app(
         manager=manager,
         corpus_registry=corpus_registry,
         build_service=build_service,
     )
+
+
+def _env_flag(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _make_run_record(

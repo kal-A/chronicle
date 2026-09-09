@@ -146,6 +146,64 @@ def test_rebuilding_same_topic_is_idempotent(tmp_path):
     assert registry.list_corpus_ids().count(first.corpusId) == 1
 
 
+class _FakeEmbedder:
+    """Deterministic tiny embedder; enough to exercise indexing + reranking."""
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        return [self.embed_one(text) for text in texts]
+
+    def embed_one(self, text: str) -> list[float]:
+        return [float(len(text) % 7 + 1), 1.0, 0.0]
+
+
+def test_build_with_embedder_registers_a_hybrid_corpus(tmp_path):
+    from chronicle.acquisition.hybrid_corpus import HybridCorpus
+
+    registry = CorpusRegistry()
+    result = _built_result()
+    service = CorpusBuildService(
+        pipeline=_FakePipeline(result),
+        registry=registry,
+        build_dir=tmp_path / "built",
+        embedder=_FakeEmbedder(),
+    )
+
+    outcome = service.build(
+        topic="a placeholder subject",
+        interpreted_question="What happened?",
+        geographic_scope=["Somewhere"],
+        date_earliest=date(1800, 1, 1),
+        date_latest=date(1850, 12, 31),
+    )
+
+    assert outcome.semantic is True
+    corpus = registry.get_corpus(outcome.corpusId)
+    assert isinstance(corpus, HybridCorpus)
+    # search still works through the hybrid wrapper
+    hits = corpus.search_passages(
+        PassageSearchRequest(corpusId=outcome.corpusId, query="zeppelin")
+    )
+    assert hits.totalMatched >= 1
+
+
+def test_build_without_embedder_registers_plain_corpus(tmp_path):
+    from chronicle.acquisition.hybrid_corpus import HybridCorpus
+
+    registry = CorpusRegistry()
+    service = _service(tmp_path, registry, _FakePipeline(_built_result()))
+
+    outcome = service.build(
+        topic="a placeholder subject",
+        interpreted_question="What happened?",
+        geographic_scope=["Somewhere"],
+        date_earliest=date(1800, 1, 1),
+        date_latest=date(1850, 12, 31),
+    )
+
+    assert outcome.semantic is False
+    assert not isinstance(registry.get_corpus(outcome.corpusId), HybridCorpus)
+
+
 def test_build_writes_a_loadable_package_file(tmp_path):
     registry = CorpusRegistry()
     result = _built_result()
