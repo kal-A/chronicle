@@ -37,6 +37,7 @@ from ...storage.agent_run_store import AgentRunStore
 from ...workflow.hashing import stable_json_hash
 from ..agents import EvidenceAnalyst, InvestigationPlanner
 from ..agents.analyst import AnalystValidationError
+from ..agents.planner import PlannerValidationError
 from ..contracts.analysis import GroundingValidationReport
 from ..contracts.plan import PlanDisposition
 from ..contracts.run import AgentRunRecord, AgentStageName, AgentStageRecord, AgentStageStatus
@@ -162,7 +163,38 @@ class LangGraphAgentWorkflow:
                     maximumOutputCharacters=self.retrieval_runner.policy.maxCharactersPerToolOutput,
                 )
                 specs = self.retrieval_runner.registry.list_specs(context, corpus)
-                record.plan = self.planner.plan(record.request, record.corpusSnapshot, specs)
+                try:
+                    record.plan = self.planner.plan(
+                        record.request, record.corpusSnapshot, specs
+                    )
+                except PlannerValidationError as exc:
+                    # A schema-valid plan that failed deterministic planner
+                    # authorization (unauthorized tool, incoherent proceed-plan,
+                    # a proceed-plan for an out-of-corpus question) is a
+                    # model-capability outcome over this corpus, not a system
+                    # error: abstain with an audited REJECTED stage rather than
+                    # hard-fail. Genuine boundary errors (identity/budget) carry
+                    # no model attempt and are re-raised to the failure path.
+                    if exc.modelCall is None:
+                        raise
+                    record.modelCalls.append(exc.modelCall)
+                    record.stages.append(_planner_rejected_stage(record.runId, exc))
+                    _stage_completed(emitter, AgentStageName.PLANNER)
+                    progress["stage"] = None
+                    record.status = AgentRunStatus.ABSTAINED
+                    record.abstentionReason = _planner_abstention_reason(exc)
+                    self._save(record)
+                    emitter(
+                        WorkflowSignal(
+                            type=WorkflowSignalType.RUN_ABSTAINED,
+                            message=(
+                                "Chronicle could not form a valid, authorized line of "
+                                "inquiry over this corpus, and abstained rather than "
+                                "proceed on an invalid plan."
+                            ),
+                        )
+                    )
+                    return {"outcome": "abstained"}
                 if self.planner.last_execution is None:
                     raise RuntimeError("Planner returned without an execution record")
                 execution = self.planner.last_execution
@@ -206,14 +238,38 @@ class LangGraphAgentWorkflow:
                 self._save(record)
                 _stage_completed(emitter, AgentStageName.RETRIEVAL)
                 progress["stage"] = None
-                if retrieval.stageRecord.status in {
+                retrieval_status = retrieval.stageRecord.status
+                if retrieval_status is AgentStageStatus.REJECTED:
+                    # The plan was structurally acceptable to the planner but its
+                    # tool-call arguments failed the runner's deterministic input
+                    # preflight -- the local model produced an unusable plan. That
+                    # is a model-capability outcome, not a system error: abstain
+                    # honestly rather than crash. (Genuine execution failures and
+                    # deadline interruptions keep their FAILED/INTERRUPTED terminal
+                    # below.)
+                    record.status = AgentRunStatus.ABSTAINED
+                    record.abstentionReason = _retrieval_rejected_reason(
+                        retrieval.stageRecord
+                    )
+                    self._save(record)
+                    emitter(
+                        WorkflowSignal(
+                            type=WorkflowSignalType.RUN_ABSTAINED,
+                            stage=AgentStageName.RETRIEVAL,
+                            message=(
+                                "The planned retrieval was invalid; Chronicle "
+                                "abstained rather than proceed on an unusable plan."
+                            ),
+                        )
+                    )
+                    return {"outcome": "abstained"}
+                if retrieval_status in {
                     AgentStageStatus.FAILED,
-                    AgentStageStatus.REJECTED,
                     AgentStageStatus.INTERRUPTED,
                 }:
                     record.status = (
                         AgentRunStatus.INTERRUPTED
-                        if retrieval.stageRecord.status is AgentStageStatus.INTERRUPTED
+                        if retrieval_status is AgentStageStatus.INTERRUPTED
                         else AgentRunStatus.FAILED
                     )
                     record.errorMessage = (
@@ -347,7 +403,9 @@ class LangGraphAgentWorkflow:
         )
         graph.add_conditional_edges(
             "retrieval",
-            lambda state: "end" if state.get("outcome") == "failed" else "analyst",
+            lambda state: "end"
+            if state.get("outcome") in {"failed", "abstained"}
+            else "analyst",
             {"end": END, "analyst": "analyst"},
         )
         graph.add_conditional_edges(
@@ -399,6 +457,45 @@ def _grounding_rejected_stage(run_id: str, exc: AnalystValidationError) -> Agent
         modelCalls=[model_call],
         errors=[_grounding_abstention_reason(exc.validationReport)],
     )
+
+
+def _planner_rejected_stage(run_id: str, exc: PlannerValidationError) -> AgentStageRecord:
+    """Audit the planner attempt whose schema-valid plan Chronicle rejected."""
+
+    model_call = exc.modelCall
+    assert model_call is not None  # guarded by caller
+    return AgentStageRecord(
+        runId=run_id,
+        stageName=AgentStageName.PLANNER,
+        round=0,
+        status=AgentStageStatus.REJECTED,
+        startedAt=model_call.startedAt,
+        completedAt=model_call.completedAt,
+        latencyMs=model_call.latencyMs,
+        inputHash=model_call.inputHash,
+        outputHash=None,
+        promptMeasurement=exc.promptMeasurement,
+        modelCalls=[model_call],
+        errors=[_planner_abstention_reason(exc)],
+    )
+
+
+def _planner_abstention_reason(exc: PlannerValidationError) -> str:
+    detail = str(exc).strip() or "the proposed plan was not authorized"
+    reason = (
+        "Chronicle's planner could not form a valid, authorized investigation plan "
+        f"over this corpus ({detail}); it abstained rather than proceed on an invalid plan."
+    )
+    return reason[:500]
+
+
+def _retrieval_rejected_reason(stage: AgentStageRecord) -> str:
+    detail = stage.errors[0] if stage.errors else "the planned retrieval was rejected"
+    reason = (
+        "The planned retrieval could not be executed "
+        f"({detail}); Chronicle abstained rather than proceed on an unusable plan."
+    )
+    return reason[:500]
 
 
 def _grounding_abstention_reason(report: GroundingValidationReport | None) -> str:

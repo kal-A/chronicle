@@ -19,6 +19,7 @@ from chronicle.ai.agents import (
     InvestigationPlanner,
 )
 from chronicle.ai.contracts.analysis import GroundingValidationReport
+from chronicle.ai.contracts.plan import PlannedToolCall, ToolPurpose
 from chronicle.ai.models import DeterministicModelProvider
 from chronicle.ai.models.metadata import ModelCallStatus
 from chronicle.ai.orchestration.finalization import FinalizationRunner
@@ -162,6 +163,86 @@ def test_graph_abstains_when_analyst_draft_cannot_be_grounded(tmp_path):
         "analyst",
     ]
     assert result.stages[-1].status is AgentStageStatus.REJECTED
+    assert signals[-1].type is WorkflowSignalType.RUN_ABSTAINED
+    assert store.load_run(record.runId).status is AgentRunStatus.ABSTAINED
+
+
+def test_graph_abstains_when_planner_proposes_an_invalid_plan(tmp_path):
+    # A local model can return a schema-valid plan that fails Chronicle's
+    # deterministic planner authorization (e.g. proposing an unauthorized tool,
+    # or a proceed-plan for an out-of-corpus question). That is a model-capability
+    # outcome over this corpus, not a Chronicle system error: the run must ABSTAIN
+    # with an audited REJECTED planner stage, never hard-fail. Reproduces the live
+    # P3 "1918 influenza" failure where the planner emitted an invalid plan.
+    corpus, registry, plan, *_rest, record = _context("run-bad-plan")
+    invalid_plan = plan.model_copy(
+        update={
+            "plannedToolCalls": [
+                PlannedToolCall(
+                    callId="unauthorized-call",
+                    toolName="totally_unauthorized_tool",
+                    purposeCode=ToolPurpose.FIND_SUPPORT,
+                    arguments={},
+                )
+            ]
+        }
+    )
+    provider = DeterministicModelProvider()
+    provider.enqueue_value(invalid_plan)
+    workflow, store = _workflow(tmp_path, registry, provider)
+    signals = []
+
+    result = workflow.run(record, corpus, emit=signals.append)
+
+    assert result.status is AgentRunStatus.ABSTAINED
+    assert result.abstentionReason
+    assert result.finalAnswer is None
+    # the rejected planner attempt is audited (one model call, a REJECTED stage)
+    assert result.stages[-1].stageName.value == "planner"
+    assert result.stages[-1].status is AgentStageStatus.REJECTED
+    assert len(result.modelCalls) == 1
+    assert signals[-1].type is WorkflowSignalType.RUN_ABSTAINED
+    assert store.load_run(record.runId).status is AgentRunStatus.ABSTAINED
+
+
+def test_graph_abstains_when_planned_tool_call_arguments_are_invalid(tmp_path):
+    # A schema-valid plan can still carry tool-call arguments that fail the
+    # runner's deterministic input preflight (here: search_passages with a
+    # dateRange but no dateRoles -- a Pydantic cross-field rule the planner's
+    # shape check does not enforce). The initial retrieval is REJECTED; that is a
+    # model-produced-unusable-plan outcome and must ABSTAIN, not FAIL. Reproduces
+    # the live P3 "Great Fire of London" failure.
+    corpus, registry, plan, *_rest, record = _context("run-bad-toolargs")
+    bad_args_plan = plan.model_copy(
+        update={
+            "plannedToolCalls": [
+                PlannedToolCall(
+                    callId="bad-search",
+                    toolName="search_passages",
+                    purposeCode=ToolPurpose.FIND_SUPPORT,
+                    arguments={
+                        "query": "the report",
+                        "dateRange": {"earliest": "1914-06-01", "latest": "1914-08-01"},
+                    },
+                )
+            ]
+        }
+    )
+    provider = DeterministicModelProvider()
+    provider.enqueue_value(bad_args_plan)
+    workflow, store = _workflow(tmp_path, registry, provider)
+    signals = []
+
+    result = workflow.run(record, corpus, emit=signals.append)
+
+    assert result.status is AgentRunStatus.ABSTAINED
+    assert result.abstentionReason
+    assert result.finalAnswer is None
+    # reached and was rejected at retrieval preflight, not the planner
+    assert any(
+        stage.stageName.value == "retrieval" and stage.status is AgentStageStatus.REJECTED
+        for stage in result.stages
+    )
     assert signals[-1].type is WorkflowSignalType.RUN_ABSTAINED
     assert store.load_run(record.runId).status is AgentRunStatus.ABSTAINED
 
