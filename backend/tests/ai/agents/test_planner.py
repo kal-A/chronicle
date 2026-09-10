@@ -68,6 +68,39 @@ def _snapshot(*, capabilities: tuple[str, ...] = ("claims", "passages")) -> Corp
     )
 
 
+def _search_passages_spec() -> ToolSpec:
+    return ToolSpec(
+        name="search_passages",
+        version="test-v1",
+        description="Search passages by query, optionally date/role filtered.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "corpusId": {"type": "string", "minLength": 1},
+                "query": {"type": "string", "minLength": 1},
+                "dateRange": {
+                    "anyOf": [{"type": "object"}, {"type": "null"}],
+                    "default": None,
+                },
+                "dateRoles": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "default": [],
+                },
+                "maxResults": {"type": "integer"},
+            },
+            "required": ["corpusId", "query"],
+            "additionalProperties": False,
+        },
+        outputSummary="Passage hits.",
+        requiredCapabilities=["passages"],
+        maxResultLimit=4,
+        maxOutputCharacters=6_000,
+        useWhen="A free-text evidence search is appropriate.",
+        avoidWhen="A precise record id is selected.",
+    )
+
+
 def _spec(
     name: str = "get_claim_evidence",
     *,
@@ -149,6 +182,25 @@ def test_planner_schema_keeps_counterevidence_type_for_a_counterevidence_questio
         request, [_spec("search_passages", capability="passages")]
     )
     assert "counterevidence" in schema["$defs"]["QuestionType"]["enum"]
+
+
+def test_planner_schema_forces_search_passages_date_filter_to_a_safe_absent_shape():
+    # search_passages couples dateRange <-> dateRoles (a Pydantic cross-field rule
+    # the JSON schema does not encode), so a small model routinely emits one
+    # without the other and the runner rejects the call -> a needless abstention
+    # (the live P3 Great Fire failures). Constrain the planner's search_passages
+    # arguments so the date filter is forced to its always-valid absent shape.
+    from chronicle.ai.agents.planner_schema import build_planner_response_schema
+
+    schema = build_planner_response_schema(_request(), [_search_passages_spec()])
+    variant = next(
+        v
+        for v in schema["properties"]["plannedToolCalls"]["items"]["oneOf"]
+        if v["properties"]["toolName"].get("const") == "search_passages"
+    )
+    args = variant["properties"]["arguments"]["properties"]
+    assert args["dateRange"] == {"type": "null"}
+    assert args["dateRoles"]["maxItems"] == 0
 
 
 def test_planner_returns_only_a_validated_plan_and_records_bounded_call_metadata():
