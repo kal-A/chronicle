@@ -28,6 +28,7 @@ duplication; they move here when ``sequential.py`` is retired.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -37,7 +38,10 @@ from ...storage.agent_run_store import AgentRunStore
 from ...workflow.hashing import stable_json_hash
 from ..agents import EvidenceAnalyst, InvestigationPlanner
 from ..agents.analyst import AnalystValidationError
+from ..agents.critic import CriticValidationError
+from ..agents.guide import GuideValidationError
 from ..agents.planner import PlannerValidationError
+from ..models.errors import ModelProviderError
 from ..contracts.analysis import GroundingValidationReport
 from ..contracts.plan import PlanDisposition
 from ..contracts.run import AgentRunRecord, AgentStageName, AgentStageRecord, AgentStageStatus
@@ -363,16 +367,36 @@ class LangGraphAgentWorkflow:
                     progress["stage"] = None
                     progress["round"] = 0
 
-            self.finalization_runner.finalize(
-                record.request.userQuestion,
-                record.plan,
-                corpus,
-                record.retrievalBundle,
-                record.analysisDraft,
-                record.groundingValidation,
-                run_record=record,
-                stage_callback=final_stage,
-            )
+            try:
+                self.finalization_runner.finalize(
+                    record.request.userQuestion,
+                    record.plan,
+                    corpus,
+                    record.retrievalBundle,
+                    record.analysisDraft,
+                    record.groundingValidation,
+                    run_record=record,
+                    stage_callback=final_stage,
+                )
+            except ModelProviderError as exc:
+                # The Critic/Guide model call could not produce a valid decision
+                # or answer even after bounded retries -- finalization-stage
+                # model brittleness, not a system error. The run has a grounded
+                # analysis but no completed review: abstain rather than crash.
+                return _abstain_at_finalization(
+                    record, emitter, progress, self._save, _bounded_error(exc)
+                )
+            except (CriticValidationError, GuideValidationError) as exc:
+                # A schema-valid critic decision / guide answer that failed
+                # deterministic validation is likewise an insufficient-review
+                # outcome. Genuine boundary errors (bad identities/lengths) carry
+                # no model attempt and are re-raised to the failure path.
+                if exc.modelCall is None:
+                    raise
+                record.modelCalls.append(exc.modelCall)
+                return _abstain_at_finalization(
+                    record, emitter, progress, self._save, str(exc)
+                )
             signal_type = (
                 WorkflowSignalType.RUN_ABSTAINED
                 if record.status is AgentRunStatus.ABSTAINED
@@ -485,6 +509,44 @@ def _planner_abstention_reason(exc: PlannerValidationError) -> str:
     reason = (
         "Chronicle's planner could not form a valid, authorized investigation plan "
         f"over this corpus ({detail}); it abstained rather than proceed on an invalid plan."
+    )
+    return reason[:500]
+
+
+def _abstain_at_finalization(
+    record: AgentRunRecord,
+    emitter: SignalEmitter,
+    progress: dict[str, object],
+    save: "Callable[[AgentRunRecord], None]",
+    detail: str,
+) -> dict[str, str]:
+    """Terminate a run that reached finalization but whose critic/guide model
+    call could not produce a usable result: a principled abstention, not a crash.
+    A grounded analysis exists; the run simply has no completed review."""
+
+    progress["stage"] = None
+    progress["round"] = 0
+    record.status = AgentRunStatus.ABSTAINED
+    record.abstentionReason = _finalization_abstention_reason(detail)
+    save(record)
+    emitter(
+        WorkflowSignal(
+            type=WorkflowSignalType.RUN_ABSTAINED,
+            message=(
+                "Chronicle could not complete the critical review of the analysis "
+                "and abstained rather than present an unreviewed answer."
+            ),
+        )
+    )
+    return {"outcome": "abstained"}
+
+
+def _finalization_abstention_reason(detail: str) -> str:
+    detail = detail.strip() or "the critical review could not be completed"
+    reason = (
+        "Chronicle produced a grounded analysis but could not complete the "
+        f"critical review or answer composition ({detail}); it abstained rather "
+        "than present an unreviewed answer."
     )
     return reason[:500]
 

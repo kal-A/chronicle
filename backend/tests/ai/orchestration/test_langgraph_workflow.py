@@ -247,6 +247,37 @@ def test_graph_abstains_when_planned_tool_call_arguments_are_invalid(tmp_path):
     assert store.load_run(record.runId).status is AgentRunStatus.ABSTAINED
 
 
+def test_graph_abstains_when_finalization_model_call_cannot_comply(tmp_path):
+    # With the analyst gates closed, runs reach the Critic with a grounded
+    # analysis; a brittle local model can then fail to produce a valid
+    # CriticDecision even after bounded retries (RetryExhaustedError). That is a
+    # finalization model-capability outcome, not a Chronicle system error: the
+    # run must ABSTAIN (it has a grounded analysis but no completed review),
+    # never hard-fail. Reproduces the live P3 finding where the Critic exhausted
+    # its attempts on a thin acquired corpus.
+    corpus, registry, plan, _bundle, draft, _decision, _answer, record = _context(
+        "run-critic-fail"
+    )
+    provider = DeterministicModelProvider()
+    provider.enqueue_value(plan)
+    provider.enqueue_value(draft)
+    provider.enqueue_malformed("critic cannot comply")
+    provider.enqueue_malformed("critic still cannot comply")
+    workflow, store = _workflow(tmp_path, registry, provider)
+    signals = []
+
+    result = workflow.run(record, corpus, emit=signals.append)
+
+    assert result.status is AgentRunStatus.ABSTAINED
+    assert result.abstentionReason
+    assert result.finalAnswer is None
+    # the analyst succeeded (a grounded analysis exists); the run abstained at
+    # finalization rather than crashing
+    assert any(stage.stageName.value == "analyst" for stage in result.stages)
+    assert signals[-1].type is WorkflowSignalType.RUN_ABSTAINED
+    assert store.load_run(record.runId).status is AgentRunStatus.ABSTAINED
+
+
 def test_graph_persists_failed_planner_call_and_specific_bounded_cause(tmp_path):
     corpus, registry, _plan, _bundle, _draft, _decision, _answer, record = _context(
         "run-planner-failure"
