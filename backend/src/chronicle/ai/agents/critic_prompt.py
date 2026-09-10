@@ -75,7 +75,12 @@ mistaken for causation, later knowledge projected backward, source dependence, m
 counterevidence, disputed interpretation presented as settled, source-role or primary/secondary
 confusion, unsupported location precision, incomplete date qualification, overgeneralization,
 claims absent from retrieved evidence, and failure to abstain. Preserve citation roles and never
-invent IDs. Approve, downgrade, reject, or abstain statement by statement. Request exactly one
+invent IDs. A statement whose form is evidence_synthesis and directness is inferred (with partial
+status and required review) is deliberately hedged, not a definitive assertion: approve it, or
+downgrade it, when it traces to the retrieved passages and does not claim more than they support.
+Reject only genuine over-claiming -- asserting specifics, causes, dates, or places the passages do
+not contain -- not mere lack of definitiveness or precision, which an inferred synthesis never
+claims. Approve, downgrade, reject, or abstain statement by statement. Request exactly one
 registered follow-up tool call only when one bounded evidence gap can materially change the answer.
 Unless the verdict is retrieve_more or abstain, every ID in statementIdsRequiringDisposition must
 appear exactly once in acceptedStatementIds, downgradedStatements, or rejectedStatements. For an
