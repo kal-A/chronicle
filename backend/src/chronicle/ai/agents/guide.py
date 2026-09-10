@@ -17,6 +17,7 @@ from ..models.metadata import ModelCallRecord, ModelGenerationSettings
 from ..models.protocol import ModelProvider
 from ..orchestration.policies import AgentExecutionPolicy
 from .guide_prompt import GuidePrompt, build_guide_prompt
+from .guide_schema import build_guide_response_schema
 from .validation import approved_statements, validate_agent_answer
 
 GUIDE_PROMPT_VERSION = "e4-investigation-guide-v1"
@@ -78,9 +79,15 @@ class InvestigationGuide:
         self.last_execution = None
         if not user_question or len(user_question) > 1_000:
             raise GuideValidationError("user question must contain 1 to 1,000 characters")
+        response_schema = build_guide_response_schema(analysis, decision)
         try:
             prompt = build_guide_prompt(
-                user_question, analysis, decision, action_index, self._policy
+                user_question,
+                analysis,
+                decision,
+                action_index,
+                self._policy,
+                response_schema=response_schema,
             )
         except ValueError as exc:
             raise GuideBudgetError(str(exc)) from None
@@ -89,6 +96,7 @@ class InvestigationGuide:
             system_prompt=prompt.systemPrompt,
             user_prompt=prompt.userPrompt,
             response_model=AgentAnswer,
+            response_schema=response_schema,
             prompt_version=GUIDE_PROMPT_VERSION,
             temperature=0.0,
             generation_settings=ModelGenerationSettings(

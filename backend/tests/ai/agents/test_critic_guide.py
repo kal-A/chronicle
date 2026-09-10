@@ -204,6 +204,29 @@ def test_critic_schema_forces_approve_to_cover_every_statement():
     assert accepted.get("uniqueItems") is True
 
 
+def test_guide_schema_forces_a_valid_answer_for_an_approved_critique():
+    # The Guide's bare schema let the 7B emit an invalid AgentAnswer (a citation
+    # with no record id), exhausting generation and abstaining on an approved
+    # answer -- the live P3 guide failure. Constrain it: citations/actions empty
+    # (citations are re-attached canonically), one key point per approved
+    # statement, and status cannot be abstained when something was approved.
+    from chronicle.ai.agents.guide_schema import build_guide_response_schema
+
+    _corpus, _plan, _bundle, draft, _grounding, decision = _context()  # approve, [statement-1]
+    schema = build_guide_response_schema(draft, decision)
+    props = schema["properties"]
+    assert props["citations"]["maxItems"] == 0
+    assert props["actions"]["maxItems"] == 0
+    assert props["disagreements"]["maxItems"] == 0
+    assert "abstained" not in schema["$defs"]["AnswerStatus"]["enum"]
+    key_points = props["keyPoints"]
+    assert key_points["minItems"] == 1 and key_points["maxItems"] == 1
+    # single approved statement -> id + exact text pinned so the model can't paraphrase
+    assert key_points["items"]["properties"]["statementId"]["const"] == "statement-1"
+    assert key_points["items"]["properties"]["text"]["const"] == draft.statements[0].text
+    assert props["directAnswer"]["const"] == draft.statements[0].text
+
+
 def test_critic_validation_requires_complete_non_overlapping_review():
     _corpus, _plan, _bundle, draft, grounding, decision = _context()
 
