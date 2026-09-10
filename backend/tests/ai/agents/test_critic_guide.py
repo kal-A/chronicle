@@ -107,6 +107,82 @@ def _context():
     return corpus, plan, bundle, draft, grounding, decision
 
 
+def _critic_variant(schema, verdict_value):
+    return next(
+        variant
+        for variant in schema["oneOf"]
+        if variant["properties"]["verdict"].get("const") == verdict_value
+    )
+
+
+def _critic_verdicts(schema):
+    return {variant["properties"]["verdict"].get("const") for variant in schema["oneOf"]}
+
+
+def test_critic_schema_forces_reject_to_carry_a_rejected_statement():
+    # The observed live crash: the model emitted verdict=reject with no rejected
+    # statements, failed Pydantic validation, and exhausted its retries. Constrain
+    # the reject variant so a rejected statement is mandatory.
+    from chronicle.ai.agents.critic_schema import build_critic_response_schema
+
+    _corpus, _plan, _bundle, draft, grounding, _decision = _context()
+    schema = build_critic_response_schema(draft, grounding)
+    reject = _critic_variant(schema, "reject")
+    assert reject["properties"]["rejectedStatements"]["minItems"] == 1
+    # a reject cannot smuggle a follow-up tool call
+    assert reject["properties"]["additionalToolCalls"]["maxItems"] == 0
+
+
+def test_critic_schema_constrains_retrieve_more_to_one_call_and_no_dispositions():
+    from chronicle.ai.agents.critic_schema import build_critic_response_schema
+
+    _corpus, _plan, _bundle, draft, grounding, _decision = _context()
+    schema = build_critic_response_schema(draft, grounding)
+    retrieve = _critic_variant(schema, "retrieve_more")
+    tool_calls = retrieve["properties"]["additionalToolCalls"]
+    assert tool_calls["minItems"] == 1 and tool_calls["maxItems"] == 1
+    for deferred in ("acceptedStatementIds", "downgradedStatements", "rejectedStatements"):
+        assert retrieve["properties"][deferred]["maxItems"] == 0
+
+
+def test_critic_schema_excludes_approval_verdicts_when_analysis_is_ungrounded():
+    # The deterministic validator forbids approving/exposing an ungrounded
+    # analysis; the schema must not even offer those verdicts.
+    from chronicle.ai.agents.critic_schema import build_critic_response_schema
+    from chronicle.ai.contracts.analysis import (
+        GroundingIssue,
+        GroundingIssueCode,
+        GroundingValidationReport as _Report,
+    )
+
+    _corpus, _plan, _bundle, draft, _grounding, _decision = _context()
+    ungrounded = _Report(
+        valid=False,
+        issues=[
+            GroundingIssue(
+                code=GroundingIssueCode.MISSING_CITATION,
+                statementId=None,
+                message="no citation",
+            )
+        ],
+    )
+    schema = build_critic_response_schema(draft, ungrounded)
+    verdicts = _critic_verdicts(schema)
+    assert "approve" not in verdicts
+    assert "approve_with_downgrades" not in verdicts
+    assert {"reject", "abstain", "retrieve_more"}.issubset(verdicts)
+
+
+def test_critic_schema_constrains_accepted_statement_ids_to_the_analysis():
+    from chronicle.ai.agents.critic_schema import build_critic_response_schema
+
+    _corpus, _plan, _bundle, draft, grounding, _decision = _context()
+    schema = build_critic_response_schema(draft, grounding)
+    approve = _critic_variant(schema, "approve")
+    assert approve["properties"]["acceptedStatementIds"]["items"]["enum"] == ["statement-1"]
+    assert approve["properties"]["acceptedStatementIds"]["minItems"] == 1
+
+
 def test_critic_validation_requires_complete_non_overlapping_review():
     _corpus, _plan, _bundle, draft, grounding, decision = _context()
 

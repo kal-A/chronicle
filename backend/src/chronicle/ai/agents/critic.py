@@ -13,6 +13,7 @@ from ..models.metadata import ModelCallRecord, ModelGenerationSettings
 from ..models.protocol import ModelProvider
 from ..orchestration.policies import AgentExecutionPolicy
 from .critic_prompt import CriticPrompt, build_critic_prompt
+from .critic_schema import build_critic_response_schema
 from .validation import validate_critic_decision
 
 CRITIC_PROMPT_VERSION = "e4-historical-critic-v1"
@@ -77,6 +78,7 @@ class HistoricalCritic:
             or plan.corpusId != retrieval_bundle.corpusId
         ):
             raise CriticValidationError("plan and retrieval bundle identities do not match")
+        response_schema = build_critic_response_schema(analysis, grounding)
         try:
             prompt = build_critic_prompt(
                 user_question,
@@ -85,6 +87,7 @@ class HistoricalCritic:
                 analysis,
                 grounding,
                 self._policy,
+                response_schema=response_schema,
             )
         except ValueError as exc:
             raise CriticBudgetError(str(exc)) from None
@@ -93,6 +96,7 @@ class HistoricalCritic:
             system_prompt=prompt.systemPrompt,
             user_prompt=prompt.userPrompt,
             response_model=CriticDecision,
+            response_schema=response_schema,
             prompt_version=CRITIC_PROMPT_VERSION,
             temperature=0.0,
             generation_settings=ModelGenerationSettings(
