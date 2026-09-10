@@ -113,7 +113,12 @@ def build_planner_response_schema(
         question_types.remove(QuestionType.TIMELINE_ORDERING.value)
     if not available_names.intersection(
         {"find_counterevidence", "get_claim_evidence", "search_passages"}
-    ):
+    ) or not _question_calls_for_counterevidence(request.userQuestion):
+        # Gate COUNTEREVIDENCE on the question itself (like ACTOR_KNOWLEDGE and
+        # TIMELINE_ORDERING), not merely on tool availability. Over a passage-only
+        # corpus search_passages is always present, so without this a small model
+        # can misclassify a plain factual question as COUNTEREVIDENCE and emit an
+        # incoherent plan that the planner then rejects -> a needless abstention.
         question_types.remove(QuestionType.COUNTEREVIDENCE.value)
 
     call_schema = schema["$defs"]["PlannedToolCall"]

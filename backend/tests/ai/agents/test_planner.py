@@ -121,6 +121,36 @@ def _plan(
     )
 
 
+def test_planner_schema_excludes_counterevidence_type_for_a_plain_question():
+    # Over a passage-only corpus search_passages is available, but a factual
+    # "when/where" question does not call for counterevidence. The COUNTEREVIDENCE
+    # question type must not be offered, or the small model misclassifies the
+    # question and emits an incoherent counterevidence plan that hard-abstains
+    # (the live P3 walkthrough's Great Fire failure). Gate it on the question,
+    # mirroring ACTOR_KNOWLEDGE / TIMELINE_ORDERING.
+    from chronicle.ai.agents.planner_schema import build_planner_response_schema
+
+    request = _request().model_copy(
+        update={"userQuestion": "When and where did the event begin?"}
+    )
+    schema = build_planner_response_schema(
+        request, [_spec("search_passages", capability="passages")]
+    )
+    assert "counterevidence" not in schema["$defs"]["QuestionType"]["enum"]
+
+
+def test_planner_schema_keeps_counterevidence_type_for_a_counterevidence_question():
+    from chronicle.ai.agents.planner_schema import build_planner_response_schema
+
+    request = _request().model_copy(
+        update={"userQuestion": "What counterevidence contradicts the reported claim?"}
+    )
+    schema = build_planner_response_schema(
+        request, [_spec("search_passages", capability="passages")]
+    )
+    assert "counterevidence" in schema["$defs"]["QuestionType"]["enum"]
+
+
 def test_planner_returns_only_a_validated_plan_and_records_bounded_call_metadata():
     provider = DeterministicModelProvider()
     provider.enqueue_value(_plan())
