@@ -36,6 +36,7 @@ from ..acquisition.embeddings import OllamaEmbedder
 from ..corpus import CorpusRegistry
 from ..corpus.errors import UnknownCorpusError
 from ..storage.agent_run_store import AgentRunNotFoundError, AgentRunStore
+from ..acquisition.connectors.base import ConnectorError
 from ..acquisition.scope_resolver import ScopeResolver
 from .contracts import (
     AgentRunAccepted,
@@ -179,15 +180,27 @@ def create_app(
                 status_code=501,
                 detail="Topic acquisition is not configured on this deployment.",
             )
-        outcome = build_service.build(
-            topic=submission.topic,
-            interpreted_question=submission.question,
-            geographic_scope=submission.geographicScope,
-            date_earliest=submission.dateEarliest,
-            date_latest=submission.dateLatest,
-            terms=submission.terms,
-            max_sources=submission.maxSources,
-        )
+        try:
+            outcome = build_service.build(
+                topic=submission.topic,
+                interpreted_question=submission.question,
+                geographic_scope=submission.geographicScope,
+                date_earliest=submission.dateEarliest,
+                date_latest=submission.dateLatest,
+                terms=submission.terms,
+                max_sources=submission.maxSources,
+            )
+        except ConnectorError as exc:
+            # Per-source fetch failures are already skipped inside the pipeline;
+            # a ConnectorError reaching here is a broader source-service outage.
+            # Report it as an upstream failure, not an opaque 500.
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "A source service could not be reached while acquiring for this "
+                    f"topic; please try again shortly. ({str(exc)[:200]})"
+                ),
+            ) from exc
         try:
             corpus = corpus_registry.get_corpus(outcome.corpusId)
         except UnknownCorpusError as exc:  # pragma: no cover - registration just happened

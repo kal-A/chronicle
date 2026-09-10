@@ -21,11 +21,12 @@ from chronicle.contracts.enums import PackageStatus, RightsStatus, SourceType
 class FakeConnector(SourceConnector):
     """A network-free connector with canned discovery + fetch, and call counters."""
 
-    def __init__(self, name, candidates, bodies, *, fail_discovery=False):
+    def __init__(self, name, candidates, bodies, *, fail_discovery=False, raise_on=None):
         self.name = name  # instance attr shadows the class attr; no client created
         self._candidates = candidates
         self._bodies = bodies
         self._fail_discovery = fail_discovery
+        self._raise_on = set(raise_on or ())
         self.fetch_calls: list[str] = []
 
     def discover(self, query: DiscoveryQuery) -> list[SourceCandidate]:
@@ -35,6 +36,8 @@ class FakeConnector(SourceConnector):
 
     def fetch(self, candidate: SourceCandidate) -> AcquiredSource | None:
         self.fetch_calls.append(candidate.candidateId)
+        if candidate.candidateId in self._raise_on:
+            raise ConnectorError(f"fetch failed: 403 Forbidden for {candidate.candidateId}")
         body = self._bodies.get(candidate.candidateId)
         if body is None:
             return None
@@ -132,6 +135,32 @@ def test_pipeline_builds_a_corpus_end_to_end(tmp_path):
     assert result.investigation.status is PackageStatus.PARTIAL
     assert len(result.investigation.sources) == 2
     assert len(result.investigation.passages) == result.passages
+
+
+def test_pipeline_skips_a_source_that_fails_to_fetch(tmp_path):
+    # A single flaky/forbidden source (e.g. Internet Archive returning 403) must
+    # not fail the whole acquisition: the pipeline skips it, records the error,
+    # and builds a corpus from the sources that did succeed. Reproduces the live
+    # walkthrough bug where one 403 turned the build endpoint into a 500.
+    candidates = [_candidate("good", "fake"), _candidate("bad", "fake")]
+    bodies = {"good": "Reliable body about the event. " * 30}
+    connector = FakeConnector("fake", candidates, bodies, raise_on={"bad"})
+    pipeline = AcquisitionPipeline([connector], FetchCache(tmp_path))
+
+    result = pipeline.run(
+        topic="a placeholder subject",
+        interpreted_question="What happened?",
+        geographic_scope=["Somewhere"],
+        date_earliest=date(1800, 1, 1),
+        date_latest=date(1850, 12, 31),
+        max_sources=8,
+    )
+
+    assert result.discovered == 2
+    assert result.acquired == 1  # the good source survived; the bad one was skipped
+    assert result.passages >= 1
+    assert "bad" in result.fetch_errors  # the failure is recorded, not raised
+    assert len(result.investigation.sources) == 1
 
 
 def test_pipeline_requires_at_least_one_connector(tmp_path):

@@ -15,7 +15,7 @@ from datetime import date, datetime
 from ..contracts.enums import RequestedDepth, RequestType
 from ..contracts.generated_investigation import GeneratedInvestigation
 from .chunking import DEFAULT_TARGET_CHARS, chunk_source
-from .connectors.base import SourceConnector
+from .connectors.base import ConnectorError, SourceConnector
 from .contracts import AcquiredSource, DiscoveryQuery, ExtractedPassage
 from .corpus_builder import build_corpus
 from .discovery import discover_sources
@@ -31,6 +31,8 @@ class AcquisitionResult:
     discovery_errors: dict[str, str] = field(default_factory=dict)
     #: reputable pointers surfaced but not ingested (e.g. licensed/paid resources)
     reference_resources: list[SourceCandidate] = field(default_factory=list)
+    #: per-source fetch failures skipped so one flaky source can't fail the build
+    fetch_errors: dict[str, str] = field(default_factory=dict)
 
 
 class AcquisitionPipeline:
@@ -80,11 +82,19 @@ class AcquisitionPipeline:
 
         acquired: list[AcquiredSource] = []
         passages: list[ExtractedPassage] = []
+        fetch_errors: dict[str, str] = {}
         for candidate in discovery.candidates:
             connector = self._by_name.get(candidate.connector)
             if connector is None:
                 continue
-            source = self._cache.get_or_fetch(connector, candidate)
+            try:
+                source = self._cache.get_or_fetch(connector, candidate)
+            except ConnectorError as exc:
+                # A single flaky/forbidden source (e.g. a 403) must not fail the
+                # whole acquisition: skip it, record why, and keep going with the
+                # sources that do succeed (partial acquisition).
+                fetch_errors[candidate.candidateId] = str(exc)[:300]
+                continue
             if source is None:
                 continue
             acquired.append(source)
@@ -111,4 +121,5 @@ class AcquisitionPipeline:
             passages=len(passages),
             discovery_errors=discovery.errors,
             reference_resources=discovery.references,
+            fetch_errors=fetch_errors,
         )
