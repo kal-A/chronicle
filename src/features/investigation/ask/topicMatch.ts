@@ -1,13 +1,16 @@
 import type { GeneratedInvestigation } from '../model/generatedInvestigation'
 
 /**
- * No live generation pipeline is wired to the frontend yet (the Python
- * backend is CLI-only; live model/search calls are deferred past Phase C —
- * docs/decisions/ADR-002-map-first-workspace.md). Rather than pretending to
- * generate a new investigation, the Ask entry surface matches a typed
- * question against the investigations that actually exist, scored against
- * their own real InvestigationExperiencePlan.opening content — no separate,
- * hand-maintained keyword list to fall out of sync with real content.
+ * Routes a typed question to a *curated* investigation when one matches, so the
+ * two hand-authored topics open their rich map-first workspace. A match is
+ * scored against each investigation's own real InvestigationExperiencePlan.opening
+ * content — no separate, hand-maintained keyword list to fall out of sync.
+ *
+ * A non-match is no longer a dead-end: AskEntryPage routes it to the live
+ * generation path (useAskGeneration), which acquires free/public sources, builds
+ * a corpus, runs the four-agent investigation, and presents the real cited
+ * answer or honest abstention inline. A generated corpus is passage-only, so it
+ * does not drive the map workspace — that stays reserved for curated content.
  */
 
 const STOPWORDS = new Set([

@@ -503,4 +503,18 @@ New `acquisition/scope_resolver.py` `ScopeResolver.resolve(question)`: one bound
 
 **Verification:** `tests/acquisition/test_scope_resolver.py` (proposes-valid-scope, falls-back-when-model-fails, rejects-blank-without-a-call) + `tests/api/test_scope_resolution_api.py` (resolved / fallback / 501 / 422). Full backend suite **738 passed, 4 skipped**; guard green. Live probe (real Ollama): *"What started the Great Fire of London?"* → topic "Great Fire of London", geo ["London, England"], dates 1666-09-02..1666-09-05, sensible terms.
 
-**Next (frontend, in progress):** build API client (`resolveScope` + `buildInvestigation`), replace the fixture-match simulation in `AskEntryPage` with resolve → editable scope card → real build → streamed run → inline cited-answer/abstention result, and replace the `CHR-ENTRY-006` "searches two curated investigations" text with an honest live-generation disclosure. Optional later: July Crisis acquisition-recall oracle (inputs exist; scoring harness does not).
+Scope-resolution committed `0758b01`.
+
+## Phase P3 — frontend Ask wiring: live generation inline (additive)
+
+Wired the Ask entry surface to the real backend, **additively**: the curated-match path (keyword-match → `ScopeReviewCard` → simulated `GenerationProgress` → map workspace, for the two hand-authored topics) is unchanged, and the former **no-match dead-end** now runs real live generation. A generated corpus is passage-only and cannot drive the map-first workspace, so the outcome is presented **inline** as a cited text answer or an honest abstention — the workspace stays reserved for curated content.
+
+- **API client** (`assistant/agentApi.ts`): `resolveInvestigationScope(question)` → `POST /api/investigations/resolve-scope`; `buildInvestigation(submission)` → `POST /api/investigations/build`; plus `ProposedScopeResponse` / `TopicBuildSubmission` / `CorpusBuildAccepted` types (reusing the existing `requestJson` + run-polling infra).
+- **Controller** (`ask/useAskGeneration.ts`): a state machine idle → resolving → scope (editable) → building → running → result/error. It awaits the synchronous, minutes-scale build POST, then polls `fetchAgentRun` to a terminal status; fallback-safe (a `resolved=false` proposal or any error degrades to manual entry / an inline note, never a crash).
+- **Editable scope** (`ask/GeneratedScopeForm.tsx`): the model-proposed topic/geography/date-range presented for review and edit before anything is acquired (model assists, human confirms); empty-and-manual when the model could not propose one.
+- **Inline result** (`ask/GeneratedResult.tsx`): the real cited answer (direct answer, key points, citation count, limitations) / principled abstention (reason) / bounded failure, with the acquired source+passage counts.
+- **Honest disclosure:** `AskEntryPage`'s starter copy and `topicMatch.ts`'s docstring now state that non-curated questions are researched live from free public sources with a local model — slow, experimental, text-only.
+
+**Verification:** `AskEntryPage.test.tsx` updated — the four curated-path tests stay green; the old no-match dead-end test is replaced by two live-generation tests (real cited answer inline; honest inline abstention) driving the flow over a mocked backend (resolve → scope form → build → run poll). Frontend: **typecheck clean, lint clean, 118 tests passed** (16 files). Backend unchanged (738 passed).
+
+**Remaining P3 (optional):** July Crisis acquisition-recall oracle (inputs exist — golden fixture + source register + pipeline; the recall/source-identity-match scoring harness does not). A full manual browser walkthrough against a live backend (real minutes-scale generation) is also worth doing before closing P3.

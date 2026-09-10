@@ -4,9 +4,12 @@ import { investigationFixtures } from '../../../content/investigationFixtures'
 import type { GeneratedInvestigation } from '../model/generatedInvestigation'
 import { AtlanticAtlas } from './AtlanticAtlas'
 import { CartographicTransition } from './CartographicTransition'
+import { GeneratedResult } from './GeneratedResult'
+import { GeneratedScopeForm } from './GeneratedScopeForm'
 import { GenerationProgress } from './GenerationProgress'
 import { ScopeReviewCard } from './ScopeReviewCard'
 import { matchInvestigationToQuestion } from './topicMatch'
+import { useAskGeneration } from './useAskGeneration'
 import { useHeroIntro } from './useHeroIntro'
 import { usePrefersReducedMotion } from './useReducedMotion'
 
@@ -17,7 +20,7 @@ const TRANSITION_DELAY_MS = 900
 
 type AskState =
   | { step: 'ask' }
-  | { step: 'no-match' }
+  | { step: 'generate' }
   | {
       step: 'scope-review' | 'generating' | 'transitioning'
       investigation: GeneratedInvestigation
@@ -43,6 +46,7 @@ export function AskEntryPage({
   const [state, setState] = useState<AskState>({ step: 'ask' })
   const [question, setQuestion] = useState('')
   const navigate = useNavigate()
+  const generation = useAskGeneration()
   const prefersReducedMotion = usePrefersReducedMotion()
   const heroIntro = useHeroIntro(HERO_HEADLINE, HERO_INTRO)
   const atlasDrawProgress = Math.min(
@@ -56,7 +60,19 @@ export function AskEntryPage({
 
     const match = matchInvestigationToQuestion(normalizedQuestion, investigationsWithAPlan)
     setQuestion(normalizedQuestion)
-    setState(match ? { step: 'scope-review', investigation: match } : { step: 'no-match' })
+    if (match) {
+      setState({ step: 'scope-review', investigation: match })
+      return
+    }
+    // No curated investigation matches: research it live from public sources
+    // instead of a dead-end. The outcome is presented inline (see useAskGeneration).
+    setState({ step: 'generate' })
+    void generation.proposeScope(normalizedQuestion)
+  }
+
+  function returnToAsk() {
+    generation.reset()
+    setState({ step: 'ask' })
   }
 
   function handleGenerationComplete(investigation: GeneratedInvestigation) {
@@ -107,12 +123,11 @@ export function AskEntryPage({
             <span aria-hidden="true">{heroIntro.introText}</span>
           </p>
 
-          {state.step === 'ask' || state.step === 'no-match' ? (
+          {state.step === 'ask' ? (
             <AskForm
               question={question}
               onQuestionChange={setQuestion}
               onSubmit={submit}
-              noMatch={state.step === 'no-match'}
             />
           ) : null}
 
@@ -129,6 +144,10 @@ export function AskEntryPage({
               onComplete={() => handleGenerationComplete(state.investigation)}
               stepDelayMs={generationStepDelayMs}
             />
+          ) : null}
+
+          {state.step === 'generate' ? (
+            <LiveGeneration generation={generation} onAskSomethingElse={returnToAsk} />
           ) : null}
         </div>
 
@@ -158,16 +177,93 @@ export function AskEntryPage({
   )
 }
 
+function LiveGeneration({
+  generation,
+  onAskSomethingElse,
+}: {
+  generation: ReturnType<typeof useAskGeneration>
+  onAskSomethingElse: () => void
+}) {
+  const { state, generate } = generation
+
+  if (state.phase === 'resolving') {
+    return (
+      <div role="status" className="chronicle-generation-card">
+        <p className="chronicle-eyebrow">No curated investigation matched</p>
+        <h2>Proposing a research scope…</h2>
+        <p>Chronicle is reading your question to suggest a geography and timeframe.</p>
+      </div>
+    )
+  }
+
+  if (state.phase === 'scope') {
+    return (
+      <GeneratedScopeForm
+        initialScope={state.scope}
+        autoResolved={state.autoResolved}
+        note={state.note}
+        onGenerate={(scope) => void generate(scope)}
+        onCancel={onAskSomethingElse}
+      />
+    )
+  }
+
+  if (state.phase === 'building') {
+    return (
+      <div role="status" aria-label="Generation progress" className="chronicle-generation-card">
+        <p className="chronicle-eyebrow">Researching live from public sources</p>
+        <h2>Acquiring sources and building a corpus…</h2>
+        <p>This runs a local model over free, public sources and can take a few minutes.</p>
+      </div>
+    )
+  }
+
+  if (state.phase === 'running') {
+    const currentStage = state.run?.stages.at(-1)?.stageName
+    return (
+      <div role="status" aria-label="Generation progress" className="chronicle-generation-card">
+        <p className="chronicle-eyebrow">Investigating the acquired sources</p>
+        <h2>Researching with the local model…</h2>
+        <p>{currentStage ? `Current stage: ${currentStage}.` : 'Starting the investigation…'}</p>
+      </div>
+    )
+  }
+
+  if (state.phase === 'result') {
+    return (
+      <GeneratedResult
+        run={state.run}
+        build={state.build}
+        onAskSomethingElse={onAskSomethingElse}
+      />
+    )
+  }
+
+  if (state.phase === 'error') {
+    return (
+      <div className="chronicle-generation-card">
+        <h2>Chronicle could not complete this</h2>
+        <p role="alert" className="chronicle-generated-answer">
+          {state.message}
+        </p>
+        <button type="button" onClick={onAskSomethingElse} className="chronicle-secondary-action">
+          Ask something else
+        </button>
+      </div>
+    )
+  }
+
+  return null
+}
+
 function AskForm({
   question,
   onQuestionChange,
   onSubmit,
-  noMatch,
 }: {
   question: string
   onQuestionChange: (value: string) => void
   onSubmit: (question: string) => void
-  noMatch: boolean
 }) {
   return (
     <div id="starting-points" className="chronicle-ask">
@@ -203,17 +299,14 @@ function AskForm({
         <span className="chronicle-action-caption">Begin an investigation</span>
       </form>
 
-      {noMatch ? (
-        <p role="alert" className="chronicle-no-match">
-          This prototype only has investigations for the topics below — nothing curated matches
-          that question yet.
-        </p>
-      ) : null}
-
       <div className="chronicle-starters">
         <div className="chronicle-starters-heading">
           <h3>Suggested starting points</h3>
-          <p>This prototype searches two curated investigations.</p>
+          <p>
+            These two topics open a curated map workspace. Any other question is
+            researched live from free, public sources with a local model — slower
+            and experimental, returning a cited answer or an honest abstention.
+          </p>
         </div>
         <ul>
           {investigationsWithAPlan.map((investigation) => {

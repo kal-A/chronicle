@@ -598,6 +598,107 @@ summary {
   gap: 12px;
 }
 
+.chronicle-scope-fields {
+  display: grid;
+  margin: 22px 0 0;
+  gap: 16px;
+}
+
+.chronicle-scope-dates {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.chronicle-scope-fields label {
+  display: grid;
+  gap: 6px;
+}
+
+.chronicle-scope-fields span {
+  color: #9bc6cf;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.chronicle-scope-fields input {
+  min-height: 44px;
+  border: 1px solid rgb(114 168 181 / 40%);
+  background: rgb(4 12 19 / 90%);
+  color: #f0e7d5;
+  font-size: 0.95rem;
+  padding: 8px 12px;
+}
+
+.chronicle-scope-note {
+  margin: 8px 0 0;
+  color: #d9a679;
+  font-size: 0.85rem;
+}
+
+.chronicle-scope-disclosure,
+.chronicle-generated-honesty {
+  margin: 20px 0 0;
+  color: rgb(155 198 207 / 88%);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.chronicle-generated-result {
+  margin-top: 32px;
+  border: 1px solid rgb(114 168 181 / 36%);
+  background: rgb(6 18 27 / 96%);
+  box-shadow: 0 30px 84px rgb(0 0 0 / 44%);
+  padding: clamp(24px, 4vw, 36px);
+}
+
+.chronicle-generated-result h2 {
+  margin: 8px 0 12px;
+  color: #e9dec5;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 2rem;
+  font-weight: 400;
+}
+
+.chronicle-generated-answer {
+  margin: 0 0 16px;
+  color: #f0e7d5;
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.chronicle-generated-points {
+  margin: 0 0 16px;
+  padding-left: 20px;
+  color: rgb(240 231 213 / 90%);
+  line-height: 1.6;
+}
+
+.chronicle-generated-citations {
+  margin: 0 0 16px;
+  color: #9bc6cf;
+  font-size: 0.85rem;
+}
+
+.chronicle-generated-limitations h3 {
+  margin: 0 0 6px;
+  color: #9bc6cf;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.chronicle-generated-limitations ul {
+  margin: 0 0 16px;
+  padding-left: 20px;
+  color: rgb(240 231 213 / 82%);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
 .chronicle-primary-action,
 .chronicle-secondary-action {
   min-height: 44px;

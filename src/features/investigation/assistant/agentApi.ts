@@ -145,6 +145,55 @@ export async function submitInvestigationQuestion(
   )
 }
 
+export interface ProposedScopeResponse {
+  resolved: boolean
+  topic?: string | null
+  interpretedQuestion?: string | null
+  geographicScope?: string[] | null
+  dateEarliest?: string | null
+  dateLatest?: string | null
+  terms?: string[] | null
+  message?: string | null
+}
+
+export interface TopicBuildSubmission {
+  topic: string
+  question: string
+  geographicScope: string[]
+  dateEarliest: string
+  dateLatest: string
+  terms?: string[]
+  maxSources?: number
+}
+
+export interface CorpusBuildAccepted {
+  corpusId: string
+  alreadyBuilt: boolean
+  discovered: number
+  acquired: number
+  passages: number
+  run: AgentRunAccepted
+  corpusUrl: string
+}
+
+/** Propose an acquisition scope from a bare question, for the user to review. */
+export function resolveInvestigationScope(question: string) {
+  return requestJson<ProposedScopeResponse>('/api/investigations/resolve-scope', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question }),
+  })
+}
+
+/** Acquire free/local sources for a topic, build a corpus, and start a run. */
+export function buildInvestigation(submission: TopicBuildSubmission) {
+  return requestJson<CorpusBuildAccepted>('/api/investigations/build', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(submission),
+  })
+}
+
 export function fetchAgentRun(runId: string) {
   return requestJson<AgentRunRecord>(`/api/agent-runs/${encodeURIComponent(runId)}`)
 }
