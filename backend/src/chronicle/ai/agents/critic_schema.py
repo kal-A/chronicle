@@ -78,7 +78,22 @@ def _verdict_variant(
     else:
         _force_empty(props, "additionalToolCalls")
         if verdict is CriticVerdict.APPROVE:
-            props["acceptedStatementIds"] = {**props["acceptedStatementIds"], "minItems": 1}
+            # Approve cannot reject or downgrade, so the deterministic coverage
+            # rule (validate_critic_decision INCOMPLETE_REVIEW: every statement
+            # must be dispositioned) means approve must accept *every* statement.
+            # Force exactly the full set so a grounded analysis yields a real cited
+            # answer instead of abstaining on a subset-approval.
+            if statement_ids:
+                count = len(statement_ids)
+                props["acceptedStatementIds"] = {
+                    "type": "array",
+                    "items": {"enum": sorted(statement_ids), "type": "string"},
+                    "minItems": count,
+                    "maxItems": count,
+                    "uniqueItems": True,
+                }
+            else:
+                props["acceptedStatementIds"] = {**props["acceptedStatementIds"], "minItems": 1}
             _force_empty(props, "downgradedStatements")
             _force_empty(props, "rejectedStatements")
         elif verdict is CriticVerdict.APPROVE_WITH_DOWNGRADES:

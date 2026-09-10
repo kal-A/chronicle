@@ -183,6 +183,27 @@ def test_critic_schema_constrains_accepted_statement_ids_to_the_analysis():
     assert approve["properties"]["acceptedStatementIds"]["minItems"] == 1
 
 
+def test_critic_schema_forces_approve_to_cover_every_statement():
+    # An approve verdict cannot reject or downgrade, so satisfying the
+    # deterministic INCOMPLETE_REVIEW coverage rule (every statement must be
+    # dispositioned) means accepting *all* of them. Without this the small model
+    # approves a subset and the run abstains on a grounded analysis -- the "non
+    # answer" Kamal flagged. A two-statement analysis must force acceptance of both.
+    from chronicle.ai.agents.critic_schema import build_critic_response_schema
+
+    _corpus, _plan, _bundle, draft, grounding, _decision = _context()
+    second = draft.statements[0].model_copy(update={"statementId": "statement-2"})
+    two_statement = draft.model_copy(update={"statements": [draft.statements[0], second]})
+
+    schema = build_critic_response_schema(two_statement, grounding)
+    approve = _critic_variant(schema, "approve")
+    accepted = approve["properties"]["acceptedStatementIds"]
+    assert accepted["minItems"] == 2
+    assert accepted["maxItems"] == 2
+    assert accepted["items"]["enum"] == ["statement-1", "statement-2"]
+    assert accepted.get("uniqueItems") is True
+
+
 def test_critic_validation_requires_complete_non_overlapping_review():
     _corpus, _plan, _bundle, draft, grounding, decision = _context()
 
