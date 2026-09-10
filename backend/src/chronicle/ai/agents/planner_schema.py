@@ -209,7 +209,7 @@ def _tool_call_schema(
     properties["toolName"] = {"const": spec.name, "type": "string"}
     properties["arguments"] = _trusted_argument_schema(spec.inputSchema, trusted)
     if spec.name == "search_passages":
-        _force_absent_date_filter(properties["arguments"])
+        _force_minimal_search_arguments(properties["arguments"])
     properties["bindings"] = {"items": {}, "maxItems": 0, "type": "array"}
     properties["dependsOn"] = {"items": {}, "maxItems": 0, "type": "array"}
     return {
@@ -227,22 +227,26 @@ def _tool_call_schema(
     }
 
 
-def _force_absent_date_filter(arguments: dict[str, Any]) -> None:
-    """Pin search_passages' coupled dateRange/dateRoles filter to its always-valid
-    absent shape. The two fields must be set together (a Pydantic cross-field rule
-    the JSON schema cannot express for the decoder), and a small model reliably
-    sets one without the other, so the runner rejects the call. Forcing both absent
-    keeps a plain query search -- exactly what a passage corpus needs -- always
-    valid. Date scoping remains available through discovery/acquisition, not this
-    per-call filter."""
+def _force_minimal_search_arguments(arguments: dict[str, Any]) -> None:
+    """Pin search_passages to a plain query search by forcing every optional
+    filter to its always-valid absent shape. A small model over-specifies these
+    filters two ways: (1) dateRange<->dateRoles must be set together (a Pydantic
+    cross-field rule the JSON schema cannot express for the decoder), so setting
+    one alone makes the runner reject the call; (2) evidenceRoles /
+    sourceClassifications filter on passage metadata an auto-acquired corpus does
+    not carry, so the search returns zero matches and the analyst abstains on a
+    non-answer. Dropping the filters leaves a plain query search -- exactly what a
+    passage corpus needs -- that reliably surfaces the relevant passages. Scope
+    filtering happens at discovery/acquisition, not this per-call filter."""
 
     properties = arguments.get("properties")
     if not isinstance(properties, dict):
         return
     if "dateRange" in properties:
         properties["dateRange"] = {"type": "null"}
-    if "dateRoles" in properties:
-        properties["dateRoles"] = {"type": "array", "items": {}, "maxItems": 0}
+    for field in ("dateRoles", "evidenceRoles", "sourceClassifications"):
+        if field in properties:
+            properties[field] = {"type": "array", "items": {}, "maxItems": 0}
 
 
 def _trusted_argument_schema(

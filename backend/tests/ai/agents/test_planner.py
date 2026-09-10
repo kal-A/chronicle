@@ -87,6 +87,16 @@ def _search_passages_spec() -> ToolSpec:
                     "items": {"type": "string"},
                     "default": [],
                 },
+                "evidenceRoles": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "default": [],
+                },
+                "sourceClassifications": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "default": [],
+                },
                 "maxResults": {"type": "integer"},
             },
             "required": ["corpusId", "query"],
@@ -201,6 +211,10 @@ def test_planner_schema_forces_search_passages_date_filter_to_a_safe_absent_shap
     args = variant["properties"]["arguments"]["properties"]
     assert args["dateRange"] == {"type": "null"}
     assert args["dateRoles"]["maxItems"] == 0
+    # the over-constraining evidence/source filters are pinned absent too, so an
+    # acquired corpus (whose passages lack those classifications) still returns hits
+    assert args["evidenceRoles"]["maxItems"] == 0
+    assert args["sourceClassifications"]["maxItems"] == 0
 
 
 def test_planner_returns_only_a_validated_plan_and_records_bounded_call_metadata():
