@@ -50,6 +50,18 @@ def build_analyst_response_schema(bundle: RetrievalBundle) -> dict[str, Any]:
             "maxLength": 800,
             "type": "string",
         }
+    else:
+        # Relevant passages were retrieved, so synthesize from them rather than
+        # abstain: a simple factual question whose sources are in hand should get a
+        # cited answer / the factors surrounding the event, not a non-answer. The
+        # honesty guardrails still hold -- every statement cites a retrieved record
+        # and is constrained to inferred synthesis (see _statement_variant), the
+        # status stays partial when the bundle is partial, and genuine no-evidence
+        # (no citations) still abstains above.
+        status_schema["enum"] = [
+            value for value in status_schema["enum"] if value != "abstained"
+        ]
+        properties["statements"] = {**properties["statements"], "minItems": 1}
 
     if _bundle_is_truncated(bundle):
         # grounding rejects an undisclosed truncation. Force the disclosure into

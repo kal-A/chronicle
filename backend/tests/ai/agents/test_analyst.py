@@ -196,6 +196,21 @@ def test_analyst_schema_forces_inferred_synthesis_over_passage_only_evidence(tmp
         }
 
 
+def test_analyst_schema_requires_a_synthesis_when_passages_were_retrieved(tmp_path):
+    # Kamal's feedback: a simple factual question whose retrieval returned relevant
+    # passages must yield a cited synthesis (the factors from the sources), not a
+    # "not found" abstention. When citations exist the status cannot be abstained
+    # and at least one statement is required. Genuine no-evidence still abstains
+    # (covered by the citations-empty path / other tests).
+    _plan, bundle = _passage_only_context(tmp_path)
+    assert bundle.totalResultCount > 0
+
+    schema = build_analyst_response_schema(bundle)
+
+    assert "abstained" not in schema["$defs"]["AnswerStatus"]["enum"]
+    assert schema["properties"]["statements"]["minItems"] >= 1
+
+
 def test_analyst_schema_excludes_knowledge_kind_without_a_knowledge_basis(tmp_path):
     # A KNOWLEDGE statement needs a retrieved knowledge-state / awareness record
     # to ground (grounding._validate_knowledge). A passage-only bundle has none,
