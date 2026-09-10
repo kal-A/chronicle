@@ -36,12 +36,15 @@ from ..acquisition.embeddings import OllamaEmbedder
 from ..corpus import CorpusRegistry
 from ..corpus.errors import UnknownCorpusError
 from ..storage.agent_run_store import AgentRunNotFoundError, AgentRunStore
+from ..acquisition.scope_resolver import ScopeResolver
 from .contracts import (
     AgentRunAccepted,
     CorpusBuildAccepted,
     CorpusSummary,
     QuestionSubmission,
     RunIdFactory,
+    ScopeResolutionRequest,
+    ScopeResolutionResponse,
     TopicBuildSubmission,
 )
 
@@ -60,12 +63,14 @@ def create_app(
     corpus_registry: CorpusRegistry,
     run_id_factory: RunIdFactory | None = None,
     build_service: CorpusBuildService | None = None,
+    scope_resolver: ScopeResolver | None = None,
 ) -> FastAPI:
     """Create the HTTP app around injected runtime dependencies.
 
     ``build_service`` is optional: when present, the topic-build endpoint can
     acquire sources for an arbitrary topic and register a corpus on demand; when
-    absent, that endpoint reports the capability is not configured.
+    absent, that endpoint reports the capability is not configured. ``scope_resolver``
+    is likewise optional and backs the scope-proposal endpoint.
     """
 
     make_run_id = run_id_factory or (lambda: f"run-{uuid4().hex}")
@@ -122,6 +127,37 @@ def create_app(
         except AgentRunAlreadyExistsError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return AgentRunAccepted.from_run(run_id, record.status)
+
+    @app.post(
+        "/api/investigations/resolve-scope",
+        response_model=ScopeResolutionResponse,
+    )
+    def resolve_scope(request: ScopeResolutionRequest) -> ScopeResolutionResponse:
+        """Propose an acquisition scope (geography + date window + terms) from a
+        bare question, for the caller to review and edit before building.
+
+        Fallback-safe: when the local model cannot propose a valid scope this
+        returns ``resolved=false`` with a note, so the frontend collects the
+        scope manually. Nothing is acquired here.
+        """
+        if scope_resolver is None:
+            raise HTTPException(
+                status_code=501,
+                detail="Scope resolution is not configured on this deployment.",
+            )
+        result = scope_resolver.resolve(request.question)
+        if not result.resolved or result.proposal is None:
+            return ScopeResolutionResponse(resolved=False, message=result.message)
+        proposal = result.proposal
+        return ScopeResolutionResponse(
+            resolved=True,
+            topic=proposal.topic,
+            interpretedQuestion=proposal.interpretedQuestion,
+            geographicScope=proposal.geographicScope,
+            dateEarliest=proposal.dateEarliest,
+            dateLatest=proposal.dateLatest,
+            terms=proposal.terms,
+        )
 
     @app.post(
         "/api/investigations/build",
@@ -292,6 +328,7 @@ def create_default_app() -> FastAPI:
         manager=manager,
         corpus_registry=corpus_registry,
         build_service=build_service,
+        scope_resolver=ScopeResolver(provider, policy),
     )
 
 

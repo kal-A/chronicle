@@ -119,6 +119,40 @@ class CorpusBuildAccepted(BaseModel):
         )
 
 
+class ScopeResolutionRequest(BaseModel):
+    """Ask Chronicle to propose an acquisition scope from a bare question."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    question: str = Field(min_length=1, max_length=1_000)
+
+    @field_validator("question")
+    @classmethod
+    def _question_has_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("question must contain text")
+        return value
+
+
+class ScopeResolutionResponse(BaseModel):
+    """A model-proposed scope for human review, or a manual-entry fallback.
+
+    ``resolved`` is False when the local model could not propose a valid scope;
+    the scope fields are then null and the frontend collects them manually.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    resolved: bool
+    topic: str | None = None
+    interpretedQuestion: str | None = None
+    geographicScope: list[str] | None = None
+    dateEarliest: date | None = None
+    dateLatest: date | None = None
+    terms: list[str] | None = None
+    message: str | None = None
+
+
 class CorpusSummary(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
