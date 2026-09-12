@@ -79,7 +79,9 @@ def test_graph_runs_and_persists_all_four_roles_in_strict_order(tmp_path):
     ] == ["planner", "retrieval", "analyst", "critic", "guide"]
     assert signals[0].type is WorkflowSignalType.RUN_STARTED
     assert signals[-1].type is WorkflowSignalType.RUN_COMPLETED
-    assert len(result.modelCalls) == 4
+    # planner + analyst + critic make model calls; the Guide composes
+    # deterministically (no model call), so exactly three calls are recorded.
+    assert len(result.modelCalls) == 3
     assert len(result.toolCalls) == 1
     assert result.finalAnswer.directAnswer == answer.directAnswer
     assert store.load_run(record.runId) == result

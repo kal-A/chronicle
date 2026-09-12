@@ -297,5 +297,9 @@ def test_finalization_persists_auditable_critic_and_guide_stages(tmp_path):
     persisted = store.load_run(plan.runId)
     assert persisted.status is AgentRunStatus.ANSWER_READY
     assert [stage.stageName.value for stage in persisted.stages] == ["critic", "guide"]
-    assert len(persisted.modelCalls) == 2
+    # Only the Critic makes a model call now; the Guide composes deterministically,
+    # so its stage records no model call (the audit trail states that plainly).
+    assert len(persisted.modelCalls) == 1
+    guide_stage = next(s for s in persisted.stages if s.stageName.value == "guide")
+    assert guide_stage.modelCalls == []
     assert persisted.finalAnswer == answer

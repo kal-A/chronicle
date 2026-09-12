@@ -344,8 +344,8 @@ def test_answer_validator_rejects_new_facts_citations_and_action_ids():
     }
 
 
-def test_guide_receives_only_critic_approved_statements_and_valid_action_ids():
-    corpus, plan, _bundle, draft, _grounding, decision = _context()
+def test_guide_composes_only_critic_approved_statements():
+    corpus, _plan, _bundle, draft, _grounding, decision = _context()
     rejected_statement = draft.statements[0].model_copy(
         update={"statementId": "statement-rejected", "text": "Rejected material."}
     )
@@ -362,41 +362,29 @@ def test_guide_receives_only_critic_approved_statements_and_valid_action_ids():
             ]
         }
     )
-    event_id = corpus.get_investigation().events[0].id
-    answer = AgentAnswer(
-        answerVersion="e4-guide-v1",
-        runId=plan.runId,
-        planId=plan.planId,
-        corpusId=plan.corpusId,
-        status=AnswerStatus.ANSWERED,
-        directAnswer=draft.statements[0].text,
-        keyPoints=[
-            AnswerPoint(
-                statementId=draft.statements[0].statementId,
-                text=draft.statements[0].text,
-            )
-        ],
-        limitations=list(draft.limitations),
-        citations=[
-            AnswerCitation(
-                statementId=draft.statements[0].statementId,
-                citation=draft.statements[0].citations[0],
-            )
-        ],
-        actions=[FocusEventAction(eventId=event_id)],
-    )
-    provider = DeterministicModelProvider()
-    provider.enqueue_value(answer)
-    guide = InvestigationGuide(provider)
+    guide = InvestigationGuide(DeterministicModelProvider())
 
-    assert guide.compose(
+    answer = guide.compose(
         "What did the report say?",
         expanded_draft,
         expanded_decision,
         build_action_reference_index(corpus.get_investigation()),
-    ) == answer
-    assert guide.last_prompt is not None
-    assert rejected_statement.text not in guide.last_prompt.userPrompt
+    )
+
+    # The deterministic composer draws only from the approved statements, so the
+    # rejected statement cannot surface -- guaranteed by construction, not by
+    # prompt hygiene. No model was called.
+    assert {point.statementId for point in answer.keyPoints} == {
+        draft.statements[0].statementId
+    }
+    assert rejected_statement.text not in answer.directAnswer
+    assert all(
+        citation.statementId != rejected_statement.statementId
+        for citation in answer.citations
+    )
+    assert guide.last_execution is not None
+    assert guide.last_execution.modelCall is None
+    assert guide.last_execution.deterministic is True
 
 
 def test_guide_prompt_names_required_key_points_for_an_approved_answer():
@@ -415,63 +403,28 @@ def test_guide_prompt_names_required_key_points_for_an_approved_answer():
     assert "Never return answered or partial with an empty keyPoints list" in normalized_system
 
 
-def test_guide_rejects_a_schema_valid_answer_with_an_unknown_action():
+def test_guide_never_emits_map_actions():
+    # A passage-only acquired corpus has no map records to target. The
+    # deterministic composer emits no map actions at all, so an unknown action
+    # reference (the old model-output failure this guarded) is impossible by
+    # construction -- there is no model to invent one.
+    corpus, _plan, _bundle, draft, _grounding, decision = _context()
+
+    answer = InvestigationGuide(DeterministicModelProvider()).compose(
+        "What did the report say?",
+        draft,
+        decision,
+        build_action_reference_index(corpus.get_investigation()),
+    )
+
+    assert answer.actions == []
+    assert answer.disagreements == []
+
+
+def test_guide_attaches_canonical_grounded_citations_and_exact_text():
     corpus, _plan, _bundle, draft, _grounding, decision = _context()
     statement = draft.statements[0]
-    bad_answer = AgentAnswer(
-        answerVersion="e4-guide-v1",
-        runId=draft.runId,
-        planId=draft.planId,
-        corpusId=draft.corpusId,
-        status=AnswerStatus.ANSWERED,
-        directAnswer=statement.text,
-        keyPoints=[AnswerPoint(statementId=statement.statementId, text=statement.text)],
-        citations=[
-            AnswerCitation(statementId=statement.statementId, citation=statement.citations[0])
-        ],
-        actions=[FocusEventAction(eventId="invented-event")],
-    )
-    provider = DeterministicModelProvider()
-    provider.enqueue_value(bad_answer)
-
-    with pytest.raises(GuideValidationError) as exc_info:
-        InvestigationGuide(provider).compose(
-            "What did the report say?",
-            draft,
-            decision,
-            build_action_reference_index(corpus.get_investigation()),
-        )
-
-    assert exc_info.value.validationReport is not None
-    assert exc_info.value.modelCall is not None
-    assert exc_info.value.proposedAnswer == bad_answer
-
-
-def test_guide_mechanically_reattaches_canonical_grounded_citations():
-    corpus, _plan, _bundle, draft, _grounding, decision = _context()
-    statement = draft.statements[0]
-    lossy_model_answer = AgentAnswer(
-        answerVersion="e4-guide-v1",
-        runId=draft.runId,
-        planId=draft.planId,
-        corpusId=draft.corpusId,
-        status=AnswerStatus.ANSWERED,
-        directAnswer=statement.text,
-        keyPoints=[AnswerPoint(statementId=statement.statementId, text=statement.text)],
-        citations=[
-            AnswerCitation(
-                statementId=statement.statementId,
-                citation=AnalysisCitation(
-                    toolCallId=statement.citations[0].toolCallId,
-                    evidenceLinkId=statement.citations[0].evidenceLinkId,
-                    passageId=statement.citations[0].passageId,
-                ),
-            )
-        ],
-    )
-    provider = DeterministicModelProvider()
-    provider.enqueue_value(lossy_model_answer)
-    guide = InvestigationGuide(provider)
+    guide = InvestigationGuide(DeterministicModelProvider())
 
     answer = guide.compose(
         "What did the report say?",
@@ -480,8 +433,16 @@ def test_guide_mechanically_reattaches_canonical_grounded_citations():
         build_action_reference_index(corpus.get_investigation()),
     )
 
+    # Citations come from the approved statement's grounded evidence, key-point
+    # text is the exact approved text, and directAnswer is its verbatim join --
+    # composed deterministically, with no model call.
     assert answer.citations == [
         AnswerCitation(statementId=statement.statementId, citation=statement.citations[0])
     ]
+    assert answer.keyPoints == [
+        AnswerPoint(statementId=statement.statementId, text=statement.text)
+    ]
+    assert answer.directAnswer == statement.text
     assert guide.last_execution is not None
-    assert guide.last_execution.citationsNormalized is True
+    assert guide.last_execution.modelCall is None
+    assert guide.last_execution.deterministic is True

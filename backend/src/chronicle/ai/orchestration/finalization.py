@@ -197,17 +197,24 @@ class FinalizationRunner:
         _notify(stage_callback, AgentStageName.GUIDE, False, 0)
         if self.guide.last_execution is None:
             raise RuntimeError("Guide returned without an execution record")
-        model_calls.append(self.guide.last_execution.modelCall)
-        stage_records.append(
-            _model_stage(
-                plan.runId,
-                AgentStageName.GUIDE,
-                0,
-                self.guide.last_execution.modelCall,
-                self.guide.last_execution.promptMeasurement,
-                answer,
+        guide_call = self.guide.last_execution.modelCall
+        if guide_call is not None:
+            model_calls.append(guide_call)
+            stage_records.append(
+                _model_stage(
+                    plan.runId,
+                    AgentStageName.GUIDE,
+                    0,
+                    guide_call,
+                    self.guide.last_execution.promptMeasurement,
+                    answer,
+                )
             )
-        )
+        else:
+            # The Guide composed the answer deterministically (no model call);
+            # record a model-free stage, mirroring the deterministic retrieval
+            # stage, so the audit trail states plainly that no model was invoked.
+            stage_records.append(_deterministic_guide_stage(plan.runId, answer))
         execution = FinalizationExecution(
             retrievalBundle=current_bundle,
             analysisDraft=current_analysis,
@@ -296,6 +303,19 @@ def _notify(
 ) -> None:
     if callback is not None:
         callback(stage, started, round_number)
+
+
+def _deterministic_guide_stage(run_id: str, answer: BaseModel) -> AgentStageRecord:
+    """A Guide stage that ran with no model call (deterministic composition)."""
+
+    return AgentStageRecord(
+        runId=run_id,
+        stageName=AgentStageName.GUIDE,
+        round=0,
+        status=AgentStageStatus.SUCCEEDED,
+        outputHash=stable_json_hash(answer.model_dump(mode="json")),
+        modelCalls=[],
+    )
 
 
 def _model_stage(
