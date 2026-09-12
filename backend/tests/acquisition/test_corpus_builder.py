@@ -121,6 +121,146 @@ def test_package_id_is_deterministic_for_same_topic_and_content():
     assert first.startswith("acq-")
 
 
+def _period(earliest, latest, label):
+    from chronicle.contracts.enums import DatePrecision
+    from chronicle.contracts.shared import HistoricalDate
+
+    return HistoricalDate(precision=DatePrecision.RANGE, earliest=earliest, latest=latest, label=label)
+
+
+def _enricher(place_name, year, *, located):
+    """An enrich() closure that cites the first *built* passage id, so its event
+    is grounded in a real passage. ``located`` toggles whether the geocoder can
+    place the name (coordinates) or not (honest low precision)."""
+    from chronicle.acquisition.assembly import assemble_enrichment
+    from chronicle.acquisition.extraction import ExtractedEvent, ExtractedEvents
+    from chronicle.acquisition.geocoding import GeoResolution
+    from chronicle.ai.models.deterministic import DeterministicModelProvider
+    from chronicle.contracts.enums import LocationPrecision
+    from chronicle.contracts.shared import Coordinates
+
+    class _StubGeocoder:
+        def resolve(self, name, period):
+            if located and name == place_name:
+                return GeoResolution(
+                    canonicalName=name, nameAtTime=name,
+                    coordinates=Coordinates(lat=51.5, lng=-0.12),
+                    precision=LocationPrecision.CITY, providerName="stub",
+                    provenanceUrl="https://example/x",
+                )
+            return None
+
+    def enrich(passages):
+        provider = DeterministicModelProvider()
+        provider.enqueue_value(
+            ExtractedEvents(events=[
+                ExtractedEvent(title="An event", placeName=place_name, year=year, passageIds=[passages[0].id]),
+            ])
+        )
+        return assemble_enrichment(
+            passages, _period(date(1660, 1, 1), date(1670, 12, 31), "1660-1670"),
+            "a placeholder subject", extractor=provider, geocoder=_StubGeocoder(),
+        )
+
+    return enrich
+
+
+def _enriched_inputs():
+    src = _acquired("wikipedia:en:1", "Alpha", "Alpha body about the placeholder event. " * 30)
+    return [src], chunk_source(src)
+
+
+def test_enrichment_populates_events_timeline_and_flips_timeline_capability():
+    acquired, passages = _enriched_inputs()
+    investigation = build_corpus(
+        topic="a placeholder subject",
+        interpreted_question="What happened?",
+        geographic_scope=["London"],
+        date_earliest=date(1660, 1, 1),
+        date_latest=date(1670, 12, 31),
+        acquired=acquired,
+        passages=passages,
+        date_label="1660-1670",
+        enrich=_enricher("Placeholdertown", 1666, located=True),
+    )
+
+    # events + timeline + evidence links are now present and validated on build
+    assert len(investigation.events) == 1
+    assert len(investigation.timeline) == 1
+    assert len(investigation.evidenceLinks) == 1
+    # geography carries a located place with coordinates
+    located = [e for e in investigation.entities if e.entityType == "place" and e.coordinates is not None]
+    assert len(located) == 1 and located[0].canonicalName == "Placeholdertown"
+    # timeline capability lights up; map stays omitted (generated-map is a later slice)
+    assert "timeline" not in investigation.interactionSpec.omittedCapabilities
+    assert "map" in investigation.interactionSpec.omittedCapabilities
+    facet_values = {f.value for f in investigation.interactionSpec.enabledFacets}
+    assert "timeline" in facet_values
+    # the scene surfaces the events
+    assert investigation.scenes[0].eventIds == [investigation.events[0].id]
+
+
+def test_enrichment_drops_duplicate_scope_stub_when_name_matches_located_place():
+    acquired, passages = _enriched_inputs()
+    investigation = build_corpus(
+        topic="a placeholder subject",
+        interpreted_question="What happened?",
+        geographic_scope=["London"],  # same name the enricher locates
+        date_earliest=date(1660, 1, 1),
+        date_latest=date(1670, 12, 31),
+        acquired=acquired,
+        passages=passages,
+        date_label="1660-1670",
+        enrich=_enricher("London", 1666, located=True),
+    )
+
+    londons = [e for e in investigation.entities if e.canonicalName == "London"]
+    assert len(londons) == 1  # the richer located place won; the stub was dropped
+    assert londons[0].coordinates is not None
+
+
+def test_unlocated_enrichment_keeps_event_without_coordinates():
+    acquired, passages = _enriched_inputs()
+    investigation = build_corpus(
+        topic="a placeholder subject",
+        interpreted_question="What happened?",
+        geographic_scope=["Somewhere"],
+        date_earliest=date(1660, 1, 1),
+        date_latest=date(1670, 12, 31),
+        acquired=acquired,
+        passages=passages,
+        date_label="1660-1670",
+        enrich=_enricher("Placeholdertown", 1666, located=False),
+    )
+
+    assert len(investigation.events) == 1  # grounded event survives
+    assert all(e.coordinates is None for e in investigation.entities if e.entityType == "place")
+    assert "timeline" not in investigation.interactionSpec.omittedCapabilities  # events exist
+
+
+def test_empty_enrichment_leaves_corpus_evidence_only():
+    acquired, passages = _enriched_inputs()
+
+    def enrich_nothing(passages):
+        from chronicle.acquisition.assembly import Enrichment
+        return Enrichment()
+
+    investigation = build_corpus(
+        topic="a placeholder subject",
+        interpreted_question="What happened?",
+        geographic_scope=["Somewhere"],
+        date_earliest=date(1660, 1, 1),
+        date_latest=date(1670, 12, 31),
+        acquired=acquired,
+        passages=passages,
+        enrich=enrich_nothing,
+    )
+
+    assert investigation.events == []
+    assert investigation.timeline == []
+    assert "timeline" in investigation.interactionSpec.omittedCapabilities  # unchanged
+
+
 def test_empty_geographic_scope_is_rejected():
     acquired, passages = _sample_inputs()
     with pytest.raises(ValueError):

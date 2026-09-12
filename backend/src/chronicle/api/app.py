@@ -32,7 +32,7 @@ from ..ai.orchestration.runner import InvestigationRunner
 from ..ai.orchestration.statuses import AgentRunStatus
 from ..ai.tools import build_default_registry
 from ..acquisition.build_service import CorpusBuildService
-from ..acquisition.defaults import default_pipeline
+from ..acquisition.defaults import default_geocoder, default_pipeline
 from ..acquisition.embeddings import OllamaEmbedder
 from ..corpus import CorpusRegistry
 from ..corpus.errors import UnknownCorpusError
@@ -340,10 +340,19 @@ def create_default_app() -> FastAPI:
     # (nomic-embed-text) pulled into Ollama. Off by default so the lexical build
     # path always works; set CHRONICLE_ENABLE_SEMANTIC=1 once the model is present.
     embedder = OllamaEmbedder() if _env_flag("CHRONICLE_ENABLE_SEMANTIC") else None
+    # Structured enrichment (stages 7/9/12: located events + a timeline) is
+    # opt-in. It adds one more local-model pass (event extraction) plus free,
+    # period-aware geo lookups per build, so it stays off until verified on the
+    # target host; set CHRONICLE_ENABLE_EXTRACTION=1 to turn generated corpora
+    # from evidence-only into event/timeline-capable. Reuses the same Ollama
+    # provider as the agents.
+    enrichment_enabled = _env_flag("CHRONICLE_ENABLE_EXTRACTION")
     build_service = CorpusBuildService(
         pipeline=default_pipeline(
             repo_root=repo_root,
             cache_dir=runs_root / "cache",
+            extractor=provider if enrichment_enabled else None,
+            geocoder=default_geocoder() if enrichment_enabled else None,
         ),
         registry=corpus_registry,
         build_dir=runs_root / "built-corpora",

@@ -18,9 +18,10 @@ import tempfile
 from datetime import date
 from pathlib import Path
 
-from chronicle.acquisition.defaults import default_connectors
+from chronicle.acquisition.defaults import default_connectors, default_geocoder
 from chronicle.acquisition.fetch_cache import FetchCache
 from chronicle.acquisition.pipeline import AcquisitionPipeline
+from chronicle.ai.models.ollama import OllamaModelProvider, resolve_timeout_from_env
 from chronicle.corpus.contracts import PassageSearchRequest
 from chronicle.corpus.package_corpus import PackageBackedCorpus
 
@@ -36,11 +37,26 @@ def main() -> int:
     parser.add_argument("--latest", type=int, default=1815)
     parser.add_argument("--max-sources", type=int, default=6)
     parser.add_argument("--search", default="congress", help="sample passage query to run")
+    parser.add_argument(
+        "--enrich",
+        action="store_true",
+        help="enable structured enrichment (events + timeline + period-aware geo); needs Ollama + network",
+    )
     args = parser.parse_args()
 
     connectors = default_connectors(REPO_ROOT)
     cache_dir = Path(tempfile.gettempdir()) / "chronicle-acquire-smoke"
-    pipeline = AcquisitionPipeline(connectors, FetchCache(cache_dir), per_connector_results=3)
+    extractor = geocoder = None
+    if args.enrich:
+        extractor = OllamaModelProvider(timeout=resolve_timeout_from_env(180.0))
+        geocoder = default_geocoder()
+    pipeline = AcquisitionPipeline(
+        connectors,
+        FetchCache(cache_dir),
+        per_connector_results=3,
+        extractor=extractor,
+        geocoder=geocoder,
+    )
 
     print(f"Researching: {args.topic!r}  ({args.earliest}-{args.latest})")
     print(f"Connectors: {[c.name for c in connectors]}")
@@ -56,6 +72,19 @@ def main() -> int:
     )
 
     print(f"discovered={result.discovered}  acquired={result.acquired}  passages={result.passages}")
+    if args.enrich:
+        print(f"events={result.events}  located_places={result.located_places}")
+        spec = result.investigation.interactionSpec
+        print(f"timeline_capable={'timeline' not in spec.omittedCapabilities}")
+        places_by_id = {
+            e.id: e for e in result.investigation.entities if e.entityType == "place"
+        }
+        for event in result.investigation.events[:8]:
+            place = places_by_id.get(event.placeId)
+            coords = place.coordinates if place else None
+            where = place.canonicalName if place else event.placeId
+            coord_str = f"({coords.lat:.3f}, {coords.lng:.3f})" if coords else "(no coords)"
+            print(f"  • {event.eventTime.label}  {event.title[:60]}  @ {where} {coord_str}")
     print(f"packageId={result.investigation.packageId}  status={result.investigation.status.value}\n")
     print("Acquired sources:")
     for source in result.investigation.sources:

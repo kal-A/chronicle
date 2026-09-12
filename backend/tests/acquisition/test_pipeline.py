@@ -166,3 +166,58 @@ def test_pipeline_skips_a_source_that_fails_to_fetch(tmp_path):
 def test_pipeline_requires_at_least_one_connector(tmp_path):
     with pytest.raises(ValueError):
         AcquisitionPipeline([], FetchCache(tmp_path))
+
+
+def test_pipeline_enriches_with_events_when_extractor_and_geocoder_injected(tmp_path):
+    # Opt-in enrichment: inject an event extractor + a period-aware geocoder and
+    # the same topic-agnostic path now yields located events + a timeline, while
+    # the default pipeline (no enrichment) stays evidence-only.
+    from chronicle.acquisition.assembly import assemble_enrichment
+    from chronicle.acquisition.extraction import ExtractedEvent, ExtractedEvents
+    from chronicle.acquisition.geocoding import GeoResolution
+    from chronicle.ai.models.deterministic import DeterministicModelProvider
+    from chronicle.contracts.enums import LocationPrecision
+    from chronicle.contracts.shared import Coordinates
+
+    class _StubGeocoder:
+        def resolve(self, name, period):
+            return GeoResolution(
+                canonicalName=name, nameAtTime=name,
+                coordinates=Coordinates(lat=51.5, lng=-0.12),
+                precision=LocationPrecision.CITY, providerName="stub",
+                provenanceUrl="https://example/x",
+            )
+
+    class _StubExtractor(DeterministicModelProvider):
+        """Cites the first built passage so the event is grounded in a real id."""
+        def generate_structured(self, *args, **kwargs):
+            # the user_prompt carries the built passages; grab the first id from it
+            import json, re
+            prompt = kwargs.get("user_prompt") or args[1]
+            first_id = re.search(r'"id":"(psg-[^"]+)"', prompt).group(1)
+            self.enqueue_value(ExtractedEvents(events=[
+                ExtractedEvent(title="An event", placeName="Placeholdertown", year=1820, passageIds=[first_id]),
+            ]))
+            return super().generate_structured(*args, **kwargs)
+
+    candidates = [_candidate("x", "fake")]
+    bodies = {"x": "Alpha body about the placeholder event. " * 30}
+    connector = FakeConnector("fake", candidates, bodies)
+    pipeline = AcquisitionPipeline(
+        [connector], FetchCache(tmp_path),
+        extractor=_StubExtractor(), geocoder=_StubGeocoder(),
+    )
+
+    result = pipeline.run(
+        topic="a placeholder subject",
+        interpreted_question="What happened?",
+        geographic_scope=["Somewhere"],
+        date_earliest=date(1800, 1, 1),
+        date_latest=date(1850, 12, 31),
+        max_sources=8,
+    )
+
+    assert result.events == 1
+    assert result.located_places == 1
+    assert len(result.investigation.events) == 1
+    assert "timeline" not in result.investigation.interactionSpec.omittedCapabilities

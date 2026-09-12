@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 from collections import defaultdict
+from collections.abc import Callable
 from datetime import date, datetime, timezone
 
 from ..contracts.enums import (
@@ -57,6 +58,7 @@ from ..contracts.shared import (
     Source,
 )
 from ..contracts.validation import validate_generated_investigation
+from .assembly import Enrichment
 from .contracts import AcquiredSource, ExtractedPassage
 
 _UNREVIEWED_POLITY = "Not established (auto-acquired draft; requires research)"
@@ -100,6 +102,7 @@ def build_corpus(
     requested_depth: RequestedDepth = RequestedDepth.STANDARD,
     generated_at: datetime | None = None,
     package_id: str | None = None,
+    enrich: Callable[[list[Passage]], Enrichment] | None = None,
 ) -> GeneratedInvestigation:
     if not geographic_scope:
         raise ValueError("geographic_scope must name at least one place for the scope")
@@ -176,11 +179,25 @@ def build_corpus(
                 )
             )
 
-    # --- scope placeholder geography (explicitly unreviewed, no assertions) ---
+    # --- optional structured enrichment (stages 7/9/12, injected) -----------
+    # The enricher runs over the *built* passages so its evidence links cite the
+    # real passage ids assigned above. Default None keeps this an evidence-only
+    # draft with byte-identical behavior. An enricher that finds nothing grounded
+    # returns an empty Enrichment and the corpus likewise stays evidence-only.
+    enrichment = enrich(built_passages) if enrich is not None else None
+    has_enrichment = enrichment is not None and not enrichment.is_empty
+    events = list(enrichment.events) if has_enrichment else []
+    evidence_links = list(enrichment.evidence_links) if has_enrichment else []
+    timeline = list(enrichment.timeline) if has_enrichment else []
+
+    # --- geography: scope scaffolding, upgraded by extracted + geolocated ----
+    # Scope names are explicitly unreviewed stubs (no coordinates). When the
+    # enricher resolved a place of the same name, the richer extracted record
+    # wins and the duplicate stub is dropped, so no place is double-listed.
     period_label = date_label or f"{date_earliest.year}-{date_latest.year}"
-    places: list[PlaceEntity] = []
+    scope_places: list[PlaceEntity] = []
     for index, place_name in enumerate(dict.fromkeys(geographic_scope)):
-        places.append(
+        scope_places.append(
             PlaceEntity(
                 id=f"place-{index:04d}",
                 entityType="place",
@@ -196,17 +213,47 @@ def build_corpus(
                 reviewStatus=ReviewStatus.PROPOSED,
             )
         )
+    if has_enrichment:
+        enriched_names = {place.canonicalName.casefold() for place in enrichment.places}
+        scope_places = [
+            place for place in scope_places if place.canonicalName.casefold() not in enriched_names
+        ]
+        places = scope_places + list(enrichment.places)
+    else:
+        places = scope_places
+
+    # --- capability flags: timeline lights up only when events were built ----
+    # Map stays omitted: the contract couples it to a raster MapAsset, and the
+    # generated-map rendering over these coordinates is a later slice. We never
+    # advertise a capability the workspace cannot yet render for this corpus.
+    coordinates_present = any(place.coordinates is not None for place in places)
+    omitted_capabilities = ["map", "graph", "claims", "relationships", "knowledge_states"]
+    enabled_facets = [Facet.EVIDENCE]
+    if not has_enrichment:
+        omitted_capabilities.insert(0, "timeline")
+    else:
+        enabled_facets.append(Facet.TIMELINE)
 
     # --- presentation scaffolding (one non-material block, one scene) --------
-    summary_block = NarrativeBlock(
-        id="nb-0000",
-        order=0,
-        text=(
+    if has_enrichment:
+        summary_text = (
+            f"Draft evidence corpus for “{topic}”. "
+            f"{len(sources)} source(s) and {len(built_passages)} passage(s) were auto-acquired "
+            f"from free sources; {len(events)} grounded event(s) and a timeline were extracted. "
+            "All records are proposed drafts and have not been reviewed. No synthesis, claims, "
+            "relationships, or knowledge states have been generated yet."
+        )
+    else:
+        summary_text = (
             f"Draft evidence corpus for “{topic}”. "
             f"{len(sources)} source(s) and {len(built_passages)} passage(s) were auto-acquired "
             "from free sources and have not been reviewed. No synthesis, claims, relationships, "
             "events, knowledge states, timeline, or geography have been generated yet."
-        ),
+        )
+    summary_block = NarrativeBlock(
+        id="nb-0000",
+        order=0,
+        text=summary_text,
         isMaterialAssertion=False,
     )
     scene = InvestigationScene(
@@ -218,6 +265,7 @@ def build_corpus(
         sourceIds=[source.id for source in sources],
         documentIds=[document.id for document in documents],
         passageIds=passage_ids,
+        eventIds=[event.id for event in events],
         narrativeBlockIds=[summary_block.id],
     )
     presentation = Presentation(
@@ -228,24 +276,40 @@ def build_corpus(
     interaction_spec = InteractionSpecification(
         defaultSceneId=scene.id,
         focusKinds=[FocusKind.SOURCE, FocusKind.PASSAGE],
-        enabledFacets=[Facet.EVIDENCE],
-        omittedCapabilities=[
-            "timeline",
-            "map",
-            "graph",
-            "claims",
-            "relationships",
-            "knowledge_states",
-        ],
+        enabledFacets=enabled_facets,
+        omittedCapabilities=omitted_capabilities,
     )
-    report = GenerationReport(
-        outcome=GenerationOutcome.PARTIAL,
-        omissions=[
+
+    omissions = [
+        "Sources were auto-acquired from free connectors and are not human-reviewed.",
+    ]
+    if has_enrichment:
+        omissions.insert(
+            0,
+            "Draft corpus: grounded events and a timeline were extracted, but no synthesis, "
+            "claims, relationships, or knowledge states have been generated.",
+        )
+        if coordinates_present:
+            omissions.append(
+                "Geography carries period-aware coordinates for located places, but controlling "
+                "polity is unreviewed and the generated map is not yet rendered."
+            )
+        else:
+            omissions.append(
+                "Extracted places could not be located in period; no coordinates were asserted."
+            )
+    else:
+        omissions.insert(
+            0,
             "Evidence-only corpus: no synthesis, claims, relationships, events, "
             "knowledge states, timeline, or map has been generated.",
-            "Sources were auto-acquired from free connectors and are not human-reviewed.",
-            "Geography is a scope placeholder; controlling polity and coordinates are not established.",
-        ],
+        )
+        omissions.append(
+            "Geography is a scope placeholder; controlling polity and coordinates are not established."
+        )
+    report = GenerationReport(
+        outcome=GenerationOutcome.PARTIAL,
+        omissions=omissions,
     )
 
     investigation = GeneratedInvestigation(
@@ -269,9 +333,12 @@ def build_corpus(
         status=PackageStatus.PARTIAL,
         presentation=presentation,
         entities=list(places),
+        events=events,
         sources=sources,
         documents=documents,
         passages=built_passages,
+        evidenceLinks=evidence_links,
+        timeline=timeline,
         scenes=[scene],
         interactionSpec=interaction_spec,
         generationReport=report,

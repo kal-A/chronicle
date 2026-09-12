@@ -9,17 +9,22 @@ deterministic given its inputs and connectors.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
-from ..contracts.enums import RequestedDepth, RequestType
+from ..ai.models.protocol import ModelProvider
+from ..contracts.enums import DatePrecision, RequestedDepth, RequestType
 from ..contracts.generated_investigation import GeneratedInvestigation
+from ..contracts.shared import HistoricalDate, Passage
+from .assembly import Enrichment, assemble_enrichment
 from .chunking import DEFAULT_TARGET_CHARS, chunk_source
 from .connectors.base import ConnectorError, SourceConnector
 from .contracts import AcquiredSource, DiscoveryQuery, ExtractedPassage
 from .corpus_builder import build_corpus
 from .discovery import discover_sources
 from .fetch_cache import FetchCache
+from .geocoding import PeriodAwareGeocoder
 
 
 @dataclass
@@ -28,6 +33,11 @@ class AcquisitionResult:
     discovered: int
     acquired: int
     passages: int
+    #: grounded events extracted and located (0 when enrichment is disabled or
+    #: nothing datable/located was found -- the corpus is then evidence-only)
+    events: int = 0
+    #: extracted places the period-aware geocoder could place with coordinates
+    located_places: int = 0
     discovery_errors: dict[str, str] = field(default_factory=dict)
     #: reputable pointers surfaced but not ingested (e.g. licensed/paid resources)
     reference_resources: list[SourceCandidate] = field(default_factory=list)
@@ -44,6 +54,8 @@ class AcquisitionPipeline:
         target_chars: int = DEFAULT_TARGET_CHARS,
         per_connector_results: int = 5,
         max_passages_per_source: int = 40,
+        extractor: ModelProvider | None = None,
+        geocoder: PeriodAwareGeocoder | None = None,
     ) -> None:
         if not connectors:
             raise ValueError("AcquisitionPipeline requires at least one connector")
@@ -53,6 +65,12 @@ class AcquisitionPipeline:
         self._target_chars = target_chars
         self._per_connector_results = per_connector_results
         self._max_passages_per_source = max_passages_per_source
+        # Structured enrichment (stages 7/9/12) is opt-in: supply BOTH an event
+        # extractor and a period-aware geocoder to turn passages into located
+        # events + a timeline. Absent either, the pipeline builds an
+        # evidence-only corpus exactly as before.
+        self._extractor = extractor
+        self._geocoder = geocoder
 
     def run(
         self,
@@ -101,6 +119,12 @@ class AcquisitionPipeline:
             source_passages = chunk_source(source, target_chars=self._target_chars)
             passages.extend(source_passages[: self._max_passages_per_source])
 
+        enrich = self._build_enricher(
+            topic=topic,
+            date_earliest=date_earliest,
+            date_latest=date_latest,
+            date_label=date_label,
+        )
         investigation = build_corpus(
             topic=topic,
             interpreted_question=interpreted_question,
@@ -113,13 +137,52 @@ class AcquisitionPipeline:
             request_type=request_type,
             requested_depth=requested_depth,
             generated_at=generated_at,
+            enrich=enrich,
+        )
+        located_places = sum(
+            1
+            for entity in investigation.entities
+            if entity.entityType == "place" and entity.coordinates is not None
         )
         return AcquisitionResult(
             investigation=investigation,
             discovered=len(discovery.candidates),
             acquired=len(acquired),
             passages=len(passages),
+            events=len(investigation.events),
+            located_places=located_places,
             discovery_errors=discovery.errors,
             reference_resources=discovery.references,
             fetch_errors=fetch_errors,
         )
+
+    def _build_enricher(
+        self,
+        *,
+        topic: str,
+        date_earliest: date,
+        date_latest: date,
+        date_label: str | None,
+    ) -> Callable[[list[Passage]], Enrichment] | None:
+        """A closure binding the injected extractor + geocoder over the built
+        passages, or None when enrichment is disabled (keeps build_corpus on its
+        evidence-only path)."""
+
+        if self._extractor is None or self._geocoder is None:
+            return None
+
+        period = HistoricalDate(
+            precision=DatePrecision.EXACT if date_earliest == date_latest else DatePrecision.RANGE,
+            earliest=date_earliest,
+            latest=date_latest,
+            label=date_label,
+        )
+        extractor = self._extractor
+        geocoder = self._geocoder
+
+        def enrich(built_passages: list[Passage]) -> Enrichment:
+            return assemble_enrichment(
+                built_passages, period, topic, extractor=extractor, geocoder=geocoder
+            )
+
+        return enrich
