@@ -16,6 +16,7 @@ from ..ai.agents import EvidenceAnalyst, HistoricalCritic, InvestigationGuide, I
 from ..ai.agents.planner_prompt import ToolSpecRepresentation
 from ..ai.contracts.run import AgentRunRecord, CorpusSnapshot, InvestigationRequest
 from ..ai.models import OllamaModelProvider
+from ..ai.models.ollama import resolve_timeout_from_env
 from ..ai.orchestration.finalization import FinalizationRunner
 from ..ai.orchestration.manager import (
     AgentRunAlreadyActiveError,
@@ -291,11 +292,22 @@ def create_default_app() -> FastAPI:
     )
     store = AgentRunStore(run_root)
     # Qwen 7B structured calls on a local CPU/GPU routinely exceed one minute;
-    # the UI streams bounded progress while the request remains synchronous.
-    provider = OllamaModelProvider(timeout=180.0)
-    # Two passage-sized records stay within the downstream 6k evidence window
-    # for the current verbose, provenance-rich search projection.
-    policy = AgentExecutionPolicy(maxResultsPerTool=2)
+    # the UI streams bounded progress while the request remains synchronous. A
+    # larger, slower model can be given a higher ceiling via CHRONICLE_OLLAMA_TIMEOUT.
+    provider = OllamaModelProvider(timeout=resolve_timeout_from_env(180.0))
+    # Evidence-window cap tuned for local-model prompt-processing speed: on a
+    # CPU-only host the analyst re-reads its whole retrieval bundle at ~13 tok/s,
+    # so a fat aggregate window (the schema ceiling is 14k chars) can push a
+    # single analyst call past its timeout. Capping the AGGREGATE at 8k lets the
+    # runner stop after ~2 tool calls (~6.4k chars) -- it truncates gracefully
+    # (marks the bundle truncated) rather than rejecting, roughly halving the
+    # analyst prompt model-independently. The per-tool-output ceiling stays at
+    # its default: it is a hard rejection gate, not a trimmer, so lowering it
+    # below a normal two-passage result (~3.2k chars) only fails the retrieval.
+    policy = AgentExecutionPolicy(
+        maxResultsPerTool=2,
+        maxAggregateRetrievalCharacters=8_000,
+    )
     analyst = EvidenceAnalyst(provider, policy)
     retrieval = InvestigationRunner(build_default_registry(), store=store, policy=policy)
     workflow = LangGraphAgentWorkflow(

@@ -94,6 +94,35 @@ def resolve_base_url_from_env() -> str:
     return os.environ.get("CHRONICLE_OLLAMA_BASE_URL", DEFAULT_OLLAMA_BASE_URL)
 
 
+def resolve_model_from_env() -> str:
+    """The Ollama model tag, overridable via CHRONICLE_OLLAMA_MODEL.
+
+    Lets a larger local model (e.g. qwen2.5:14b-instruct) be swapped in for a
+    run without a code change, while defaulting to the qwen2.5:7b-instruct the
+    pipeline is tuned against. Not a topic branch -- the model is the same for
+    every question."""
+
+    return os.environ.get("CHRONICLE_OLLAMA_MODEL", DEFAULT_MODEL)
+
+
+def resolve_timeout_from_env(default: float) -> float:
+    """The per-request timeout, overridable via CHRONICLE_OLLAMA_TIMEOUT.
+
+    A larger local model generates fewer tokens per second, so a single
+    structured call can outrun the timeout tuned for the smaller default. This
+    lets the ceiling scale with the model without a code change; an unparseable
+    or non-positive value falls back to ``default``."""
+
+    raw = os.environ.get("CHRONICLE_OLLAMA_TIMEOUT")
+    if raw is None:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
 @dataclass
 class _ChatResponse:
     content: str
@@ -108,7 +137,7 @@ class OllamaModelProvider:
         self,
         *,
         base_url: str | None = None,
-        model: str = DEFAULT_MODEL,
+        model: str | None = None,
         provider_version: str = OLLAMA_PROVIDER_VERSION,
         timeout: float = DEFAULT_REQUEST_TIMEOUT_SECONDS,
         client: httpx.Client | None = None,
@@ -116,11 +145,12 @@ class OllamaModelProvider:
         resolved_base_url = base_url or resolve_base_url_from_env()
         if not resolved_base_url.startswith(("http://", "https://")):
             raise InvalidConfigurationError(f"Invalid Ollama base URL: {resolved_base_url!r}")
-        if not model:
+        resolved_model = resolve_model_from_env() if model is None else model
+        if not resolved_model:
             raise InvalidConfigurationError("OllamaModelProvider requires a non-empty model name")
 
         self._base_url = resolved_base_url.rstrip("/")
-        self._model = model
+        self._model = resolved_model
         self._provider_version = provider_version
         self._timeout = timeout
         self._client = client or httpx.Client(base_url=self._base_url, timeout=timeout)

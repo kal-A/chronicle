@@ -178,8 +178,10 @@ def _compact_spec(spec: ToolSpec, policy: AgentExecutionPolicy) -> dict[str, Any
         "requiresCapabilities": spec.requiredCapabilities,
         "maxResults": bounded["maxResultLimit"],
         "maxOutputCharacters": bounded["maxOutputCharacters"],
+        # useWhen (positive tool-selection guidance) is kept; avoidWhen is dropped
+        # from the compact catalogue -- it is prompt bytes the planner re-reads at
+        # local-model speed for marginal selection benefit over description+useWhen.
         "useWhen": spec.useWhen,
-        "avoidWhen": spec.avoidWhen,
     }
 
 

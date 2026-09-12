@@ -20,7 +20,10 @@ from chronicle.ai.models.errors import (
     SchemaValidationError,
 )
 from chronicle.ai.models.metadata import CostBasis
-from chronicle.ai.models.ollama import OllamaModelProvider
+from chronicle.ai.models.ollama import (
+    OllamaModelProvider,
+    resolve_timeout_from_env,
+)
 
 
 class _SampleAnswer(BaseModel):
@@ -59,6 +62,53 @@ def test_request_includes_the_json_schema_and_model_name():
     assert payload["format"] == _SampleAnswer.model_json_schema()
     assert payload["messages"][0] == {"role": "system", "content": "sys"}
     assert payload["messages"][1] == {"role": "user", "content": "usr"}
+
+
+def test_model_defaults_from_env_when_not_passed(monkeypatch):
+    monkeypatch.setenv("CHRONICLE_OLLAMA_MODEL", "qwen2.5:14b-instruct")
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["payload"] = json.loads(request.content)
+        return _ok_chat_response(json.dumps({"summary": "ok", "confidence": 1.0}))
+
+    # No explicit model -> resolves CHRONICLE_OLLAMA_MODEL.
+    provider = _provider_with_handler(handler)
+    provider.generate_structured(
+        system_prompt="sys", user_prompt="usr", response_model=_SampleAnswer, prompt_version="v1"
+    )
+
+    assert captured["payload"]["model"] == "qwen2.5:14b-instruct"
+
+
+def test_resolve_timeout_from_env(monkeypatch):
+    monkeypatch.delenv("CHRONICLE_OLLAMA_TIMEOUT", raising=False)
+    assert resolve_timeout_from_env(180.0) == 180.0
+
+    monkeypatch.setenv("CHRONICLE_OLLAMA_TIMEOUT", "600")
+    assert resolve_timeout_from_env(180.0) == 600.0
+
+    # Unparseable or non-positive values fall back to the default.
+    monkeypatch.setenv("CHRONICLE_OLLAMA_TIMEOUT", "not-a-number")
+    assert resolve_timeout_from_env(180.0) == 180.0
+    monkeypatch.setenv("CHRONICLE_OLLAMA_TIMEOUT", "0")
+    assert resolve_timeout_from_env(180.0) == 180.0
+
+
+def test_explicit_model_argument_overrides_env(monkeypatch):
+    monkeypatch.setenv("CHRONICLE_OLLAMA_MODEL", "qwen2.5:14b-instruct")
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["payload"] = json.loads(request.content)
+        return _ok_chat_response(json.dumps({"summary": "ok", "confidence": 1.0}))
+
+    provider = _provider_with_handler(handler, model="qwen2.5:7b-instruct")
+    provider.generate_structured(
+        system_prompt="sys", user_prompt="usr", response_model=_SampleAnswer, prompt_version="v1"
+    )
+
+    assert captured["payload"]["model"] == "qwen2.5:7b-instruct"
 
 
 def test_request_uses_an_explicit_response_schema_override():
