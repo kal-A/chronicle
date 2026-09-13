@@ -1163,6 +1163,43 @@ html:has(.chronicle-investigation-state) {
   background: #0b2231;
 }
 
+/* Generated map: the same MapLibre GL canvas as the historical map, but its
+   basemap is a generated neutral graticule (no tiles, no borders). Markers reuse
+   .chronicle-map-marker. Shares the dark map ground. */
+.chronicle-generated-map-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chronicle-generated-map {
+  width: 100%;
+  min-height: clamp(320px, 48vh, 540px);
+  border: 1px solid rgb(114 168 181 / 40%);
+  border-radius: 0;
+  background: #0b2231;
+}
+
+.chronicle-generated-map-note {
+  margin: 0;
+  color: #9bc6cf;
+  font-size: 0.67rem;
+  letter-spacing: 0.02em;
+}
+
+.chronicle-generated-map-popup .maplibregl-popup-content {
+  padding: 3px 8px;
+  border-radius: 0;
+  background: #0e2c3d;
+  color: #e9dec5;
+  font: 600 11px system-ui;
+  border: 1px solid rgb(155 198 207 / 40%);
+}
+
+.chronicle-generated-map-popup .maplibregl-popup-tip {
+  display: none;
+}
+
 .chronicle-location-index {
   border-top: 1px solid rgb(233 222 197 / 16%);
   padding-top: 12px;

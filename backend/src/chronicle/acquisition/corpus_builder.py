@@ -222,17 +222,22 @@ def build_corpus(
     else:
         places = scope_places
 
-    # --- capability flags: timeline lights up only when events were built ----
-    # Map stays omitted: the contract couples it to a raster MapAsset, and the
-    # generated-map rendering over these coordinates is a later slice. We never
-    # advertise a capability the workspace cannot yet render for this corpus.
+    # --- capability flags: timeline + map light up only when populated -------
+    # The map here is the GENERATED map (markers plotted from these extracted
+    # coordinates over a neutral graticule), not a raster MapAsset -- so it is
+    # advertised only when at least one place is actually located, and never
+    # otherwise, so we don't promise a canvas with nothing to draw.
     coordinates_present = any(place.coordinates is not None for place in places)
-    omitted_capabilities = ["map", "graph", "claims", "relationships", "knowledge_states"]
+    omitted_capabilities = ["graph", "claims", "relationships", "knowledge_states"]
     enabled_facets = [Facet.EVIDENCE]
-    if not has_enrichment:
-        omitted_capabilities.insert(0, "timeline")
-    else:
+    if has_enrichment:
         enabled_facets.append(Facet.TIMELINE)
+    else:
+        omitted_capabilities.insert(0, "timeline")
+    if coordinates_present:
+        enabled_facets.append(Facet.MAP)
+    else:
+        omitted_capabilities.insert(0, "map")
 
     # --- presentation scaffolding (one non-material block, one scene) --------
     if has_enrichment:
@@ -291,8 +296,8 @@ def build_corpus(
         )
         if coordinates_present:
             omissions.append(
-                "Geography carries period-aware coordinates for located places, but controlling "
-                "polity is unreviewed and the generated map is not yet rendered."
+                "Geography carries period-aware coordinates for located places, rendered as a "
+                "generated map; controlling polity and period-specific names remain unreviewed."
             )
         else:
             omissions.append(

@@ -1,5 +1,11 @@
 import { useEffect, useRef } from 'react'
-import type { Map as MapLibreMap, Marker } from 'maplibre-gl'
+import type {
+  ExpressionSpecification,
+  GeoJSONSource,
+  Map as MapLibreMap,
+  Marker,
+  Popup,
+} from 'maplibre-gl'
 import type { EventRecord, Scene, PlaceEntity } from '../model/schema'
 import type { FocusValue } from '../model/focus'
 import { formatHistoricalDate } from '../model/formatHistoricalDate'
@@ -42,6 +48,7 @@ export function MapView({
   )
   const visibleEvents = scene.events.filter((event) => !eventIds || eventIds.has(event.id))
   const isTemporalWorkspace = eventIds !== undefined
+  const hasCoordinates = places.some((place) => place.coordinates)
 
   return (
     <div className="chronicle-map-view">
@@ -54,6 +61,8 @@ export function MapView({
           visibleEvents={visibleEvents}
           isTemporalWorkspace={isTemporalWorkspace}
         />
+      ) : hasCoordinates ? (
+        <GeneratedMap places={places} focus={focus} visibleEvents={visibleEvents} />
       ) : (
         <SchematicMap places={places} focus={focus} visibleEvents={visibleEvents} />
       )}
@@ -396,5 +405,345 @@ function SchematicMap({
         )
       })}
     </svg>
+  )
+}
+
+// --- Generated map -----------------------------------------------------------
+// A map BUILT from the investigation's own extracted coordinates, not a found
+// raster plate. It is the SAME MapLibre GL canvas as HistoricalMap (pannable/
+// zoomable, real lng/lat markers) so generated and curated investigations share
+// one interaction model — the difference is the basemap: instead of a
+// georeferenced raster image, a bundled neutral PHYSICAL basemap (Natural Earth
+// 1:110m land / coastlines / rivers / lakes, public domain, served from the app)
+// under a generated lat/lng graticule. No tiles, no network, and NO political
+// borders or labels — only period-stable physical geography — so the map asserts
+// only what the evidence locates and never implies period-inaccurate borders
+// (docs/architecture/geographic-and-map-generation.md: "Rendering cannot exceed
+// the evidence's precision"; period-accurate boundaries/place-names are the
+// later OpenHistoricalMap slice, which layers into this same canvas). Like
+// HistoricalMap the WebGL canvas is an aria-hidden progressive enhancement that
+// no-ops under jsdom/no-WebGL; the accessible location list below stays the
+// first-class interaction.
+
+const _MIN_SPAN_DEG = 1.2 // a single point (or coincident points) still gets a readable frame
+// Bundled Natural Earth physical layers, served from the app itself (public/).
+const BASEMAP_BASE = `${import.meta.env.BASE_URL}basemap`
+
+/** A "nice" 1/2/5×10ⁿ graticule step giving ~`target` gridlines across `span`. */
+function niceStep(span: number, target = 4): number {
+  const raw = Math.max(span, 1e-6) / Math.max(target, 1)
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)))
+  const norm = raw / mag
+  const step = norm >= 5 ? 5 : norm >= 2 ? 2 : 1
+  return step * mag
+}
+
+function gridlines(min: number, max: number, step: number): number[] {
+  const lines: number[] = []
+  const start = Math.ceil(min / step) * step
+  for (let v = start; v <= max + 1e-9; v += step) {
+    lines.push(Math.round(v / step) * step) // kill FP drift so labels read cleanly
+  }
+  return lines
+}
+
+interface Bounds {
+  minLat: number
+  maxLat: number
+  minLng: number
+  maxLng: number
+}
+
+/** Padded bounding box of the located places (a single point still frames). */
+function boundsOf(located: { coordinates: { lat: number; lng: number } }[]): Bounds {
+  const lats = located.map((p) => p.coordinates.lat)
+  const lngs = located.map((p) => p.coordinates.lng)
+  const padLat = Math.max((Math.max(...lats) - Math.min(...lats)) * 0.25, _MIN_SPAN_DEG / 2)
+  const padLng = Math.max((Math.max(...lngs) - Math.min(...lngs)) * 0.25, _MIN_SPAN_DEG / 2)
+  return {
+    minLat: Math.min(...lats) - padLat,
+    maxLat: Math.max(...lats) + padLat,
+    minLng: Math.min(...lngs) - padLng,
+    maxLng: Math.max(...lngs) + padLng,
+  }
+}
+
+/** Meridian/parallel LineStrings across the bounds — the whole generated basemap. */
+function graticuleGeoJSON(b: Bounds) {
+  const features: {
+    type: 'Feature'
+    properties: Record<string, never>
+    geometry: { type: 'LineString'; coordinates: [number, number][] }
+  }[] = []
+  for (const lng of gridlines(b.minLng, b.maxLng, niceStep(b.maxLng - b.minLng))) {
+    features.push({
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [lng, b.minLat],
+          [lng, b.maxLat],
+        ],
+      },
+    })
+  }
+  for (const lat of gridlines(b.minLat, b.maxLat, niceStep(b.maxLat - b.minLat))) {
+    features.push({
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [b.minLng, lat],
+          [b.maxLng, lat],
+        ],
+      },
+    })
+  }
+  return { type: 'FeatureCollection' as const, features }
+}
+
+type LocatedPlace = PlaceEntity & { coordinates: { lat: number; lng: number } }
+
+/** The place currently in focus (selected place, or the place of a focused event). */
+function focusedPlaceId(
+  located: LocatedPlace[],
+  focus: FocusValue,
+  visibleEvents: EventRecord[],
+): string | undefined {
+  if (focus.kind === 'entity' && focus.entityType === 'place') return focus.entityId
+  if (focus.kind === 'event') {
+    return located.find((place) =>
+      visibleEvents.some((event) => event.id === focus.eventId && event.placeId === place.id),
+    )?.id
+  }
+  return undefined
+}
+
+/** Located places as a GeoJSON point layer — rendered ON the GL canvas (same
+ * pass as the basemap, so points stay welded to the geography) and carrying each
+ * place's LocationPrecision so the marker can size its uncertainty honestly. */
+function placesToGeoJSON(located: LocatedPlace[], focusedId: string | undefined) {
+  return {
+    type: 'FeatureCollection' as const,
+    features: located.map((place) => ({
+      type: 'Feature' as const,
+      properties: {
+        id: place.id,
+        name: place.canonicalName,
+        // periodRecords is min-length 1 (contract); default defensively anyway.
+        precision: place.periodRecords[0]?.precision ?? 'approximate',
+        focused: place.id === focusedId,
+      },
+      geometry: {
+        type: 'Point' as const,
+        coordinates: [place.coordinates.lng, place.coordinates.lat] as [number, number],
+      },
+    })),
+  }
+}
+
+// Uncertainty-disc radius (screen px) by evidence precision: coarser location →
+// larger, softer halo, so the marker never implies more spatial precision than
+// the evidence supports ("Rendering cannot exceed the evidence's precision").
+const _PRECISION_RADIUS: ExpressionSpecification = [
+  'match',
+  ['get', 'precision'],
+  'building',
+  4,
+  'city',
+  8,
+  'region',
+  14,
+  'approximate',
+  20,
+  12,
+]
+
+function GeneratedMap({
+  places,
+  focus,
+  visibleEvents,
+}: {
+  places: PlaceEntity[]
+  focus: FocusValue
+  visibleEvents: EventRecord[]
+}) {
+  const located = places.filter(
+    (place): place is PlaceEntity & { coordinates: { lat: number; lng: number } } =>
+      place.coordinates != null,
+  )
+  const locatedRef = useRef(located)
+  locatedRef.current = located
+  const focusRef = useRef(focus)
+  focusRef.current = focus
+  const visibleEventsRef = useRef(visibleEvents)
+  visibleEventsRef.current = visibleEvents
+  const containerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<MapLibreMap | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    let localMap: MapLibreMap | null = null
+    let localPopup: Popup | null = null
+    const current = locatedRef.current
+    if (current.length === 0) return
+
+    async function init() {
+      if (!containerRef.current) return
+      try {
+        const maplibregl = await import('maplibre-gl')
+        await import('maplibre-gl/dist/maplibre-gl.css')
+        if (cancelled || !containerRef.current) return
+
+        const bounds = boundsOf(current)
+        const map = new maplibregl.Map({
+          container: containerRef.current,
+          style: {
+            version: 8,
+            // Basemap = a bundled neutral PHYSICAL layer (Natural Earth 1:110m
+            // land / rivers / lakes, public domain) + a generated graticule. No
+            // tiles, no sprite/glyphs, no political borders or labels: only
+            // period-stable physical geography, all served from the app itself,
+            // so nothing external is fetched. (glyphs is omitted entirely —
+            // MapLibre rejects an explicit `undefined`.)
+            sources: {
+              land: { type: 'geojson', data: `${BASEMAP_BASE}/ne_110m_land.geojson` },
+              lakes: { type: 'geojson', data: `${BASEMAP_BASE}/ne_110m_lakes.geojson` },
+              rivers: {
+                type: 'geojson',
+                data: `${BASEMAP_BASE}/ne_110m_rivers_lake_centerlines.geojson`,
+              },
+              graticule: { type: 'geojson', data: graticuleGeoJSON(bounds) },
+              // Located places are DATA on the GL canvas, not DOM overlays: a
+              // circle layer in the same render pass as the basemap stays exactly
+              // registered to the geography (no pan/zoom drift) and scales.
+              places: {
+                type: 'geojson',
+                data: placesToGeoJSON(
+                  current,
+                  focusedPlaceId(current, focusRef.current, visibleEventsRef.current),
+                ),
+              },
+            },
+            layers: [
+              { id: 'ocean', type: 'background', paint: { 'background-color': '#0b2231' } },
+              { id: 'land', type: 'fill', source: 'land', paint: { 'fill-color': '#17313d' } },
+              {
+                id: 'coastline',
+                type: 'line',
+                source: 'land',
+                paint: { 'line-color': 'rgba(155,198,207,0.55)', 'line-width': 0.7 },
+              },
+              { id: 'lakes', type: 'fill', source: 'lakes', paint: { 'fill-color': '#0b2231' } },
+              {
+                id: 'rivers',
+                type: 'line',
+                source: 'rivers',
+                paint: { 'line-color': 'rgba(102,170,190,0.5)', 'line-width': 0.5 },
+              },
+              {
+                id: 'graticule-lines',
+                type: 'line',
+                source: 'graticule',
+                paint: { 'line-color': 'rgba(155,198,207,0.12)', 'line-width': 0.5 },
+              },
+              {
+                // Uncertainty halo, sized by the place's evidence precision.
+                id: 'place-halo',
+                type: 'circle',
+                source: 'places',
+                paint: {
+                  'circle-radius': _PRECISION_RADIUS,
+                  'circle-color': [
+                    'case',
+                    ['get', 'focused'],
+                    'rgba(59,130,246,0.30)',
+                    'rgba(155,198,207,0.16)',
+                  ],
+                },
+              },
+              {
+                // Crisp centre dot marking the representative coordinate.
+                id: 'place-core',
+                type: 'circle',
+                source: 'places',
+                paint: {
+                  'circle-radius': 3.5,
+                  'circle-color': ['case', ['get', 'focused'], '#3b82f6', '#e2e8f0'],
+                  'circle-stroke-color': '#0b2231',
+                  'circle-stroke-width': 1.2,
+                },
+              },
+            ],
+          },
+          attributionControl: false,
+        })
+        localMap = map
+        mapRef.current = map
+        map.getCanvas().setAttribute('tabindex', '-1') // keep the aria-hidden canvas out of tab order
+
+        map.fitBounds(
+          [
+            [bounds.minLng, bounds.minLat],
+            [bounds.maxLng, bounds.maxLat],
+          ],
+          // Cap zoom-in: 1:110m geography reads as a map at regional scale but
+          // blocky if you zoom past it, so a single located place lands on a
+          // regional frame rather than a coarse close-up (honest to the basemap
+          // precision; period city detail is the later OHM slice).
+          { padding: 28, maxZoom: 6, duration: 0 },
+        )
+
+        // A name label on hover — closeOnMove hides it during pan/zoom, so no
+        // overlay drifts against the basemap. The accessible location list below
+        // remains the first-class, always-available naming.
+        const popup = new maplibregl.Popup({
+          closeButton: false,
+          closeOnMove: true,
+          offset: 12,
+          className: 'chronicle-generated-map-popup',
+        })
+        localPopup = popup
+        map.on('mouseenter', 'place-core', (event) => {
+          const feature = event.features?.[0]
+          if (!feature || feature.geometry.type !== 'Point') return
+          const [lng, lat] = feature.geometry.coordinates as [number, number]
+          popup.setLngLat([lng, lat]).setText(String(feature.properties?.name ?? '')).addTo(map)
+        })
+        map.on('mouseleave', 'place-core', () => popup.remove())
+      } catch {
+        // WebGL is a progressive enhancement only; jsdom/no-WebGL falls back to
+        // the accessible location list, which is the first-class interaction.
+      }
+    }
+
+    void init()
+    return () => {
+      cancelled = true
+      localPopup?.remove()
+      localMap?.remove()
+    }
+  }, [places])
+
+  // Focus changes only rewrite the point source's data — no map rebuild, and the
+  // points stay on the GL canvas (no drift).
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const source = map.getSource('places') as GeoJSONSource | undefined
+    if (!source || typeof source.setData !== 'function') return
+    source.setData(placesToGeoJSON(located, focusedPlaceId(located, focus, visibleEvents)))
+  }, [focus, located, visibleEvents])
+
+  return (
+    <div className="chronicle-generated-map-frame">
+      <div ref={containerRef} aria-hidden="true" className="chronicle-generated-map" />
+      <p className="chronicle-generated-map-note">
+        Generated map — {located.length} located place{located.length === 1 ? '' : 's'} on a neutral
+        physical basemap (Natural Earth coastlines &amp; rivers; no period-specific borders).
+      </p>
+    </div>
   )
 }

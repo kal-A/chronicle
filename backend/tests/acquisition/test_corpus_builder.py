@@ -191,11 +191,12 @@ def test_enrichment_populates_events_timeline_and_flips_timeline_capability():
     # geography carries a located place with coordinates
     located = [e for e in investigation.entities if e.entityType == "place" and e.coordinates is not None]
     assert len(located) == 1 and located[0].canonicalName == "Placeholdertown"
-    # timeline capability lights up; map stays omitted (generated-map is a later slice)
+    # timeline + map both light up (map because a place was located with coordinates)
     assert "timeline" not in investigation.interactionSpec.omittedCapabilities
-    assert "map" in investigation.interactionSpec.omittedCapabilities
+    assert "map" not in investigation.interactionSpec.omittedCapabilities
     facet_values = {f.value for f in investigation.interactionSpec.enabledFacets}
     assert "timeline" in facet_values
+    assert "map" in facet_values
     # the scene surfaces the events
     assert investigation.scenes[0].eventIds == [investigation.events[0].id]
 
@@ -236,6 +237,8 @@ def test_unlocated_enrichment_keeps_event_without_coordinates():
     assert len(investigation.events) == 1  # grounded event survives
     assert all(e.coordinates is None for e in investigation.entities if e.entityType == "place")
     assert "timeline" not in investigation.interactionSpec.omittedCapabilities  # events exist
+    # no place was located -> the generated map has nothing to draw, so map stays omitted
+    assert "map" in investigation.interactionSpec.omittedCapabilities
 
 
 def test_empty_enrichment_leaves_corpus_evidence_only():
