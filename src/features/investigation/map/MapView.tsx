@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type {
   ExpressionSpecification,
   GeoJSONSource,
@@ -574,12 +574,15 @@ function GeneratedMap({
     (place): place is PlaceEntity & { coordinates: { lat: number; lng: number } } =>
       place.coordinates != null,
   )
+  const [labelsOn, setLabelsOn] = useState(true)
   const locatedRef = useRef(located)
   locatedRef.current = located
   const focusRef = useRef(focus)
   focusRef.current = focus
   const visibleEventsRef = useRef(visibleEvents)
   visibleEventsRef.current = visibleEvents
+  const labelsOnRef = useRef(labelsOn)
+  labelsOnRef.current = labelsOn
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
 
@@ -602,12 +605,14 @@ function GeneratedMap({
           container: containerRef.current,
           style: {
             version: 8,
+            // Bundled OFL font glyphs (Noto Sans, in public/basemap/fonts/) power
+            // the on-map name labels. Like the basemap they are served from the
+            // app — no external font/tile fetch.
+            glyphs: `${BASEMAP_BASE}/fonts/{fontstack}/{range}.pbf`,
             // Basemap = a bundled neutral PHYSICAL layer (Natural Earth 1:110m
             // land / rivers / lakes, public domain) + a generated graticule. No
-            // tiles, no sprite/glyphs, no political borders or labels: only
-            // period-stable physical geography, all served from the app itself,
-            // so nothing external is fetched. (glyphs is omitted entirely —
-            // MapLibre rejects an explicit `undefined`.)
+            // tiles, no political borders: only period-stable physical geography,
+            // all served from the app itself, so nothing external is fetched.
             sources: {
               land: { type: 'geojson', data: `${BASEMAP_BASE}/ne_110m_land.geojson` },
               lakes: { type: 'geojson', data: `${BASEMAP_BASE}/ne_110m_lakes.geojson` },
@@ -676,6 +681,28 @@ function GeneratedMap({
                   'circle-stroke-width': 1.2,
                 },
               },
+              {
+                // On-map name labels. text-optional + collision (allow-overlap
+                // off) means crowded labels drop out rather than overprint — a
+                // natural "some labels off" at density, before the explicit toggle.
+                id: 'place-labels',
+                type: 'symbol',
+                source: 'places',
+                layout: {
+                  'text-field': ['get', 'name'],
+                  'text-font': ['NotoSans-Regular'],
+                  'text-size': 11,
+                  'text-anchor': 'left',
+                  'text-offset': [0.8, 0],
+                  'text-optional': true,
+                  visibility: labelsOnRef.current ? 'visible' : 'none',
+                },
+                paint: {
+                  'text-color': '#e9dec5',
+                  'text-halo-color': '#0b2231',
+                  'text-halo-width': 1.2,
+                },
+              },
             ],
           },
           attributionControl: false,
@@ -737,8 +764,31 @@ function GeneratedMap({
     source.setData(placesToGeoJSON(located, focusedPlaceId(located, focus, visibleEvents)))
   }, [focus, located, visibleEvents])
 
+  // Toggle the label layer's visibility. If the style isn't ready yet, init reads
+  // labelsOnRef so the layer lands in the right state on load.
+  useEffect(() => {
+    const map = mapRef.current
+    try {
+      if (map?.getLayer('place-labels')) {
+        map.setLayoutProperty('place-labels', 'visibility', labelsOn ? 'visible' : 'none')
+      }
+    } catch {
+      /* style not ready */
+    }
+  }, [labelsOn])
+
   return (
     <div className="chronicle-generated-map-frame">
+      <div className="chronicle-generated-map-toolbar">
+        <button
+          type="button"
+          className="chronicle-map-toggle"
+          aria-pressed={labelsOn}
+          onClick={() => setLabelsOn((on) => !on)}
+        >
+          {labelsOn ? 'Hide place labels' : 'Show place labels'}
+        </button>
+      </div>
       <div ref={containerRef} aria-hidden="true" className="chronicle-generated-map" />
       <p className="chronicle-generated-map-note">
         Generated map — {located.length} located place{located.length === 1 ? '' : 's'} on a neutral

@@ -1180,6 +1180,24 @@ html:has(.chronicle-investigation-state) {
   background: #0b2231;
 }
 
+.chronicle-generated-map-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.chronicle-map-toggle {
+  padding: 4px 10px;
+  background: #0e2c3d;
+  color: #e9dec5;
+  border: 1px solid rgb(155 198 207 / 30%);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.chronicle-map-toggle[aria-pressed='true'] {
+  border-color: rgb(155 198 207 / 60%);
+}
+
 .chronicle-generated-map-note {
   margin: 0;
   color: #9bc6cf;

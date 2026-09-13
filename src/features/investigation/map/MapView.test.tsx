@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { MapView } from './MapView'
 import type { Scene, PlaceEntity } from '../model/schema'
@@ -52,5 +52,20 @@ describe('MapView generated-map fallback', () => {
 
     expect(screen.getByRole('img', { name: /schematic orientation map/i })).toBeInTheDocument()
     expect(screen.queryByText(/Generated map —/i)).not.toBeInTheDocument()
+  })
+
+  it('offers an accessible labels toggle that flips its pressed state', () => {
+    const scene = sceneWith([place('p1', 'London', { lat: 51.507, lng: -0.128 })])
+
+    render(<MapView scene={scene} focus={NEUTRAL_FOCUS} onSelectFocus={noop} />)
+
+    const toggle = screen.getByRole('button', { name: /place labels/i })
+    expect(toggle).toHaveAttribute('aria-pressed', 'true') // labels on by default
+    expect(toggle).toHaveTextContent(/hide place labels/i)
+
+    fireEvent.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    expect(toggle).toHaveTextContent(/show place labels/i)
   })
 })
