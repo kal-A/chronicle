@@ -9,6 +9,7 @@ import type {
 import type { EventRecord, Scene, PlaceEntity } from '../model/schema'
 import type { FocusValue } from '../model/focus'
 import { formatHistoricalDate } from '../model/formatHistoricalDate'
+import { placesToGeoJSON, type LocatedPlace } from './generatedMapGeo'
 
 /**
  * When a scene ships a `mapLayer` (docs/research/scene-2-map-source.md
@@ -504,8 +505,6 @@ function graticuleGeoJSON(b: Bounds) {
   return { type: 'FeatureCollection' as const, features }
 }
 
-type LocatedPlace = PlaceEntity & { coordinates: { lat: number; lng: number } }
-
 /** The place currently in focus (selected place, or the place of a focused event). */
 function focusedPlaceId(
   located: LocatedPlace[],
@@ -519,29 +518,6 @@ function focusedPlaceId(
     )?.id
   }
   return undefined
-}
-
-/** Located places as a GeoJSON point layer — rendered ON the GL canvas (same
- * pass as the basemap, so points stay welded to the geography) and carrying each
- * place's LocationPrecision so the marker can size its uncertainty honestly. */
-function placesToGeoJSON(located: LocatedPlace[], focusedId: string | undefined) {
-  return {
-    type: 'FeatureCollection' as const,
-    features: located.map((place) => ({
-      type: 'Feature' as const,
-      properties: {
-        id: place.id,
-        name: place.canonicalName,
-        // periodRecords is min-length 1 (contract); default defensively anyway.
-        precision: place.periodRecords[0]?.precision ?? 'approximate',
-        focused: place.id === focusedId,
-      },
-      geometry: {
-        type: 'Point' as const,
-        coordinates: [place.coordinates.lng, place.coordinates.lat] as [number, number],
-      },
-    })),
-  }
 }
 
 // Uncertainty-disc radius (screen px) by evidence precision: coarser location →
@@ -629,6 +605,7 @@ function GeneratedMap({
                 data: placesToGeoJSON(
                   current,
                   focusedPlaceId(current, focusRef.current, visibleEventsRef.current),
+                  visibleEventsRef.current,
                 ),
               },
             },
@@ -656,6 +633,9 @@ function GeneratedMap({
               },
               {
                 // Uncertainty halo, sized by the place's evidence precision.
+                // Shown only for places active at the current time cursor (or the
+                // focused one); dormant places drop their halo so scrubbing the
+                // timeline visibly lights places up as their events arrive.
                 id: 'place-halo',
                 type: 'circle',
                 source: 'places',
@@ -667,16 +647,42 @@ function GeneratedMap({
                     'rgba(59,130,246,0.30)',
                     'rgba(155,198,207,0.16)',
                   ],
+                  'circle-opacity': [
+                    'case',
+                    ['any', ['get', 'active'], ['get', 'focused']],
+                    1,
+                    0,
+                  ],
                 },
               },
               {
-                // Crisp centre dot marking the representative coordinate.
+                // Crisp centre dot marking the representative coordinate. Dormant
+                // places (no event visible yet at the cursor) render smaller, muted
+                // and semi-transparent — present but clearly not-yet-in-play.
                 id: 'place-core',
                 type: 'circle',
                 source: 'places',
                 paint: {
-                  'circle-radius': 3.5,
-                  'circle-color': ['case', ['get', 'focused'], '#3b82f6', '#e2e8f0'],
+                  'circle-radius': [
+                    'case',
+                    ['any', ['get', 'active'], ['get', 'focused']],
+                    3.5,
+                    2.5,
+                  ],
+                  'circle-color': [
+                    'case',
+                    ['get', 'focused'],
+                    '#3b82f6',
+                    ['get', 'active'],
+                    '#e2e8f0',
+                    '#7c8b95',
+                  ],
+                  'circle-opacity': [
+                    'case',
+                    ['any', ['get', 'active'], ['get', 'focused']],
+                    1,
+                    0.5,
+                  ],
                   'circle-stroke-color': '#0b2231',
                   'circle-stroke-width': 1.2,
                 },
@@ -701,6 +707,8 @@ function GeneratedMap({
                   'text-color': '#e9dec5',
                   'text-halo-color': '#0b2231',
                   'text-halo-width': 1.2,
+                  // Dim labels for places not yet in play at the cursor.
+                  'text-opacity': ['case', ['any', ['get', 'active'], ['get', 'focused']], 1, 0.4],
                 },
               },
             ],
@@ -751,17 +759,27 @@ function GeneratedMap({
       cancelled = true
       localPopup?.remove()
       localMap?.remove()
+      mapRef.current = null // don't leave a torn-down map behind for the effects below
     }
   }, [places])
 
-  // Focus changes only rewrite the point source's data — no map rebuild, and the
-  // points stay on the GL canvas (no drift).
+  // Focus/time changes only rewrite the point source's data — no map rebuild, and
+  // the points stay on the GL canvas (no drift). Guarded like the labels effect:
+  // getSource throws if the style isn't loaded yet (or the map was just torn down
+  // during a StrictMode remount) rather than returning undefined; on load, init
+  // seeds the source with the current data, so skipping here is safe.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    const source = map.getSource('places') as GeoJSONSource | undefined
-    if (!source || typeof source.setData !== 'function') return
-    source.setData(placesToGeoJSON(located, focusedPlaceId(located, focus, visibleEvents)))
+    try {
+      const source = map.getSource('places') as GeoJSONSource | undefined
+      if (!source || typeof source.setData !== 'function') return
+      source.setData(
+        placesToGeoJSON(located, focusedPlaceId(located, focus, visibleEvents), visibleEvents),
+      )
+    } catch {
+      /* style not ready / map torn down — init seeds the source on load */
+    }
   }, [focus, located, visibleEvents])
 
   // Toggle the label layer's visibility. If the style isn't ready yet, init reads

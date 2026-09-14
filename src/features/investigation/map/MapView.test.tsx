@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { MapView } from './MapView'
-import type { Scene, PlaceEntity } from '../model/schema'
+import { placesToGeoJSON } from './generatedMapGeo'
+import type { EventRecord, Scene, PlaceEntity } from '../model/schema'
 import type { FocusValue } from '../model/focus'
 
 // MapView only reads scene.entities / scene.events / scene.mapLayer, so these
@@ -67,5 +68,45 @@ describe('MapView generated-map fallback', () => {
 
     expect(toggle).toHaveAttribute('aria-pressed', 'false')
     expect(toggle).toHaveTextContent(/show place labels/i)
+  })
+})
+
+// The generated map answers the single time cursor through the GeoJSON it feeds
+// its GL point layer: each place carries the count of currently-visible events and
+// an `active` flag. jsdom can't render the GL canvas, so we assert this pure builder
+// directly — it's the logic that makes markers light up / go dormant as the
+// workspace's temporal rail narrows the visible-event window.
+describe('placesToGeoJSON — time-cursor responsiveness', () => {
+  const located = [
+    place('p1', 'London', { lat: 51.507, lng: -0.128 }),
+    place('p2', 'Paris', { lat: 48.857, lng: 2.352 }),
+  ] as unknown as Parameters<typeof placesToGeoJSON>[0]
+
+  function ev(id: string, placeId: string): EventRecord {
+    return { id, placeId } as unknown as EventRecord
+  }
+
+  it('marks a place active with its visible-event count, and dormant when its events are outside the window', () => {
+    // The cursor has advanced far enough to reveal two London events but no Paris event.
+    const visibleEvents = [ev('e1', 'p1'), ev('e2', 'p1')]
+
+    const fc = placesToGeoJSON(located, undefined, visibleEvents)
+    const byId = Object.fromEntries(fc.features.map((f) => [f.properties.id, f.properties]))
+
+    expect(byId.p1.active).toBe(true)
+    expect(byId.p1.eventCount).toBe(2)
+    expect(byId.p2.active).toBe(false)
+    expect(byId.p2.eventCount).toBe(0)
+  })
+
+  it('reflects the focused place and defaults precision defensively', () => {
+    const fc = placesToGeoJSON(located, 'p2', [])
+    const byId = Object.fromEntries(fc.features.map((f) => [f.properties.id, f.properties]))
+
+    expect(byId.p2.focused).toBe(true)
+    expect(byId.p1.focused).toBe(false)
+    // Every place is dormant when no events are in the window yet.
+    expect(byId.p1.active).toBe(false)
+    expect(byId.p2.active).toBe(false)
   })
 })
