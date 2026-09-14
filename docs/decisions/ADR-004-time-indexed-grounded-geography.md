@@ -127,6 +127,12 @@ moment; ask a question → it can move the map/time).
   over the event, which is the whole point — and it would imply a fixed geopolitical
   state that most investigated events do not have.
 
+## Addendum
+
+- [ADR-004 Addendum: Territory + Time-Cursor — Implementation Plan](ADR-004-addendum-territory-time-implementation.md)
+  — the concrete build plan for sequencing steps 2–3 (one time cursor; territories),
+  written after a throwaway visual prototype locked the coloration/interaction language.
+
 ## References
 
 - `docs/architecture/geographic-and-map-generation.md`, `timeline-generation.md`,

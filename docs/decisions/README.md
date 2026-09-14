@@ -19,3 +19,4 @@ ADRs capture architecturally-significant decisions — ones that are expensive t
 - [ADR-002: Map-First Investigation Workspace](ADR-002-map-first-workspace.md) — accepted; inserts Phase D, shifts former Phases D-K to E-L
 - [ADR-003: The LLM-Agent System Is the Product Core](ADR-003-llm-agent-system-is-product-core.md) — accepted; replaces former Phases E-L with the AI-core-first Phase E-K sequence
 - [ADR-004: Time-Indexed, Grounded Geographic Model for the Generated Map](ADR-004-time-indexed-grounded-geography.md) — proposed; the map as a time-indexed join of LLM-grounded claims + sourced geometry (labels, territories, timeline evolution)
+  - [ADR-004 Addendum: Territory + Time-Cursor — Implementation Plan](ADR-004-addendum-territory-time-implementation.md) — proposed; build plan for the time cursor + territory rendering after a prototype locked the visual/interaction language
