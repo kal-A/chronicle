@@ -29,6 +29,11 @@ backend/**/*.egg-info
 backend/.pytest_cache
 backend/runs
 
+# Historical-boundaries dataset — a large (~69 MB) backend resolver input fetched
+# on demand, not committed. Populate with: python backend/scripts/fetch_boundaries.py
+# (see docs/research/historical-boundaries-source.md).
+backend/data/boundaries/
+
 # Editor
 .vscode/*
 !.vscode/extensions.json

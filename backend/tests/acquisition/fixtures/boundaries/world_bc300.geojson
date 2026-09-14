@@ -1,0 +1,20 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "NAME": "Alpha" },
+      "geometry": { "type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "NAME": "Beta" },
+      "geometry": { "type": "Polygon", "coordinates": [[[2, 2], [3, 2], [3, 3], [2, 3], [2, 2]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "NAME": null },
+      "geometry": { "type": "Polygon", "coordinates": [[[9, 9], [9, 10], [10, 10], [9, 9]]] }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "NAME": "Alpha" },
+      "geometry": { "type": "Polygon", "coordinates": [[[0, 0], [2, 0], [2, 2], [0, 2], [0, 0]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "NAME": "Gamma" },
+      "geometry": { "type": "MultiPolygon", "coordinates": [[[[5, 5], [6, 5], [6, 6], [5, 6], [5, 5]]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "NAME": "Point Place" },
+      "geometry": { "type": "Point", "coordinates": [7, 7] }
+    }
+  ]
+}

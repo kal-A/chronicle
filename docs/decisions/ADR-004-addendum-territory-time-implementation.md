@@ -92,10 +92,12 @@ validation tests that must stay in parity):
 
 ## Data sources (free/offline-first, per AGENTS.md §5)
 
-- **Bundled historical-boundaries dataset** for area geometry — e.g.
-  `historical-basemaps` (world polities at snapshot years), shipped as offline GeoJSON in
-  `public/` alongside the Natural Earth basemap. License must be verified and download
-  approved before use.
+- **Bundled historical-boundaries dataset** for area geometry —
+  `historical-basemaps` (A. Ourednik, **GPL-3.0**), 54 `world_<year>.geojson` snapshots
+  (~69 MB, 8000 BCE → 2010 CE), matched on each feature's `NAME` property. Because it is
+  a **backend resolver input** (not shipped to the browser) and large, it lives in a
+  **gitignored** `backend/data/boundaries/`, fetched by `backend/scripts/fetch_boundaries.py`;
+  see `docs/research/historical-boundaries-source.md`. (Implemented in Slice T3.)
 - **Gazetteers (existing: Wikidata + World Historical Gazetteer)** continue to supply
   point coordinates and label names.
 - **OpenHistoricalMap (date-filtered)** remains an *optional*, higher-fidelity **networked**
@@ -103,9 +105,14 @@ validation tests that must stay in parity):
 
 ## Deterministic geometry resolver (not the LLM)
 
-A resolver in the `acquisition` package maps a grounded `ControlState` (named polity +
-time interval) to a polygon: match the polity name against the bundled dataset and pick
-the **nearest snapshot year ≤ the interval**, tagging `attestedYear`. **No match ⇒ no
+A resolver in the `acquisition` package (`boundaries.py`, `BoundaryResolver`) maps a
+grounded `ControlState` (named polity + time interval) to a polygon: it normalises and
+matches the polity name against the dataset's `NAME` field and takes the **nearest
+snapshot that names the polity** — preferring an at-or-before snapshot on ties, and
+searching outward when the closest snapshot doesn't name it (antiquity's snapshots are
+sparse and a polity isn't in every one) — tagging `attestedYear` with the year it
+actually landed on so the map reads "as of ~Y" and never implies exact currency. An
+optional distance cap rejects matches too temporally far to stand in. **No match ⇒ no
 geometry**: the `ControlState` stays as a non-rendered claim rather than inventing a
 frontier. This is the load-bearing honesty boundary and is fully deterministic.
 
