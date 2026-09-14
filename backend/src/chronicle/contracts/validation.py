@@ -481,6 +481,26 @@ def validate_generated_investigation(data: Any) -> GeneratedInvestigation:
                 f'{control_state.kind.value} ControlState "{control_state.id}" cannot claim '
                 f'"{control_state.precision.value}" precision; use region or approximate'
             )
+        # A control basis (de jure vs de facto) describes controlled territory
+        # only — influence/contested have no sovereignty status.
+        if control_state.basis is not None and control_state.kind.value != "controlled":
+            _fail(
+                f'ControlState "{control_state.id}" sets a control basis but its kind is '
+                f'"{control_state.kind.value}"; basis applies only to controlled territory'
+            )
+        # A named de jure owner is meaningful only when control is not sovereign,
+        # and the sovereign differs from the controller (that is what occupation is).
+        if control_state.sovereignPolity is not None:
+            if control_state.basis is None or control_state.basis.value == "sovereign":
+                _fail(
+                    f'ControlState "{control_state.id}" names a sovereignPolity but is not held on '
+                    f'a non-sovereign basis (occupied/administered)'
+                )
+            if control_state.sovereignPolity == control_state.polity:
+                _fail(
+                    f'ControlState "{control_state.id}" names its own polity as sovereignPolity; '
+                    f'the sovereign must differ from the controller'
+                )
     enabled_facets = {facet.value for facet in investigation.interactionSpec.enabledFacets}
     if "territory" in enabled_facets and not investigation.controlStates:
         _fail("The 'territory' facet is enabled but no ControlState records back it")

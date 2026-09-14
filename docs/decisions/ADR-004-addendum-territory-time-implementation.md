@@ -60,9 +60,19 @@ Backend `backend/src/chronicle/contracts/generated_investigation.py` and fronten
 validation tests that must stay in parity):
 
 - **`ControlState` record:** `{ id, polity, kind: controlled | influence | contested,
-  validFrom, validTo, geometryRef, precision, evidenceLinkIds, reviewStatus, visibility }`.
-  Mirrors the discipline of every other generated record: PROPOSED, reviewable,
-  passage-grounded. **Carries no geometry** — only a `geometryRef`.
+  basis?, sovereignPolity?, validFrom, validTo, geometryRef, precision, evidenceLinkIds,
+  reviewStatus, visibility }`. Mirrors the discipline of every other generated record:
+  PROPOSED, reviewable, passage-grounded. **Carries no geometry** — only a `geometryRef`.
+  - **`basis` (optional, controlled only):** the de jure ↔ de facto nature of controlled
+    territory — `sovereign` (a polity's own recognized homeland), `occupied` (another's
+    land held by force), or `administered` (governed without homeland sovereignty: colony,
+    protectorate, mandate, client/puppet). Left null when the sources don't classify it.
+  - **`sovereignPolity` (optional):** the de jure owner, named only when control is not
+    sovereign (basis `occupied`/`administered`) and different from the controller. This is
+    what lets the map render held-not-owned land — e.g. German-occupied France — as the
+    controller's colour **textured over the sovereign's**, rather than simply recoloured.
+    The LLM classifies `basis` during extraction (T5) and abstains (null) when unclear;
+    the renderer (T4) keys the sovereign-vs-occupied treatment off it.
 - **Geometry model.** `geometryRef` resolves to a `Polygon`/`MultiPolygon` held in a new
   `territoryGeometries` collection, each tagged `{ sourceDataset, attestedYear, license }`.
   Geometry is attached by a deterministic resolver (below), referenced by id — keeping it

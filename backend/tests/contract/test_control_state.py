@@ -153,6 +153,45 @@ def test_fuzzy_control_states_cannot_claim_city_precision(golden_investigation, 
         validate_generated_investigation(package)
 
 
+def test_accepts_occupied_territory_with_a_named_sovereign(golden_investigation):
+    package = _package_with_grounded_territory(golden_investigation)
+    package["controlStates"][0]["basis"] = "occupied"
+    package["controlStates"][0]["sovereignPolity"] = "Rome"  # controller is Carthage
+    result = validate_generated_investigation(package)
+    assert result.controlStates[0].basis.value == "occupied"
+    assert result.controlStates[0].sovereignPolity == "Rome"
+
+
+def test_basis_applies_only_to_controlled_territory(golden_investigation):
+    package = _package_with_grounded_territory(golden_investigation)
+    package["controlStates"][0]["kind"] = "influence"
+    package["controlStates"][0]["precision"] = "region"  # keep the fuzzy-precision rule happy
+    package["controlStates"][0]["basis"] = "occupied"
+    with pytest.raises(Exception, match="basis applies only to controlled"):
+        validate_generated_investigation(package)
+
+
+def test_sovereign_polity_requires_a_non_sovereign_basis(golden_investigation):
+    package = _package_with_grounded_territory(golden_investigation)
+    package["controlStates"][0]["basis"] = "sovereign"
+    package["controlStates"][0]["sovereignPolity"] = "Rome"
+    with pytest.raises(Exception, match="not held on a non-sovereign basis"):
+        validate_generated_investigation(package)
+
+
+def test_sovereign_polity_must_differ_from_the_controller(golden_investigation):
+    package = _package_with_grounded_territory(golden_investigation)
+    package["controlStates"][0]["basis"] = "occupied"
+    package["controlStates"][0]["sovereignPolity"] = "Carthage"  # same as polity
+    with pytest.raises(Exception, match="sovereign must differ from the controller"):
+        validate_generated_investigation(package)
+
+
+def test_control_state_rejects_an_unknown_basis():
+    with pytest.raises(ValidationError):
+        ControlState.model_validate({**VALID_CONTROL_STATE, "basis": "colonised"})
+
+
 def test_territory_facet_requires_control_states(golden_investigation):
     package = copy.deepcopy(golden_investigation)
     package["interactionSpec"]["enabledFacets"] = [

@@ -179,6 +179,17 @@ class ControlStateKind(str, Enum):
     CONTESTED = "contested"
 
 
+class ControlBasis(str, Enum):
+    """The de jure ↔ de facto nature of `controlled` territory: a polity's own
+    recognized homeland (sovereign), another polity's land held by force
+    (occupied), or land governed without homeland sovereignty — colony,
+    protectorate, mandate, client/puppet (administered)."""
+
+    SOVEREIGN = "sovereign"
+    OCCUPIED = "occupied"
+    ADMINISTERED = "administered"
+
+
 class GeometryType(str, Enum):
     POLYGON = "Polygon"
     MULTI_POLYGON = "MultiPolygon"

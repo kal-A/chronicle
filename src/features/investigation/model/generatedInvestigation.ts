@@ -176,11 +176,22 @@ export type MapScene = z.infer<typeof MapSceneSchema>
 // map's polygons only ever come from a sourced dataset, never the LLM. Additive:
 // existing packages omit both collections.
 export const ControlStateKindSchema = z.enum(['controlled', 'influence', 'contested'])
+// The de jure ↔ de facto nature of `controlled` territory: a polity's own
+// recognized homeland (sovereign), another's land held by force (occupied), or
+// land governed without homeland sovereignty — colony / protectorate / mandate /
+// client (administered).
+export const ControlBasisSchema = z.enum(['sovereign', 'occupied', 'administered'])
 
 export const ControlStateSchema = z.object({
   id: z.string().min(1),
   polity: z.string().min(1),
   kind: ControlStateKindSchema,
+  // Optional refinement of `controlled` territory. When control is not sovereign,
+  // `sovereignPolity` names the de jure owner (e.g. occupied France under German
+  // control), so the map can show held-not-owned land as the controller textured
+  // over the sovereign rather than simply recolored.
+  basis: ControlBasisSchema.optional(),
+  sovereignPolity: z.string().min(1).optional(),
   validFrom: HistoricalDateSchema,
   validTo: HistoricalDateSchema,
   geometryRef: z.string().min(1),
@@ -911,6 +922,29 @@ export function validateGeneratedInvestigation(
         `${controlState.kind} ControlState "${controlState.id}" cannot claim ` +
           `"${controlState.precision}" precision; use region or approximate`,
       )
+    }
+    // A control basis (de jure vs de facto) describes controlled territory only.
+    if (controlState.basis && controlState.kind !== 'controlled') {
+      fail(
+        `ControlState "${controlState.id}" sets a control basis but its kind is ` +
+          `"${controlState.kind}"; basis applies only to controlled territory`,
+      )
+    }
+    // A named de jure owner is meaningful only when control is not sovereign, and
+    // the sovereign differs from the controller (that is what occupation is).
+    if (controlState.sovereignPolity) {
+      if (!controlState.basis || controlState.basis === 'sovereign') {
+        fail(
+          `ControlState "${controlState.id}" names a sovereignPolity but is not held on ` +
+            `a non-sovereign basis (occupied/administered)`,
+        )
+      }
+      if (controlState.sovereignPolity === controlState.polity) {
+        fail(
+          `ControlState "${controlState.id}" names its own polity as sovereignPolity; ` +
+            `the sovereign must differ from the controller`,
+        )
+      }
     }
   }
   if (investigation.interactionSpec.enabledFacets.includes('territory') && controlStates.length === 0) {

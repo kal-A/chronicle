@@ -505,6 +505,45 @@ describe('Territory layer cross-record rules (Rule 22)', () => {
     expect(() => validateGeneratedInvestigation(pkg)).toThrow(/cannot claim/i)
   })
 
+  it('accepts occupied territory with a named sovereign', () => {
+    const pkg = packageWithGroundedTerritory()
+    Object.assign((pkg.controlStates as Array<Record<string, unknown>>)[0], {
+      basis: 'occupied',
+      sovereignPolity: 'Rome', // controller is Carthage
+    })
+    const parsed = validateGeneratedInvestigation(pkg)
+    expect(parsed.controlStates?.[0].basis).toBe('occupied')
+    expect(parsed.controlStates?.[0].sovereignPolity).toBe('Rome')
+  })
+
+  it('allows a control basis only on controlled territory', () => {
+    const pkg = packageWithGroundedTerritory()
+    Object.assign((pkg.controlStates as Array<Record<string, unknown>>)[0], {
+      kind: 'influence',
+      precision: 'region',
+      basis: 'occupied',
+    })
+    expect(() => validateGeneratedInvestigation(pkg)).toThrow(/basis applies only to controlled/i)
+  })
+
+  it('requires a non-sovereign basis to name a sovereignPolity', () => {
+    const pkg = packageWithGroundedTerritory()
+    Object.assign((pkg.controlStates as Array<Record<string, unknown>>)[0], {
+      basis: 'sovereign',
+      sovereignPolity: 'Rome',
+    })
+    expect(() => validateGeneratedInvestigation(pkg)).toThrow(/not held on a non-sovereign basis/i)
+  })
+
+  it('requires the sovereign to differ from the controller', () => {
+    const pkg = packageWithGroundedTerritory()
+    Object.assign((pkg.controlStates as Array<Record<string, unknown>>)[0], {
+      basis: 'occupied',
+      sovereignPolity: 'Carthage', // same as polity
+    })
+    expect(() => validateGeneratedInvestigation(pkg)).toThrow(/sovereign must differ from the controller/i)
+  })
+
   it('requires control states behind a declared territory facet', () => {
     const pkg = makeValidPackage() as ReturnType<typeof makeValidPackage> & {
       interactionSpec: { enabledFacets: string[] }

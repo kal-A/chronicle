@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from .enums import (
     ApprovalStatus,
     Awareness,
+    ControlBasis,
     ControlStateKind,
     CurationStatus,
     DirectOrInferred,
@@ -206,6 +207,12 @@ class ControlState(BaseModel):
     id: str = Field(min_length=1)
     polity: str = Field(min_length=1)
     kind: ControlStateKind
+    # Optional refinement of `controlled` territory (de jure vs de facto). When
+    # control is not sovereign, `sovereignPolity` names the de jure owner (e.g.
+    # occupied France under German control), so the map can show held-not-owned
+    # land as the controller textured over the sovereign, not simply recolored.
+    basis: ControlBasis | None = None
+    sovereignPolity: str | None = Field(default=None, min_length=1)
     validFrom: HistoricalDate
     validTo: HistoricalDate
     geometryRef: str = Field(min_length=1)
