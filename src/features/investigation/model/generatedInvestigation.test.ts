@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ControlStateSchema,
   GeneratedInvestigationValidationError,
+  TerritoryGeometrySchema,
   validateGeneratedInvestigation,
 } from './generatedInvestigation'
 import goldenInvestigation from '../../../../fixtures/blank-cheque.golden-investigation.json'
@@ -380,5 +382,136 @@ describe('Shared invalid fixtures (Python/TypeScript parity)', () => {
     ['overprecise-map-marker', overpreciseMapMarker, /exceeds Place/i],
   ])('rejects %s', (_name, fixture, messagePattern) => {
     expect(() => validateGeneratedInvestigation(fixture)).toThrow(messagePattern)
+  })
+})
+
+// --- ADR-004 addendum, Slice T2a: time-indexed territory layer (additive) ---
+// The record shapes and their parity with the Python side; the cross-record
+// rules (geometryRef resolves, evidence grounding, precision honesty, the
+// territory facet flip) are Slice T2b. `makeValidPackage()` is defined above.
+const VALID_GEOMETRY = {
+  id: 'geo-1',
+  type: 'Polygon',
+  coordinates: [
+    [
+      [10, 36],
+      [11, 36],
+      [11, 37],
+      [10, 36],
+    ],
+  ],
+  sourceDataset: 'historical-basemaps',
+  attestedYear: -218,
+  license: 'CC0-1.0',
+  polity: 'Carthage',
+}
+
+const VALID_CONTROL_STATE = {
+  id: 'cs-1',
+  polity: 'Carthage',
+  kind: 'controlled',
+  validFrom: { precision: 'range', earliest: '1900-01-01', latest: '1900-12-31' },
+  validTo: { precision: 'range', earliest: '1901-01-01', latest: '1901-12-31' },
+  geometryRef: 'geo-1',
+  precision: 'region',
+  evidenceLinkIds: ['el-1'],
+  reviewStatus: 'proposed',
+  visibility: 'public',
+}
+
+describe('Territory layer contract (ControlState / TerritoryGeometry)', () => {
+  it('accepts valid record shapes', () => {
+    expect(() => TerritoryGeometrySchema.parse(VALID_GEOMETRY)).not.toThrow()
+    expect(() => ControlStateSchema.parse(VALID_CONTROL_STATE)).not.toThrow()
+  })
+
+  it('rejects a control state that cites no evidence', () => {
+    expect(() => ControlStateSchema.parse({ ...VALID_CONTROL_STATE, evidenceLinkIds: [] })).toThrow()
+  })
+
+  it('rejects an unknown control kind', () => {
+    expect(() => ControlStateSchema.parse({ ...VALID_CONTROL_STATE, kind: 'occupied' })).toThrow()
+  })
+
+  it('rejects a geometry with no coordinates or a non-area type', () => {
+    expect(() => TerritoryGeometrySchema.parse({ ...VALID_GEOMETRY, coordinates: [] })).toThrow()
+    expect(() => TerritoryGeometrySchema.parse({ ...VALID_GEOMETRY, type: 'Point' })).toThrow()
+  })
+
+  it('leaves an existing package valid without the layer', () => {
+    expect(() => validateGeneratedInvestigation(makeValidPackage())).not.toThrow()
+  })
+})
+
+// A valid package carrying a fully-grounded ControlState: a supporting
+// EvidenceLink (targetType controlState) over an existing passage, listed
+// bidirectionally, plus its sourced geometry. `makeValidPackage()` is above.
+function packageWithGroundedTerritory() {
+  const pkg = makeValidPackage() as ReturnType<typeof makeValidPackage> & {
+    evidenceLinks: unknown[]
+    controlStates: unknown[]
+    territoryGeometries: unknown[]
+  }
+  pkg.evidenceLinks = [
+    ...pkg.evidenceLinks,
+    {
+      id: 'evidence-cs-1',
+      targetType: 'controlState',
+      targetId: 'cs-1',
+      passageId: 'passage-1',
+      role: 'supporting',
+    },
+  ]
+  pkg.territoryGeometries = [{ ...VALID_GEOMETRY }]
+  pkg.controlStates = [{ ...VALID_CONTROL_STATE, evidenceLinkIds: ['evidence-cs-1'] }]
+  return pkg
+}
+
+describe('Territory layer cross-record rules (Rule 22)', () => {
+  it('accepts a fully-grounded territory layer', () => {
+    const parsed = validateGeneratedInvestigation(packageWithGroundedTerritory())
+    expect(parsed.controlStates?.[0].id).toBe('cs-1')
+    expect(parsed.territoryGeometries?.[0].id).toBe('geo-1')
+  })
+
+  it('requires a supporting evidence link', () => {
+    const pkg = packageWithGroundedTerritory()
+    ;(pkg.evidenceLinks as Array<{ role: string }>)[pkg.evidenceLinks.length - 1].role = 'context'
+    expect(() => validateGeneratedInvestigation(pkg)).toThrow(/requires a supporting EvidenceLink/i)
+  })
+
+  it('requires the geometryRef to resolve', () => {
+    const pkg = packageWithGroundedTerritory()
+    ;(pkg.controlStates as Array<{ geometryRef: string }>)[0].geometryRef = 'geo-missing'
+    expect(() => validateGeneratedInvestigation(pkg)).toThrow(/unknown TerritoryGeometry/i)
+  })
+
+  it('requires the interval to be ordered', () => {
+    const pkg = packageWithGroundedTerritory()
+    ;(pkg.controlStates as Array<{ validFrom: unknown }>)[0].validFrom = {
+      precision: 'range',
+      earliest: '1902-01-01',
+      latest: '1902-12-31',
+    }
+    expect(() => validateGeneratedInvestigation(pkg)).toThrow(/validFrom after validTo/i)
+  })
+
+  it.each(['influence', 'contested'])('forbids %s at city precision', (kind) => {
+    const pkg = packageWithGroundedTerritory()
+    Object.assign((pkg.controlStates as Array<Record<string, unknown>>)[0], {
+      kind,
+      precision: 'city',
+    })
+    expect(() => validateGeneratedInvestigation(pkg)).toThrow(/cannot claim/i)
+  })
+
+  it('requires control states behind a declared territory facet', () => {
+    const pkg = makeValidPackage() as ReturnType<typeof makeValidPackage> & {
+      interactionSpec: { enabledFacets: string[] }
+    }
+    pkg.interactionSpec.enabledFacets = [...pkg.interactionSpec.enabledFacets, 'territory']
+    expect(() => validateGeneratedInvestigation(pkg)).toThrow(
+      /territory.*facet is enabled but no ControlState/i,
+    )
   })
 })

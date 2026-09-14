@@ -213,6 +213,8 @@ def validate_generated_investigation(data: Any) -> GeneratedInvestigation:
         ("timeline", investigation.timeline),
         ("mapAssets", investigation.mapAssets),
         ("mapScenes", investigation.mapScenes),
+        ("controlStates", investigation.controlStates),
+        ("territoryGeometries", investigation.territoryGeometries),
         ("scenes", investigation.scenes),
         ("synthesis", investigation.presentation.synthesis),
         ("findings", investigation.presentation.findings),
@@ -233,6 +235,8 @@ def validate_generated_investigation(data: Any) -> GeneratedInvestigation:
     perspective_ids = _ids_of(investigation.perspectives)
     map_asset_ids = _ids_of(investigation.mapAssets)
     map_scene_ids = _ids_of(investigation.mapScenes)
+    control_state_ids = _ids_of(investigation.controlStates)
+    territory_geometry_ids = _ids_of(investigation.territoryGeometries)
     record_ids = claim_ids | relationship_ids | knowledge_state_ids
     links_by_id = {link.id: link for link in investigation.evidenceLinks}
 
@@ -252,6 +256,7 @@ def validate_generated_investigation(data: Any) -> GeneratedInvestigation:
             "relationship": relationship_ids,
             "knownAtTime": knowledge_state_ids,
             "event": event_ids,
+            "controlState": control_state_ids,
         }[link.targetType.value]
         _require_reference(targets, link.targetId, f'EvidenceLink "{link.id}"', link.targetType.value)
 
@@ -263,6 +268,7 @@ def validate_generated_investigation(data: Any) -> GeneratedInvestigation:
         "relationship": {record.id: record for record in investigation.relationships},
         "knownAtTime": {record.id: record for record in investigation.knowledgeStates},
         "event": {record.id: record for record in investigation.events},
+        "controlState": {record.id: record for record in investigation.controlStates},
     }
     for records in targets_by_type.values():
         for target in records.values():
@@ -446,5 +452,37 @@ def validate_generated_investigation(data: Any) -> GeneratedInvestigation:
             evidence_link_ids=set(links_by_id.keys()),
             any_record_ids=any_record_ids,
         )
+
+    # Rule 22: the time-indexed territory layer (ADR-004 addendum). Each
+    # ControlState is grounded like any claim (>=1 supporting EvidenceLink,
+    # bidirectionally targeted via Rule 5/5b), references a sourced geometry, is
+    # time-ordered, and is honest about precision; a declared 'territory' facet
+    # must have data behind it.
+    for control_state in investigation.controlStates:
+        links = _evidence_for(control_state, "controlState", links_by_id)
+        if not any(link.role.value == "supporting" for link in links):
+            _fail(f'ControlState "{control_state.id}" requires a supporting EvidenceLink')
+        _require_reference(
+            territory_geometry_ids,
+            control_state.geometryRef,
+            f'ControlState "{control_state.id}"',
+            "TerritoryGeometry",
+        )
+        if control_state.validFrom.earliest > control_state.validTo.latest:
+            _fail(f'ControlState "{control_state.id}" has validFrom after validTo')
+        # Influence and contested reaches had no crisp frontier — they may not
+        # claim building/city precision, only region/approximate ("rendering
+        # cannot exceed the evidence's precision", extended to fuzzy territory).
+        if (
+            control_state.kind.value in ("influence", "contested")
+            and PRECISION_RANK[control_state.precision.value] > PRECISION_RANK["region"]
+        ):
+            _fail(
+                f'{control_state.kind.value} ControlState "{control_state.id}" cannot claim '
+                f'"{control_state.precision.value}" precision; use region or approximate'
+            )
+    enabled_facets = {facet.value for facet in investigation.interactionSpec.enabledFacets}
+    if "territory" in enabled_facets and not investigation.controlStates:
+        _fail("The 'territory' facet is enabled but no ControlState records back it")
 
     return investigation

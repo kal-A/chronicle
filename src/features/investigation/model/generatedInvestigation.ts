@@ -56,7 +56,7 @@ const InvestigationScopeSchema = z.object({
 
 export const GeneratedEvidenceLinkSchema = z.object({
   id: z.string().min(1),
-  targetType: z.enum(['claim', 'relationship', 'knownAtTime', 'event']),
+  targetType: z.enum(['claim', 'relationship', 'knownAtTime', 'event', 'controlState']),
   targetId: z.string().min(1),
   passageId: z.string().min(1),
   role: EvidenceLinkRoleSchema,
@@ -170,6 +170,43 @@ export const MapSceneSchema = z.object({
 })
 export type MapScene = z.infer<typeof MapSceneSchema>
 
+// --- Time-indexed territory layer (ADR-004 addendum) ---------------------
+// A passage-grounded, time-valid control/influence/contested assertion that
+// carries NO geometry — only a `geometryRef` into `territoryGeometries` — so the
+// map's polygons only ever come from a sourced dataset, never the LLM. Additive:
+// existing packages omit both collections.
+export const ControlStateKindSchema = z.enum(['controlled', 'influence', 'contested'])
+
+export const ControlStateSchema = z.object({
+  id: z.string().min(1),
+  polity: z.string().min(1),
+  kind: ControlStateKindSchema,
+  validFrom: HistoricalDateSchema,
+  validTo: HistoricalDateSchema,
+  geometryRef: z.string().min(1),
+  precision: LocationPrecisionSchema,
+  evidenceLinkIds: z.array(z.string().min(1)).min(1),
+  reviewStatus: ReviewStatusSchema,
+  visibility: VisibilitySchema,
+})
+export type ControlState = z.infer<typeof ControlStateSchema>
+
+// A boundary polygon resolved from a sourced historical-boundary dataset,
+// referenced by ControlState.geometryRef. `attestedYear` is the snapshot year the
+// polygon actually came from (BC = negative), so rendering can say "as of ~Y";
+// `sourceDataset`/`license` keep it auditable. Coordinates are a GeoJSON
+// coordinate array whose deep shape the resolver guarantees, not re-checked here.
+export const TerritoryGeometrySchema = z.object({
+  id: z.string().min(1),
+  type: z.enum(['Polygon', 'MultiPolygon']),
+  coordinates: z.array(z.unknown()).min(1),
+  sourceDataset: z.string().min(1),
+  attestedYear: z.number().int(),
+  license: z.string().min(1),
+  polity: z.string().min(1).optional(),
+})
+export type TerritoryGeometry = z.infer<typeof TerritoryGeometrySchema>
+
 export const InvestigationSceneSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -206,7 +243,7 @@ export const InteractionSpecificationSchema = z.object({
     )
     .min(1),
   enabledFacets: z.array(
-    z.enum(['narrative', 'timeline', 'map', 'graph', 'evidence']),
+    z.enum(['narrative', 'timeline', 'map', 'graph', 'evidence', 'territory']),
   ),
   omittedCapabilities: z.array(z.string().min(1)),
 })
@@ -266,6 +303,11 @@ export const GeneratedInvestigationSchema = z.object({
   timeline: z.array(TimelineEntrySchema),
   mapAssets: z.array(HistoricalMapAssetSchema),
   mapScenes: z.array(MapSceneSchema),
+  // ADR-004 addendum, optional/additive — the time-indexed territory layer.
+  // Existing packages remain valid without these; when present they get
+  // cross-reference-validated below, same discipline as every other field.
+  controlStates: z.array(ControlStateSchema).optional(),
+  territoryGeometries: z.array(TerritoryGeometrySchema).optional(),
   scenes: z.array(InvestigationSceneSchema).min(1),
   interactionSpec: InteractionSpecificationSchema,
   generationReport: GenerationReportSchema,
@@ -394,6 +436,8 @@ export function validateGeneratedInvestigation(
     { name: 'timeline', records: investigation.timeline },
     { name: 'mapAssets', records: investigation.mapAssets },
     { name: 'mapScenes', records: investigation.mapScenes },
+    { name: 'controlStates', records: investigation.controlStates ?? [] },
+    { name: 'territoryGeometries', records: investigation.territoryGeometries ?? [] },
     { name: 'scenes', records: investigation.scenes },
     { name: 'synthesis', records: investigation.presentation.synthesis },
     { name: 'findings', records: investigation.presentation.findings },
@@ -446,6 +490,8 @@ export function validateGeneratedInvestigation(
   const perspectiveIds = idsOf(investigation.perspectives)
   const mapAssetIds = idsOf(investigation.mapAssets)
   const mapSceneIds = idsOf(investigation.mapScenes)
+  const controlStateIds = idsOf(investigation.controlStates ?? [])
+  const territoryGeometryIds = idsOf(investigation.territoryGeometries ?? [])
   const recordIds = new Set([
     ...claimIds,
     ...relationshipIds,
@@ -460,6 +506,7 @@ export function validateGeneratedInvestigation(
     ['relationship', investigation.relationships],
     ['knownAtTime', investigation.knowledgeStates],
     ['event', investigation.events],
+    ['controlState', investigation.controlStates ?? []],
   ] as const) {
     for (const record of records) {
       if (new Set(record.evidenceLinkIds).size !== record.evidenceLinkIds.length) {
@@ -502,7 +549,9 @@ export function validateGeneratedInvestigation(
           ? relationshipIds
           : link.targetType === 'knownAtTime'
             ? knowledgeStateIds
-            : eventIds
+            : link.targetType === 'event'
+              ? eventIds
+              : controlStateIds
     requireReference(
       targets,
       link.targetId,
@@ -829,6 +878,43 @@ export function validateGeneratedInvestigation(
       },
       { requireReference },
     )
+  }
+
+  // Rule 22: the time-indexed territory layer (ADR-004 addendum). Each
+  // ControlState is grounded like any claim (>=1 supporting EvidenceLink,
+  // bidirectionally targeted via Rule 5/5b), references a sourced geometry, is
+  // time-ordered, and is honest about precision; a declared 'territory' facet
+  // must have data behind it.
+  const controlStates = investigation.controlStates ?? []
+  for (const controlState of controlStates) {
+    const links = evidenceFor(controlState, 'controlState', linksById)
+    if (!links.some((link) => link.role === 'supporting')) {
+      fail(`ControlState "${controlState.id}" requires a supporting EvidenceLink`)
+    }
+    requireReference(
+      territoryGeometryIds,
+      controlState.geometryRef,
+      `ControlState "${controlState.id}"`,
+      'TerritoryGeometry',
+    )
+    if (controlState.validFrom.earliest > controlState.validTo.latest) {
+      fail(`ControlState "${controlState.id}" has validFrom after validTo`)
+    }
+    // Influence and contested reaches had no crisp frontier — they may not claim
+    // building/city precision, only region/approximate ("rendering cannot exceed
+    // the evidence's precision", extended to fuzzy territory).
+    if (
+      (controlState.kind === 'influence' || controlState.kind === 'contested') &&
+      PRECISION_RANK[controlState.precision] > PRECISION_RANK['region']
+    ) {
+      fail(
+        `${controlState.kind} ControlState "${controlState.id}" cannot claim ` +
+          `"${controlState.precision}" precision; use region or approximate`,
+      )
+    }
+  }
+  if (investigation.interactionSpec.enabledFacets.includes('territory') && controlStates.length === 0) {
+    fail("The 'territory' facet is enabled but no ControlState records back it")
   }
 
   return investigation

@@ -115,6 +115,7 @@ class EvidenceTargetType(str, Enum):
     RELATIONSHIP = "relationship"
     KNOWN_AT_TIME = "knownAtTime"
     EVENT = "event"
+    CONTROL_STATE = "controlState"
 
 
 class Awareness(str, Enum):
@@ -169,6 +170,18 @@ class Facet(str, Enum):
     MAP = "map"
     GRAPH = "graph"
     EVIDENCE = "evidence"
+    TERRITORY = "territory"
+
+
+class ControlStateKind(str, Enum):
+    CONTROLLED = "controlled"
+    INFLUENCE = "influence"
+    CONTESTED = "contested"
+
+
+class GeometryType(str, Enum):
+    POLYGON = "Polygon"
+    MULTI_POLYGON = "MultiPolygon"
 
 
 class GenerationOutcome(str, Enum):

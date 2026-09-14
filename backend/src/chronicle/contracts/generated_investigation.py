@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from .enums import (
     ApprovalStatus,
     Awareness,
+    ControlStateKind,
     CurationStatus,
     DirectOrInferred,
     EvidenceClassification,
@@ -28,6 +29,7 @@ from .enums import (
     FindingRecordType,
     FocusKind,
     GenerationOutcome,
+    GeometryType,
     GeoreferencingPrecision,
     LedgerConclusion,
     LocationPrecision,
@@ -192,6 +194,46 @@ class MapScene(BaseModel):
     markers: list[MapMarker] = Field(default_factory=list)
 
 
+class ControlState(BaseModel):
+    """A passage-grounded, time-valid assertion that a polity controlled /
+    influenced / contested a region over an interval (ADR-004 addendum). Carries
+    NO geometry — only a ``geometryRef`` into ``territoryGeometries`` — so the
+    map's polygons only ever come from a sourced dataset, never the LLM. Additive
+    and reviewable like every other generated record; existing packages omit it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    polity: str = Field(min_length=1)
+    kind: ControlStateKind
+    validFrom: HistoricalDate
+    validTo: HistoricalDate
+    geometryRef: str = Field(min_length=1)
+    precision: LocationPrecision
+    evidenceLinkIds: list[str] = Field(min_length=1)
+    reviewStatus: ReviewStatus
+    visibility: Visibility
+
+
+class TerritoryGeometry(BaseModel):
+    """A boundary polygon resolved from a sourced historical-boundary dataset,
+    referenced by ``ControlState.geometryRef``. ``attestedYear`` records the
+    snapshot year the polygon actually came from (BC = negative) so rendering can
+    say "as of ~Y"; ``sourceDataset``/``license`` keep it auditable. Coordinates
+    are a GeoJSON coordinate array — its deep shape is guaranteed by the
+    deterministic resolver that emits it, not re-validated here."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    type: GeometryType
+    coordinates: list = Field(min_length=1)
+    sourceDataset: str = Field(min_length=1)
+    attestedYear: int
+    license: str = Field(min_length=1)
+    polity: str | None = Field(default=None, min_length=1)
+
+
 class InvestigationScene(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -296,6 +338,10 @@ class GeneratedInvestigation(BaseModel):
     timeline: list[TimelineEntry] = Field(default_factory=list)
     mapAssets: list[HistoricalMapAsset] = Field(default_factory=list)
     mapScenes: list[MapScene] = Field(default_factory=list)
+    # ADR-004 addendum, optional/additive — the time-indexed territory layer.
+    # Existing packages remain valid without these (both default to empty).
+    controlStates: list[ControlState] = Field(default_factory=list)
+    territoryGeometries: list[TerritoryGeometry] = Field(default_factory=list)
     scenes: list[InvestigationScene] = Field(min_length=1)
     interactionSpec: InteractionSpecification
     generationReport: GenerationReport
