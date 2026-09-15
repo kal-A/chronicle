@@ -18,7 +18,11 @@ import tempfile
 from datetime import date
 from pathlib import Path
 
-from chronicle.acquisition.defaults import default_connectors, default_geocoder
+from chronicle.acquisition.defaults import (
+    default_boundary_resolver,
+    default_connectors,
+    default_geocoder,
+)
 from chronicle.acquisition.fetch_cache import FetchCache
 from chronicle.acquisition.pipeline import AcquisitionPipeline
 from chronicle.ai.models.ollama import OllamaModelProvider, resolve_timeout_from_env
@@ -46,16 +50,18 @@ def main() -> int:
 
     connectors = default_connectors(REPO_ROOT)
     cache_dir = Path(tempfile.gettempdir()) / "chronicle-acquire-smoke"
-    extractor = geocoder = None
+    extractor = geocoder = boundary_resolver = None
     if args.enrich:
         extractor = OllamaModelProvider(timeout=resolve_timeout_from_env(180.0))
         geocoder = default_geocoder()
+        boundary_resolver = default_boundary_resolver()
     pipeline = AcquisitionPipeline(
         connectors,
         FetchCache(cache_dir),
         per_connector_results=3,
         extractor=extractor,
         geocoder=geocoder,
+        boundary_resolver=boundary_resolver,
     )
 
     print(f"Researching: {args.topic!r}  ({args.earliest}-{args.latest})")
@@ -76,6 +82,18 @@ def main() -> int:
         print(f"events={result.events}  located_places={result.located_places}")
         spec = result.investigation.interactionSpec
         print(f"timeline_capable={'timeline' not in spec.omittedCapabilities}")
+        control_states = result.investigation.controlStates
+        geometries = result.investigation.territoryGeometries
+        print(f"territory_capable={'territory' not in spec.omittedCapabilities}")
+        print(f"control_states={len(control_states)}  territory_geometries={len(geometries)}")
+        for control_state in control_states[:8]:
+            geo = next((g for g in geometries if g.id == control_state.geometryRef), None)
+            attested = f" as of {geo.attestedYear}" if geo else ""
+            basis = f"/{control_state.basis.value}" if control_state.basis else ""
+            print(
+                f"  {control_state.polity} — {control_state.kind.value}{basis}"
+                f" ({control_state.validFrom.label}–{control_state.validTo.label}){attested}"
+            )
         places_by_id = {
             e.id: e for e in result.investigation.entities if e.entityType == "place"
         }

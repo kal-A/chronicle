@@ -30,16 +30,21 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from ..contracts.enums import (
+    ControlBasis,
+    ControlStateKind,
     DatePrecision,
     EvidenceLinkRole,
     EvidenceTargetType,
+    GeometryType,
     LocationPrecision,
     ReviewStatus,
     Visibility,
 )
 from ..contracts.generated_investigation import (
+    ControlState,
     GeneratedEvent,
     GeneratedEvidenceLink,
+    TerritoryGeometry,
     TimelineEntry,
 )
 from ..contracts.shared import (
@@ -49,9 +54,15 @@ from ..contracts.shared import (
     PlaceEntity,
     PlacePeriodRecord,
 )
+from .boundaries import BoundaryResolver
+from .control_state import extract_control_states
 from .extraction import ExtractedEvent, extract_events
 from .geocoding import GeoResolution, PeriodAwareGeocoder
 from ..ai.models.protocol import ModelProvider
+
+# Control/influence/contested territory is region-level: a boundary polygon, not a
+# point, so it never claims building/city precision (contract Rule 22).
+_TERRITORY_PRECISION = LocationPrecision.REGION
 
 # A place name we could not locate *in period* carries no coordinate and the
 # lowest precision -- honest uncertainty, never a modern-as-historical guess.
@@ -72,10 +83,18 @@ class Enrichment:
     events: list[GeneratedEvent] = field(default_factory=list)
     evidence_links: list[GeneratedEvidenceLink] = field(default_factory=list)
     timeline: list[TimelineEntry] = field(default_factory=list)
+    control_states: list[ControlState] = field(default_factory=list)
+    territory_geometries: list[TerritoryGeometry] = field(default_factory=list)
 
     @property
     def is_empty(self) -> bool:
         return not self.events
+
+    @property
+    def has_territory(self) -> bool:
+        """True when at least one control state resolved to a sourced polygon."""
+
+        return bool(self.control_states)
 
 
 def _period_label(period: HistoricalDate) -> str:
@@ -137,14 +156,14 @@ def assemble_enrichment(
     *,
     extractor: ModelProvider,
     geocoder: PeriodAwareGeocoder,
+    boundary_resolver: BoundaryResolver | None = None,
 ) -> Enrichment:
     """Extract grounded events, geolocate their places *for the period*, and
-    assemble contract geography + events + evidence links + timeline."""
+    assemble contract geography + events + evidence links + timeline. When a
+    ``boundary_resolver`` is supplied, also extract grounded control states and
+    resolve each to a sourced boundary polygon (ADR-004 territory layer)."""
 
     extracted = extract_events(passages, period, topic, extractor)
-    if not extracted:
-        return Enrichment()
-
     period_label = _period_label(period)
 
     # One PlaceEntity per distinct place name (first-seen order), geocoded once.
@@ -193,11 +212,17 @@ def assemble_enrichment(
         for order, event in enumerate(events)
     ]
 
+    control_states, territory_geometries, control_links = _assemble_control_states(
+        passages, period, topic, extractor, boundary_resolver
+    )
+
     return Enrichment(
         places=places,
         events=events,
-        evidence_links=evidence_links,
+        evidence_links=evidence_links + control_links,
         timeline=timeline,
+        control_states=control_states,
+        territory_geometries=territory_geometries,
     )
 
 
@@ -206,6 +231,86 @@ def _ordered(events: list[ExtractedEvent]) -> list[ExtractedEvent]:
     the model's emission order."""
 
     return sorted(events, key=lambda event: (event.year, event.title))
+
+
+def _assemble_control_states(
+    passages: list[Passage],
+    period: HistoricalDate,
+    topic: str,
+    extractor: ModelProvider,
+    boundary_resolver: BoundaryResolver | None,
+) -> tuple[list[ControlState], list[TerritoryGeometry], list[GeneratedEvidenceLink]]:
+    """Extract grounded control states and resolve each to a SOURCED polygon. A
+    state whose polity cannot be resolved to a period-appropriate polygon is
+    omitted -- never a fabricated frontier. Geometry is deduplicated per resolved
+    (polity, attested-year). Owns the ``control-ev-*`` / ``territory-geo-*`` /
+    ``evidence-cs-*`` id namespaces so ``corpus_builder`` can merge without clashes."""
+
+    if boundary_resolver is None:
+        return [], [], []
+    extracted = extract_control_states(passages, period, topic, extractor)
+    if not extracted:
+        return [], [], []
+
+    control_states: list[ControlState] = []
+    geometries: list[TerritoryGeometry] = []
+    links: list[GeneratedEvidenceLink] = []
+    geometry_id_by_key: dict[tuple[str, int], str] = {}
+
+    for index, state in enumerate(extracted):
+        resolved = boundary_resolver.resolve(state.polity, state.fromYear)
+        if resolved is None:
+            continue  # no sourced polygon for this polity/period -> omitted
+
+        key = (resolved.matched_name, resolved.attested_year)
+        geometry_ref = geometry_id_by_key.get(key)
+        if geometry_ref is None:
+            geometry_ref = f"territory-geo-{len(geometries):04d}"
+            geometry_id_by_key[key] = geometry_ref
+            geometries.append(
+                TerritoryGeometry(
+                    id=geometry_ref,
+                    type=GeometryType(resolved.geometry_type),
+                    coordinates=resolved.coordinates,
+                    sourceDataset=resolved.source_dataset,
+                    attestedYear=resolved.attested_year,
+                    license=resolved.license,
+                    polity=resolved.matched_name,
+                )
+            )
+
+        control_id = f"control-ev-{index:04d}"
+        link_ids: list[str] = []
+        for link_index, passage_id in enumerate(state.passageIds):
+            link_id = f"evidence-cs-{index:04d}-{link_index}"
+            link_ids.append(link_id)
+            links.append(
+                GeneratedEvidenceLink(
+                    id=link_id,
+                    targetType=EvidenceTargetType.CONTROL_STATE,
+                    targetId=control_id,
+                    passageId=passage_id,
+                    role=EvidenceLinkRole.SUPPORTING,
+                )
+            )
+        control_states.append(
+            ControlState(
+                id=control_id,
+                polity=state.polity,
+                kind=ControlStateKind(state.kind),
+                basis=ControlBasis(state.basis) if state.basis else None,
+                sovereignPolity=state.sovereignPolity,
+                validFrom=_event_time(state.fromYear),
+                validTo=_event_time(state.toYear),
+                geometryRef=geometry_ref,
+                precision=_TERRITORY_PRECISION,
+                evidenceLinkIds=link_ids,
+                reviewStatus=ReviewStatus.PROPOSED,
+                visibility=Visibility.PUBLIC,
+            )
+        )
+
+    return control_states, geometries, links
 
 
 __all__ = ["Enrichment", "assemble_enrichment"]

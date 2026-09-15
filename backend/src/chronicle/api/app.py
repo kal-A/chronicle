@@ -32,7 +32,11 @@ from ..ai.orchestration.runner import InvestigationRunner
 from ..ai.orchestration.statuses import AgentRunStatus
 from ..ai.tools import build_default_registry
 from ..acquisition.build_service import CorpusBuildService
-from ..acquisition.defaults import default_geocoder, default_pipeline
+from ..acquisition.defaults import (
+    default_boundary_resolver,
+    default_geocoder,
+    default_pipeline,
+)
 from ..acquisition.embeddings import OllamaEmbedder
 from ..corpus import CorpusRegistry
 from ..corpus.errors import UnknownCorpusError
@@ -353,6 +357,7 @@ def create_default_app() -> FastAPI:
             cache_dir=runs_root / "cache",
             extractor=provider if enrichment_enabled else None,
             geocoder=default_geocoder() if enrichment_enabled else None,
+            boundary_resolver=default_boundary_resolver() if enrichment_enabled else None,
         ),
         registry=corpus_registry,
         build_dir=runs_root / "built-corpora",

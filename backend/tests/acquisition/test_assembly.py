@@ -10,13 +10,23 @@ subject-agnostic and never branches on which place/event it is.
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 from chronicle.acquisition.assembly import Enrichment, assemble_enrichment
+from chronicle.acquisition.boundaries import BoundaryResolver
+from chronicle.acquisition.control_state import ExtractedControlState, ExtractedControlStates
 from chronicle.acquisition.extraction import ExtractedEvent, ExtractedEvents
 from chronicle.acquisition.geocoding import GeoResolution
 from chronicle.ai.models.deterministic import DeterministicModelProvider
-from chronicle.contracts.enums import DatePrecision, LocationPrecision
+from chronicle.contracts.enums import (
+    ControlStateKind,
+    DatePrecision,
+    EvidenceTargetType,
+    LocationPrecision,
+)
 from chronicle.contracts.shared import Coordinates, HistoricalDate, Passage
+
+_BOUNDARIES_FIXTURE = Path(__file__).parent / "fixtures" / "boundaries"
 
 
 def _period() -> HistoricalDate:
@@ -149,3 +159,62 @@ def test_no_extracted_events_yields_empty_enrichment_and_no_geocoding():
     assert enrichment == Enrichment()
     assert enrichment.is_empty
     assert geocoder.calls == []  # nothing to locate -> no lookups
+
+
+def _extractor_with_territory(
+    events: list[ExtractedEvent], states: list[ExtractedControlState]
+) -> DeterministicModelProvider:
+    """assemble_enrichment makes two model passes when a resolver is supplied:
+    events first, then control states — enqueue both, in order."""
+
+    provider = DeterministicModelProvider()
+    provider.enqueue_value(ExtractedEvents(events=events))
+    provider.enqueue_value(ExtractedControlStates(controlStates=states))
+    return provider
+
+
+def test_assembles_territory_from_resolved_control_states():
+    states = [
+        # Alpha is in the boundary fixture -> resolves to a sourced polygon.
+        ExtractedControlState(
+            polity="Alpha", kind="controlled", basis="sovereign",
+            fromYear=1665, toYear=1668, passageIds=["psg-0000-0000"],
+        ),
+        # Zeta is in no snapshot -> no geometry -> the state is omitted, not faked.
+        ExtractedControlState(
+            polity="Zeta", kind="influence", fromYear=1665, toYear=1668, passageIds=["psg-0000-0000"],
+        ),
+    ]
+    enrichment = assemble_enrichment(
+        _passages(), _period(), "A topic",
+        extractor=_extractor_with_territory([], states),
+        geocoder=_StubGeocoder({}),
+        boundary_resolver=BoundaryResolver(_BOUNDARIES_FIXTURE),
+    )
+
+    assert enrichment.has_territory
+    assert [cs.polity for cs in enrichment.control_states] == ["Alpha"]  # Zeta omitted
+    assert len(enrichment.territory_geometries) == 1
+
+    geometry = enrichment.territory_geometries[0]
+    control_state = enrichment.control_states[0]
+    assert control_state.geometryRef == geometry.id
+    assert geometry.sourceDataset == "historical-basemaps"
+    assert control_state.kind is ControlStateKind.CONTROLLED
+    assert control_state.precision is LocationPrecision.REGION  # boundary-level, honest
+
+    # a supporting evidence link targets the control state, bidirectionally
+    link = next(link for link in enrichment.evidence_links if link.targetId == control_state.id)
+    assert link.targetType is EvidenceTargetType.CONTROL_STATE
+    assert link.id in control_state.evidenceLinkIds
+
+
+def test_no_boundary_resolver_yields_no_territory():
+    enrichment = assemble_enrichment(
+        _passages(), _period(), "A topic",
+        extractor=_extractor([]),
+        geocoder=_StubGeocoder({}),
+    )
+    assert not enrichment.has_territory
+    assert enrichment.control_states == []
+    assert enrichment.territory_geometries == []

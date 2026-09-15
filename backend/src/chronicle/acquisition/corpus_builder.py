@@ -186,9 +186,14 @@ def build_corpus(
     # returns an empty Enrichment and the corpus likewise stays evidence-only.
     enrichment = enrich(built_passages) if enrich is not None else None
     has_enrichment = enrichment is not None and not enrichment.is_empty
+    has_territory = enrichment is not None and enrichment.has_territory
     events = list(enrichment.events) if has_enrichment else []
-    evidence_links = list(enrichment.evidence_links) if has_enrichment else []
+    # Evidence links carry both event and control-state grounding, so they follow
+    # the enrichment itself, not just the events (territory can exist without events).
+    evidence_links = list(enrichment.evidence_links) if enrichment is not None else []
     timeline = list(enrichment.timeline) if has_enrichment else []
+    control_states = list(enrichment.control_states) if has_territory else []
+    territory_geometries = list(enrichment.territory_geometries) if has_territory else []
 
     # --- geography: scope scaffolding, upgraded by extracted + geolocated ----
     # Scope names are explicitly unreviewed stubs (no coordinates). When the
@@ -238,6 +243,12 @@ def build_corpus(
         enabled_facets.append(Facet.MAP)
     else:
         omitted_capabilities.insert(0, "map")
+    # Territory (control/influence/contested over sourced polygons) lights up only
+    # when at least one control state resolved to a boundary polygon.
+    if has_territory:
+        enabled_facets.append(Facet.TERRITORY)
+    else:
+        omitted_capabilities.insert(0, "territory")
 
     # --- presentation scaffolding (one non-material block, one scene) --------
     if has_enrichment:
@@ -343,6 +354,8 @@ def build_corpus(
         documents=documents,
         passages=built_passages,
         evidenceLinks=evidence_links,
+        controlStates=control_states,
+        territoryGeometries=territory_geometries,
         timeline=timeline,
         scenes=[scene],
         interactionSpec=interaction_spec,

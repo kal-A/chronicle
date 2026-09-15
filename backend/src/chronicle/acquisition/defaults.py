@@ -18,6 +18,7 @@ from .connectors.doc_registry_seed import DocRegistrySeedConnector
 from .connectors.gutenberg import GutenbergConnector
 from .connectors.internet_archive import InternetArchiveConnector
 from .connectors.wikipedia import WikipediaConnector
+from .boundaries import BoundaryResolver
 from .fetch_cache import FetchCache
 from .geocoding import (
     PeriodAwareGeocoder,
@@ -55,6 +56,17 @@ def default_geocoder() -> PeriodAwareGeocoder:
     )
 
 
+def default_boundary_resolver() -> BoundaryResolver:
+    """The sourced historical-boundary resolver used for the territory layer.
+
+    Reads the bundled ``historical-basemaps`` snapshots (fetched into a gitignored
+    ``backend/data/boundaries/`` by ``scripts/fetch_boundaries.py``). When the
+    dataset is absent, the resolver simply resolves nothing, so territory is
+    omitted rather than fabricated."""
+
+    return BoundaryResolver()
+
+
 def default_pipeline(
     *,
     repo_root: Path,
@@ -62,12 +74,15 @@ def default_pipeline(
     per_connector_results: int = 3,
     extractor: ModelProvider | None = None,
     geocoder: PeriodAwareGeocoder | None = None,
+    boundary_resolver: BoundaryResolver | None = None,
 ) -> AcquisitionPipeline:
     """Assemble the default acquisition pipeline over a content-addressed cache.
 
     Supply both ``extractor`` and ``geocoder`` to enable structured enrichment
     (stages 7/9/12: located events + a timeline); omit either to build an
-    evidence-only corpus, the safe default."""
+    evidence-only corpus, the safe default. Additionally supply a
+    ``boundary_resolver`` to extract grounded control states and render the
+    territory layer (ADR-004)."""
 
     return AcquisitionPipeline(
         default_connectors(repo_root),
@@ -75,7 +90,13 @@ def default_pipeline(
         per_connector_results=per_connector_results,
         extractor=extractor,
         geocoder=geocoder,
+        boundary_resolver=boundary_resolver,
     )
 
 
-__all__ = ["default_connectors", "default_geocoder", "default_pipeline"]
+__all__ = [
+    "default_connectors",
+    "default_geocoder",
+    "default_boundary_resolver",
+    "default_pipeline",
+]

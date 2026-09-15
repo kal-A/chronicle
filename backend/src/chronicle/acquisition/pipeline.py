@@ -18,6 +18,7 @@ from ..contracts.enums import DatePrecision, RequestedDepth, RequestType
 from ..contracts.generated_investigation import GeneratedInvestigation
 from ..contracts.shared import HistoricalDate, Passage
 from .assembly import Enrichment, assemble_enrichment
+from .boundaries import BoundaryResolver
 from .chunking import DEFAULT_TARGET_CHARS, chunk_source
 from .connectors.base import ConnectorError, SourceConnector
 from .contracts import AcquiredSource, DiscoveryQuery, ExtractedPassage
@@ -56,6 +57,7 @@ class AcquisitionPipeline:
         max_passages_per_source: int = 40,
         extractor: ModelProvider | None = None,
         geocoder: PeriodAwareGeocoder | None = None,
+        boundary_resolver: BoundaryResolver | None = None,
     ) -> None:
         if not connectors:
             raise ValueError("AcquisitionPipeline requires at least one connector")
@@ -71,6 +73,10 @@ class AcquisitionPipeline:
         # evidence-only corpus exactly as before.
         self._extractor = extractor
         self._geocoder = geocoder
+        # Optional territory layer (ADR-004): with a boundary resolver, enrichment
+        # also extracts grounded control states and resolves each to a sourced
+        # polygon. Absent it, geography stays points + events only.
+        self._boundary_resolver = boundary_resolver
 
     def run(
         self,
@@ -179,10 +185,16 @@ class AcquisitionPipeline:
         )
         extractor = self._extractor
         geocoder = self._geocoder
+        boundary_resolver = self._boundary_resolver
 
         def enrich(built_passages: list[Passage]) -> Enrichment:
             return assemble_enrichment(
-                built_passages, period, topic, extractor=extractor, geocoder=geocoder
+                built_passages,
+                period,
+                topic,
+                extractor=extractor,
+                geocoder=geocoder,
+                boundary_resolver=boundary_resolver,
             )
 
         return enrich

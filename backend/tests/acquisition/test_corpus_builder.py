@@ -276,3 +276,65 @@ def test_empty_geographic_scope_is_rejected():
             acquired=acquired,
             passages=passages,
         )
+
+
+def _territory_enricher():
+    """An enrich() closure that extracts one grounded control state and resolves
+    it against the boundary fixture — proving the territory layer builds and
+    validates (Rule 22) end to end."""
+    from pathlib import Path
+
+    from chronicle.acquisition.assembly import assemble_enrichment
+    from chronicle.acquisition.boundaries import BoundaryResolver
+    from chronicle.acquisition.control_state import ExtractedControlState, ExtractedControlStates
+    from chronicle.acquisition.extraction import ExtractedEvents
+    from chronicle.ai.models.deterministic import DeterministicModelProvider
+
+    class _StubGeocoder:
+        def resolve(self, name, period):
+            return None
+
+    fixture = Path(__file__).parent / "fixtures" / "boundaries"
+
+    def enrich(passages):
+        provider = DeterministicModelProvider()
+        provider.enqueue_value(ExtractedEvents(events=[]))
+        provider.enqueue_value(
+            ExtractedControlStates(controlStates=[
+                ExtractedControlState(
+                    polity="Alpha", kind="controlled", basis="sovereign",
+                    fromYear=1665, toYear=1668, passageIds=[passages[0].id],
+                ),
+            ])
+        )
+        return assemble_enrichment(
+            passages, _period(date(1660, 1, 1), date(1670, 12, 31), "1660-1670"),
+            "a placeholder subject", extractor=provider, geocoder=_StubGeocoder(),
+            boundary_resolver=BoundaryResolver(fixture),
+        )
+
+    return enrich
+
+
+def test_enrichment_populates_territory_and_flips_territory_capability():
+    acquired, passages = _enriched_inputs()
+    investigation = build_corpus(
+        topic="a placeholder subject",
+        interpreted_question="Who held what?",
+        geographic_scope=["London"],
+        date_earliest=date(1660, 1, 1),
+        date_latest=date(1670, 12, 31),
+        acquired=acquired,
+        passages=passages,
+        date_label="1660-1670",
+        enrich=_territory_enricher(),
+    )
+
+    # control states + sourced geometry are present and validated on build (Rule 22)
+    assert len(investigation.controlStates) == 1
+    assert len(investigation.territoryGeometries) == 1
+    assert investigation.controlStates[0].geometryRef == investigation.territoryGeometries[0].id
+    # the territory capability lights up
+    facet_values = {f.value for f in investigation.interactionSpec.enabledFacets}
+    assert "territory" in facet_values
+    assert "territory" not in investigation.interactionSpec.omittedCapabilities
