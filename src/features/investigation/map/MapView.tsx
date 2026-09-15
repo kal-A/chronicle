@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { FeatureCollection } from 'geojson'
 import type {
   ExpressionSpecification,
   GeoJSONSource,
+  LayerSpecification,
   Map as MapLibreMap,
   Marker,
   Popup,
@@ -10,6 +12,17 @@ import type { EventRecord, Scene, PlaceEntity } from '../model/schema'
 import type { FocusValue } from '../model/focus'
 import { formatHistoricalDate } from '../model/formatHistoricalDate'
 import { placesToGeoJSON, type LocatedPlace } from './generatedMapGeo'
+import type { ControlState, TerritoryGeometry } from '../model/generatedInvestigation'
+import {
+  OCCUPATION_PATTERN,
+  TERRITORY_PALETTE,
+  colorForIndex,
+  hatchPatternName,
+  polityColorIndex,
+  stripePatternName,
+  territoryFeatureCollections,
+  territoryLegend,
+} from './territory'
 
 /**
  * When a scene ships a `mapLayer` (docs/research/scene-2-map-source.md
@@ -34,6 +47,9 @@ export function MapView({
   onSelectFocus,
   placeIds,
   eventIds,
+  controlStates,
+  territoryGeometries,
+  currentYear,
 }: {
   scene: Scene
   focus: FocusValue
@@ -42,6 +58,11 @@ export function MapView({
   placeIds?: Set<string>
   /** Workspace-only temporal window. Events after the selected moment are withheld from the map. */
   eventIds?: Set<string>
+  /** Time-indexed territory (ADR-004), rendered on the generated map. */
+  controlStates?: ControlState[]
+  territoryGeometries?: TerritoryGeometry[]
+  /** Signed year of the time cursor (for the territory layer). */
+  currentYear?: number | null
 }) {
   const places = scene.entities.filter(
     (e): e is PlaceEntity =>
@@ -63,7 +84,14 @@ export function MapView({
           isTemporalWorkspace={isTemporalWorkspace}
         />
       ) : hasCoordinates ? (
-        <GeneratedMap places={places} focus={focus} visibleEvents={visibleEvents} />
+        <GeneratedMap
+          places={places}
+          focus={focus}
+          visibleEvents={visibleEvents}
+          controlStates={controlStates}
+          territoryGeometries={territoryGeometries}
+          currentYear={currentYear}
+        />
       ) : (
         <SchematicMap places={places} focus={focus} visibleEvents={visibleEvents} />
       )}
@@ -537,14 +565,107 @@ const _PRECISION_RADIUS: ExpressionSpecification = [
   12,
 ]
 
+// --- Territory fill patterns (canvas -> GL images). Browser-only: canvas has no
+// 2D context under jsdom, so these run only inside the map init, itself wrapped in
+// the WebGL try/catch; they return null when no context is available. ---
+type PatternImage = { width: number; height: number; data: Uint8Array } | null
+function _diagonalHatch(
+  color: string,
+  { spacing = 7, width = 1.6, back = false }: { spacing?: number; width?: number; back?: boolean } = {},
+): PatternImage {
+  const size = 16
+  const ratio = 2
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = size * ratio
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.scale(ratio, ratio)
+  ctx.strokeStyle = color
+  ctx.lineWidth = width
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  for (let i = -size; i < size * 2; i += spacing) {
+    if (back) {
+      ctx.moveTo(i, size)
+      ctx.lineTo(i + size, 0)
+    } else {
+      ctx.moveTo(i, 0)
+      ctx.lineTo(i + size, size)
+    }
+  }
+  ctx.stroke()
+  const image = ctx.getImageData(0, 0, size * ratio, size * ratio)
+  return { width: size * ratio, height: size * ratio, data: new Uint8Array(image.data) }
+}
+function _twoColorStripe(colorA: string, colorB: string): PatternImage {
+  const size = 14
+  const ratio = 2
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = size * ratio
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.scale(ratio, ratio)
+  ctx.fillStyle = colorA
+  ctx.fillRect(0, 0, size, size)
+  ctx.strokeStyle = colorB
+  ctx.lineWidth = size / 2.6
+  ctx.beginPath()
+  for (let i = -size; i < size * 2; i += size / 1.4) {
+    ctx.moveTo(i, 0)
+    ctx.lineTo(i + size, size)
+  }
+  ctx.stroke()
+  const image = ctx.getImageData(0, 0, size * ratio, size * ratio)
+  return { width: size * ratio, height: size * ratio, data: new Uint8Array(image.data) }
+}
+
+// Data-driven control fill colour, keyed off each feature's polity colour index.
+const _TERRITORY_FILL_COLOR = [
+  'match',
+  ['get', 'colorIndex'],
+  ...TERRITORY_PALETTE.flatMap((color, index) => [index, color]),
+  TERRITORY_PALETTE[0],
+] as unknown as ExpressionSpecification
+
+/** Register the fill-pattern images the current territory features reference:
+ * a hatch per influence colour, a stripe per contested colour-pair, and the shared
+ * occupation overlay. Idempotent (skips images already added). */
+function _registerTerritoryPatterns(
+  map: MapLibreMap,
+  collections: ReturnType<typeof territoryFeatureCollections>,
+): void {
+  const add = (name: string, image: PatternImage) => {
+    if (image && !map.hasImage(name)) map.addImage(name, image, { pixelRatio: 2 })
+  }
+  for (const feature of collections.influence.features) {
+    const index = Number((feature.properties as { colorIndex?: number })?.colorIndex ?? 0)
+    add(hatchPatternName(index), _diagonalHatch(colorForIndex(index)))
+  }
+  for (const feature of collections.contested.features) {
+    const props = feature.properties as { colorIndex?: number; otherColorIndex?: number }
+    const a = Number(props?.colorIndex ?? 0)
+    const b = Number(props?.otherColorIndex ?? a)
+    add(stripePatternName(a, b), _twoColorStripe(colorForIndex(a), colorForIndex(b)))
+  }
+  add(OCCUPATION_PATTERN, _diagonalHatch('rgba(9,20,28,0.6)', { spacing: 5, width: 2.4, back: true }))
+}
+
 function GeneratedMap({
   places,
   focus,
   visibleEvents,
+  controlStates,
+  territoryGeometries,
+  currentYear,
 }: {
   places: PlaceEntity[]
   focus: FocusValue
   visibleEvents: EventRecord[]
+  /** Time-indexed territory (ADR-004). Rendered when both are present. */
+  controlStates?: ControlState[]
+  territoryGeometries?: TerritoryGeometry[]
+  /** Signed year of the time cursor; territory in force at this year renders. */
+  currentYear?: number | null
 }) {
   const located = places.filter(
     (place): place is PlaceEntity & { coordinates: { lat: number; lng: number } } =>
@@ -561,6 +682,17 @@ function GeneratedMap({
   labelsOnRef.current = labelsOn
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
+
+  // Territory (ADR-004): the JOIN of control states + sourced geometry, filtered by
+  // the time cursor. Colours are assigned per polity by first appearance.
+  const territoryOn = (controlStates?.length ?? 0) > 0 && (territoryGeometries?.length ?? 0) > 0
+  const colorIndex = useMemo(() => polityColorIndex(controlStates ?? []), [controlStates])
+  const legend = useMemo(
+    () => territoryLegend(controlStates ?? [], currentYear ?? null, colorIndex),
+    [controlStates, currentYear, colorIndex],
+  )
+  const territoryRef = useRef({ controlStates, territoryGeometries, currentYear, colorIndex })
+  territoryRef.current = { controlStates, territoryGeometries, currentYear, colorIndex }
 
   useEffect(() => {
     let cancelled = false
@@ -748,6 +880,44 @@ function GeneratedMap({
           popup.setLngLat([lng, lat]).setText(String(feature.properties?.name ?? '')).addTo(map)
         })
         map.on('mouseleave', 'place-core', () => popup.remove())
+
+        // Territory layers: control (solid polity tint), influence (hatch),
+        // contested (two-colour stripe), plus an occupation overlay marking
+        // de-facto-held (occupied/administered) land. Added UNDER the place markers
+        // (before 'place-halo') so places stay on top. Always added — empty when
+        // there is no territory — so the update effect below can just setData.
+        const addTerritory = () => {
+          const state = territoryRef.current
+          const collections = territoryFeatureCollections(
+            state.controlStates ?? [],
+            state.territoryGeometries ?? [],
+            state.currentYear ?? null,
+            state.colorIndex,
+          )
+          _registerTerritoryPatterns(map, collections)
+          map.addSource('territory-influence', { type: 'geojson', data: collections.influence })
+          map.addSource('territory-control', { type: 'geojson', data: collections.control })
+          map.addSource('territory-contested', { type: 'geojson', data: collections.contested })
+          const before = 'place-halo'
+          const layers: LayerSpecification[] = [
+            { id: 'territory-influence-fill', type: 'fill', source: 'territory-influence',
+              paint: { 'fill-pattern': ['get', 'pattern'], 'fill-opacity': 0.6 } },
+            { id: 'territory-control-fill', type: 'fill', source: 'territory-control',
+              paint: { 'fill-color': _TERRITORY_FILL_COLOR, 'fill-opacity': 0.45 } },
+            { id: 'territory-control-line', type: 'line', source: 'territory-control',
+              paint: { 'line-color': _TERRITORY_FILL_COLOR, 'line-width': 1.1, 'line-opacity': 0.85 } },
+            { id: 'territory-occupation', type: 'fill', source: 'territory-control',
+              filter: ['any', ['==', ['get', 'basis'], 'occupied'], ['==', ['get', 'basis'], 'administered']],
+              paint: { 'fill-pattern': OCCUPATION_PATTERN, 'fill-opacity': 0.85 } },
+            { id: 'territory-contested-fill', type: 'fill', source: 'territory-contested',
+              paint: { 'fill-pattern': ['get', 'pattern'], 'fill-opacity': 0.9 } },
+            { id: 'territory-contested-line', type: 'line', source: 'territory-contested',
+              paint: { 'line-color': 'rgba(244,236,217,0.7)', 'line-width': 0.8, 'line-dasharray': [2, 2] } },
+          ] as unknown as LayerSpecification[]
+          for (const layer of layers) map.addLayer(layer, before)
+        }
+        if (map.isStyleLoaded()) addTerritory()
+        else map.once('load', addTerritory)
       } catch {
         // WebGL is a progressive enhancement only; jsdom/no-WebGL falls back to
         // the accessible location list, which is the first-class interaction.
@@ -782,6 +952,32 @@ function GeneratedMap({
     }
   }, [focus, located, visibleEvents])
 
+  // Territory redraws when the time cursor or the data changes: register any new
+  // fill patterns, then setData on the three territory sources. Guarded like the
+  // places effect (getSource throws before the style/sources exist).
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    try {
+      const collections = territoryFeatureCollections(
+        controlStates ?? [],
+        territoryGeometries ?? [],
+        currentYear ?? null,
+        colorIndex,
+      )
+      _registerTerritoryPatterns(map, collections)
+      const set = (id: string, data: FeatureCollection) => {
+        const source = map.getSource(id) as GeoJSONSource | undefined
+        if (source && typeof source.setData === 'function') source.setData(data)
+      }
+      set('territory-influence', collections.influence)
+      set('territory-control', collections.control)
+      set('territory-contested', collections.contested)
+    } catch {
+      /* style/sources not ready — init seeds them on load */
+    }
+  }, [controlStates, territoryGeometries, currentYear, colorIndex])
+
   // Toggle the label layer's visibility. If the style isn't ready yet, init reads
   // labelsOnRef so the layer lands in the right state on load.
   useEffect(() => {
@@ -806,6 +1002,41 @@ function GeneratedMap({
         >
           {labelsOn ? 'Hide place labels' : 'Show place labels'}
         </button>
+        {territoryOn && (
+          <div
+            className="chronicle-territory-legend"
+            role="group"
+            aria-label="Territory legend"
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '4px 12px',
+              alignItems: 'center',
+              fontSize: '.72rem',
+              color: '#9bc6cf',
+              marginLeft: 12,
+            }}
+          >
+            {legend.polities.map((entry) => (
+              <span key={entry.polity} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <i
+                  aria-hidden="true"
+                  style={{
+                    width: 14,
+                    height: 10,
+                    borderRadius: 2,
+                    background: colorForIndex(entry.colorIndex),
+                    display: 'inline-block',
+                  }}
+                />
+                {entry.polity}
+              </span>
+            ))}
+            {legend.hasControl && <span>· solid = control</span>}
+            {legend.hasInfluence && <span>· hatch = influence</span>}
+            {legend.hasContested && <span>· stripe = contested</span>}
+          </div>
+        )}
       </div>
       <div ref={containerRef} aria-hidden="true" className="chronicle-generated-map" />
       <p className="chronicle-generated-map-note">
