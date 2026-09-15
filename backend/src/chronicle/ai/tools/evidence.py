@@ -59,6 +59,8 @@ def _target_record(corpus: InvestigationCorpus, target_type: str, target_id: str
         return corpus.get_knowledge_state(target_id)
     if target_type == "event":
         return corpus.get_event(target_id)
+    if target_type == "controlState":
+        return corpus.get_control_state(target_id)
     raise UnknownRecordError(f'Unknown EvidenceLink target type "{target_type}"')
 
 

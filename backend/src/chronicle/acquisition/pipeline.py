@@ -14,9 +14,9 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 
 from ..ai.models.protocol import ModelProvider
-from ..contracts.enums import DatePrecision, RequestedDepth, RequestType
+from ..contracts.enums import RequestedDepth, RequestType
 from ..contracts.generated_investigation import GeneratedInvestigation
-from ..contracts.shared import HistoricalDate, Passage
+from ..contracts.shared import HistoricalDate, Passage, scope_years
 from .assembly import Enrichment, assemble_enrichment
 from .boundaries import BoundaryResolver
 from .chunking import DEFAULT_TARGET_CHARS, chunk_source
@@ -84,8 +84,10 @@ class AcquisitionPipeline:
         topic: str,
         interpreted_question: str,
         geographic_scope: list[str],
-        date_earliest: date,
-        date_latest: date,
+        date_earliest: date | None = None,
+        date_latest: date | None = None,
+        year_earliest: int | None = None,
+        year_latest: int | None = None,
         terms: list[str] | None = None,
         languages: list[str] | None = None,
         max_sources: int = 8,
@@ -94,13 +96,15 @@ class AcquisitionPipeline:
         requested_depth: RequestedDepth = RequestedDepth.STANDARD,
         generated_at: datetime | None = None,
     ) -> AcquisitionResult:
+        # Scope may arrive as CE calendar dates or signed years (BC-capable, ADR-005).
+        lo_year, hi_year = scope_years(date_earliest, date_latest, year_earliest, year_latest)
         query = DiscoveryQuery(
             topic=topic,
             terms=terms or [],
             maxResults=self._per_connector_results,
             languages=languages or ["en"],
-            earliestYear=date_earliest.year,
-            latestYear=date_latest.year,
+            earliestYear=lo_year,
+            latestYear=hi_year,
         )
         discovery = discover_sources(self._connectors, query, max_total=max_sources)
 
@@ -127,6 +131,8 @@ class AcquisitionPipeline:
 
         enrich = self._build_enricher(
             topic=topic,
+            year_earliest=lo_year,
+            year_latest=hi_year,
             date_earliest=date_earliest,
             date_latest=date_latest,
             date_label=date_label,
@@ -137,6 +143,8 @@ class AcquisitionPipeline:
             geographic_scope=geographic_scope,
             date_earliest=date_earliest,
             date_latest=date_latest,
+            year_earliest=lo_year,
+            year_latest=hi_year,
             acquired=acquired,
             passages=passages,
             date_label=date_label,
@@ -166,8 +174,10 @@ class AcquisitionPipeline:
         self,
         *,
         topic: str,
-        date_earliest: date,
-        date_latest: date,
+        year_earliest: int,
+        year_latest: int,
+        date_earliest: date | None,
+        date_latest: date | None,
         date_label: str | None,
     ) -> Callable[[list[Passage]], Enrichment] | None:
         """A closure binding the injected extractor + geocoder over the built
@@ -177,10 +187,12 @@ class AcquisitionPipeline:
         if self._extractor is None or self._geocoder is None:
             return None
 
-        period = HistoricalDate(
-            precision=DatePrecision.EXACT if date_earliest == date_latest else DatePrecision.RANGE,
-            earliest=date_earliest,
-            latest=date_latest,
+        # Era-capable scope period (ADR-005): CE dates only when the scope is CE.
+        period = HistoricalDate.from_years(
+            year_earliest,
+            year_latest,
+            earliest=date_earliest if year_earliest >= 1 else None,
+            latest=date_latest if year_latest >= 1 else None,
             label=date_label,
         )
         extractor = self._extractor

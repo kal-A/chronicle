@@ -137,6 +137,29 @@ def test_pipeline_builds_a_corpus_end_to_end(tmp_path):
     assert len(result.investigation.passages) == result.passages
 
 
+def test_pipeline_accepts_a_bc_scope_via_signed_years(tmp_path):
+    # ADR-005: a BC investigation is initiated through the pipeline with signed
+    # years instead of CE calendar dates; the built scope is BC and it still builds.
+    candidates = [_candidate("x", "fake")]
+    bodies = {"x": "Alpha body about the siege. " * 30}
+    connector = FakeConnector("fake", candidates, bodies)
+    pipeline = AcquisitionPipeline([connector], FetchCache(tmp_path))
+
+    result = pipeline.run(
+        topic="a placeholder subject",
+        interpreted_question="What happened?",
+        geographic_scope=["Somewhere"],
+        year_earliest=-218,  # 219 BC
+        year_latest=-201,  # 202 BC
+        max_sources=8,
+    )
+
+    date_range = result.investigation.scope.dateRange
+    assert date_range.earliestYear == -218 and date_range.latestYear == -201
+    assert date_range.earliest is None and date_range.latest is None
+    assert result.investigation.status is PackageStatus.PARTIAL
+
+
 def test_pipeline_skips_a_source_that_fails_to_fetch(tmp_path):
     # A single flaky/forbidden source (e.g. Internet Archive returning 403) must
     # not fail the whole acquisition: the pipeline skips it, records the error,

@@ -53,6 +53,7 @@ from ..contracts.shared import (
     Passage,
     PlaceEntity,
     PlacePeriodRecord,
+    year_label,
 )
 from .boundaries import BoundaryResolver
 from .control_state import extract_control_states
@@ -100,13 +101,7 @@ class Enrichment:
 def _period_label(period: HistoricalDate) -> str:
     if period.label:
         return period.label
-    return f"{_year_label(period.lower_key[0])}-{_year_label(period.upper_key[0])}"
-
-
-def _year_label(year: int) -> str:
-    """Honest display of a signed astronomical year (ADR-005): '1914', '44 BC'."""
-
-    return str(year) if year >= 1 else f"{1 - year} BC"
+    return f"{year_label(period.lower_key[0])}-{year_label(period.upper_key[0])}"
 
 
 def _event_time(year: int) -> HistoricalDate:
@@ -123,7 +118,7 @@ def _event_time(year: int) -> HistoricalDate:
         latest=date(year, 12, 31) if ce else None,
         earliestYear=year,
         latestYear=year,
-        label=_year_label(year),
+        label=year_label(year),
     )
 
 

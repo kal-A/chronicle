@@ -68,12 +68,18 @@ def main() -> int:
     print(f"Connectors: {[c.name for c in connectors]}")
     print("Discovering + acquiring (live network)...\n")
 
+    # Scope years are signed (ADR-005): negative = BC. CE scopes also get calendar
+    # dates for day precision; BC scopes carry the signed year only (date() can't hold BC).
+    ce_earliest = date(args.earliest, 1, 1) if args.earliest >= 1 else None
+    ce_latest = date(args.latest, 12, 31) if args.latest >= 1 else None
     result = pipeline.run(
         topic=args.topic,
         interpreted_question=args.question or f"What happened regarding {args.topic}?",
         geographic_scope=[s.strip() for s in args.scope.split(",") if s.strip()],
-        date_earliest=date(args.earliest, 1, 1),
-        date_latest=date(args.latest, 12, 31),
+        date_earliest=ce_earliest,
+        date_latest=ce_latest,
+        year_earliest=args.earliest,
+        year_latest=args.latest,
         max_sources=args.max_sources,
     )
 

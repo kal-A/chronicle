@@ -122,6 +122,7 @@ def _target(index: CorpusIndex, target_type: str, target_id: str):
         "relationship": index.relationships_by_id,
         "event": index.events_by_id,
         "knownAtTime": index.knowledge_states_by_id,
+        "controlState": index.control_states_by_id,
     }
     return tables[target_type][target_id]
 

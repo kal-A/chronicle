@@ -80,6 +80,28 @@ def test_build_corpus_produces_a_valid_partial_evidence_package():
     assert investigation.scenes[0].placeIds == [place.id]
 
 
+def test_build_corpus_accepts_a_bc_scope_via_signed_years():
+    # ADR-005: a BC investigation enters the pipeline as signed years (no calendar
+    # date, which is CE-only). The scope date range carries the signed years and
+    # the package still validates.
+    acquired, passages = _sample_inputs()
+    investigation = build_corpus(
+        topic="a placeholder subject",
+        interpreted_question="What happened in the placeholder subject?",
+        geographic_scope=["Somewhere"],
+        year_earliest=-218,  # 219 BC
+        year_latest=-201,  # 202 BC
+        acquired=acquired,
+        passages=passages,
+    )
+
+    date_range = investigation.scenes[0].dateRange
+    assert date_range.earliestYear == -218 and date_range.latestYear == -201
+    assert date_range.earliest is None and date_range.latest is None
+    assert investigation.scope.dateRange.earliestYear == -218
+    assert investigation.status is PackageStatus.PARTIAL
+
+
 def test_acquired_corpus_loads_and_searches_through_package_backed_corpus(tmp_path):
     acquired, passages = _sample_inputs()
     investigation = build_corpus(
@@ -338,3 +360,41 @@ def test_enrichment_populates_territory_and_flips_territory_capability():
     facet_values = {f.value for f in investigation.interactionSpec.enabledFacets}
     assert "territory" in facet_values
     assert "territory" not in investigation.interactionSpec.omittedCapabilities
+
+
+def test_search_projects_control_state_evidence_links(tmp_path):
+    # Regression (ADR-004 T5, surfaced by the BC live verify): a passage whose
+    # evidence link targets a controlState must project through passage search,
+    # not raise KeyError('controlState'). The corpus read layer now resolves
+    # control-state targets like every other evidence target.
+    acquired, passages = _enriched_inputs()
+    investigation = build_corpus(
+        topic="a placeholder subject",
+        interpreted_question="Who held what?",
+        geographic_scope=["London"],
+        date_earliest=date(1660, 1, 1),
+        date_latest=date(1670, 12, 31),
+        acquired=acquired,
+        passages=passages,
+        date_label="1660-1670",
+        enrich=_territory_enricher(),
+    )
+    package_path = tmp_path / "territory.json"
+    package_path.write_text(json.dumps(investigation.model_dump(mode="json")), encoding="utf-8")
+
+    corpus = PackageBackedCorpus.load(
+        corpus_id="territory-test",
+        package_path=package_path,
+        title="Territory Test Corpus",
+        benchmark_role="control-state search regression",
+    )
+
+    # the corpus can resolve the control state directly ...
+    control_state = investigation.controlStates[0]
+    assert corpus.get_control_state(control_state.id).polity == control_state.polity
+    # ... and passage search projects its evidence link instead of crashing
+    result = corpus.search_passages(
+        PassageSearchRequest(corpusId="territory-test", query="placeholder")
+    )
+    projected = [link for hit in result.hits for link in hit.evidenceLinks]
+    assert any(link.targetType == "controlState" for link in projected)

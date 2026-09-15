@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 
 from ..contracts.generated_investigation import (
+    ControlState,
     Document,
     Entity,
     GeneratedClaim,
@@ -58,6 +59,8 @@ class InvestigationCorpus(Protocol):
         ...
 
     def get_knowledge_state(self, knowledge_state_id: str) -> KnownAtTime: ...
+
+    def get_control_state(self, control_state_id: str) -> ControlState: ...
 
     def search_passages(self, request: PassageSearchRequest) -> PassageSearchResult: ...
 

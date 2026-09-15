@@ -15,7 +15,7 @@ import pytest
 from pydantic import ValidationError
 
 from chronicle.contracts.enums import DatePrecision
-from chronicle.contracts.shared import HistoricalDate
+from chronicle.contracts.shared import HistoricalDate, scope_years, year_label
 
 
 def test_ce_date_only_stays_valid_and_derives_its_year():
@@ -70,3 +70,29 @@ def test_exact_requires_equal_bounds_for_bc_too():
         HistoricalDate(precision=DatePrecision.EXACT, earliestYear=-44, latestYear=-43)
     # equal signed years are a valid exact BC date
     HistoricalDate(precision=DatePrecision.EXACT, earliestYear=-44, latestYear=-44)
+
+
+def test_year_label_renders_bc_and_ce():
+    assert year_label(1914) == "1914"
+    assert year_label(0) == "1 BC"
+    assert year_label(-43) == "44 BC"
+
+
+def test_from_years_attaches_ce_dates_and_omits_them_for_bc():
+    ce = HistoricalDate.from_years(1914, 1914, earliest=date(1914, 7, 5), latest=date(1914, 7, 5))
+    assert ce.precision is DatePrecision.EXACT and ce.earliest == date(1914, 7, 5)
+    bc = HistoricalDate.from_years(-218, -201, label="219–202 BC")
+    assert bc.precision is DatePrecision.RANGE and bc.earliest is None
+    assert bc.lower_key == (-218, 1) and bc.upper_key == (-201, 366)
+
+
+def test_scope_years_resolves_from_dates_or_signed_years():
+    assert scope_years(date(1870, 1, 1), date(1871, 12, 31), None, None) == (1870, 1871)
+    assert scope_years(None, None, -218, -201) == (-218, -201)
+
+
+def test_scope_years_rejects_a_missing_bound_and_disagreement():
+    with pytest.raises(ValueError, match="earliest and a latest"):
+        scope_years(None, None, -218, None)
+    with pytest.raises(ValueError, match="date_earliest.year must equal"):
+        scope_years(date(1914, 1, 1), date(1915, 1, 1), 1913, 1915)

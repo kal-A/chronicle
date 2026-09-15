@@ -22,6 +22,7 @@ from datetime import date
 from typing import Union
 
 from ..contracts.generated_investigation import (
+    ControlState,
     Document,
     Entity,
     GeneratedClaim,
@@ -50,6 +51,7 @@ class CorpusIndex:
     entities_by_id: dict[str, Entity] = field(default_factory=dict)
     places_by_id: dict[str, Entity] = field(default_factory=dict)
     knowledge_states_by_id: dict[str, GeneratedKnownAtTime] = field(default_factory=dict)
+    control_states_by_id: dict[str, ControlState] = field(default_factory=dict)
     evidence_links_by_id: dict[str, GeneratedEvidenceLink] = field(default_factory=dict)
     record_ids_by_id: dict[str, RecordIdRecord] = field(default_factory=dict)
 
@@ -93,6 +95,7 @@ def build_index(investigation: GeneratedInvestigation) -> CorpusIndex:
     index.entities_by_id = {e.id: e for e in investigation.entities}
     index.places_by_id = {e.id: e for e in investigation.entities if e.entityType == "place"}
     index.knowledge_states_by_id = {k.id: k for k in investigation.knowledgeStates}
+    index.control_states_by_id = {cs.id: cs for cs in investigation.controlStates}
     index.evidence_links_by_id = {link.id: link for link in investigation.evidenceLinks}
     index.record_ids_by_id = {
         **index.claims_by_id,

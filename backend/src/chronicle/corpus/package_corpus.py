@@ -13,6 +13,7 @@ from copy import deepcopy
 from pathlib import Path
 
 from ..contracts.generated_investigation import (
+    ControlState,
     Document,
     Entity,
     GeneratedClaim,
@@ -185,6 +186,9 @@ class PackageBackedCorpus:
 
     def get_knowledge_state(self, knowledge_state_id: str) -> GeneratedKnownAtTime:
         return self._lookup(self.__index.knowledge_states_by_id, knowledge_state_id, "KnownAtTime")
+
+    def get_control_state(self, control_state_id: str) -> ControlState:
+        return self._lookup(self.__index.control_states_by_id, control_state_id, "ControlState")
 
     def search_passages(self, request: PassageSearchRequest) -> PassageSearchResult:
         if request.corpusId != self.__corpus_id:

@@ -98,6 +98,59 @@ class HistoricalDate(BaseModel):
             raise ValueError("an exact HistoricalDate must have earliest === latest")
         return self
 
+    @classmethod
+    def from_years(
+        cls,
+        earliest_year: int,
+        latest_year: int,
+        *,
+        earliest: date | None = None,
+        latest: date | None = None,
+        label: str | None = None,
+        precision: DatePrecision | None = None,
+    ) -> "HistoricalDate":
+        """Build an era-capable HistoricalDate from signed astronomical years,
+        attaching CE calendar dates only when supplied (ADR-005)."""
+
+        if precision is None:
+            equal = earliest_year == latest_year and earliest == latest
+            precision = DatePrecision.EXACT if equal else DatePrecision.RANGE
+        return cls(
+            precision=precision,
+            earliest=earliest,
+            latest=latest,
+            earliestYear=earliest_year,
+            latestYear=latest_year,
+            label=label,
+        )
+
+
+def year_label(year: int) -> str:
+    """Honest display of a signed astronomical year (ADR-005): '1914', '44 BC'."""
+
+    return str(year) if year >= 1 else f"{1 - year} BC"
+
+
+def scope_years(
+    date_earliest: date | None,
+    date_latest: date | None,
+    year_earliest: int | None,
+    year_latest: int | None,
+) -> tuple[int, int]:
+    """Resolve a scope's signed-year bounds from whichever representation a caller
+    supplied — explicit signed years (BC-capable) or CE calendar dates (ADR-005).
+    Signed years win; a calendar date must agree with an explicit year."""
+
+    lower = year_earliest if year_earliest is not None else (date_earliest.year if date_earliest else None)
+    upper = year_latest if year_latest is not None else (date_latest.year if date_latest else None)
+    if lower is None or upper is None:
+        raise ValueError("scope needs an earliest and a latest bound (a date or a signed year)")
+    if date_earliest is not None and year_earliest is not None and date_earliest.year != year_earliest:
+        raise ValueError("date_earliest.year must equal year_earliest")
+    if date_latest is not None and year_latest is not None and date_latest.year != year_latest:
+        raise ValueError("date_latest.year must equal year_latest")
+    return lower, upper
+
 
 class PlacePeriodRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")

@@ -56,6 +56,8 @@ from ..contracts.shared import (
     PlaceEntity,
     PlacePeriodRecord,
     Source,
+    scope_years,
+    year_label,
 )
 from ..contracts.validation import validate_generated_investigation
 from .assembly import Enrichment
@@ -83,9 +85,23 @@ def deterministic_package_id(topic: str, acquired: list[AcquiredSource]) -> str:
     return f"acq-{_slug(topic)}-{digest.hexdigest()[:12]}"
 
 
-def _historical_range(earliest: date, latest: date, label: str | None) -> HistoricalDate:
-    precision = DatePrecision.EXACT if earliest == latest else DatePrecision.RANGE
-    return HistoricalDate(precision=precision, earliest=earliest, latest=latest, label=label)
+def _scope_range(
+    year_earliest: int,
+    year_latest: int,
+    date_earliest: date | None,
+    date_latest: date | None,
+    label: str | None,
+) -> HistoricalDate:
+    """The scope's date range, era-capable (ADR-005): the signed years always,
+    plus the CE calendar dates when the scope is CE (year >= 1)."""
+
+    return HistoricalDate.from_years(
+        year_earliest,
+        year_latest,
+        earliest=date_earliest if year_earliest >= 1 else None,
+        latest=date_latest if year_latest >= 1 else None,
+        label=label,
+    )
 
 
 def build_corpus(
@@ -93,8 +109,10 @@ def build_corpus(
     topic: str,
     interpreted_question: str,
     geographic_scope: list[str],
-    date_earliest: date,
-    date_latest: date,
+    date_earliest: date | None = None,
+    date_latest: date | None = None,
+    year_earliest: int | None = None,
+    year_latest: int | None = None,
     acquired: list[AcquiredSource],
     passages: list[ExtractedPassage],
     date_label: str | None = None,
@@ -107,9 +125,11 @@ def build_corpus(
     if not geographic_scope:
         raise ValueError("geographic_scope must name at least one place for the scope")
 
+    # Scope may be given as CE calendar dates or as signed years (BC-capable, ADR-005).
+    lo_year, hi_year = scope_years(date_earliest, date_latest, year_earliest, year_latest)
     generated_at = generated_at or _utcnow()
     package_id = package_id or deterministic_package_id(topic, acquired)
-    scope_date = _historical_range(date_earliest, date_latest, date_label)
+    scope_date = _scope_range(lo_year, hi_year, date_earliest, date_latest, date_label)
 
     # --- sources + documents (one document per source) -----------------------
     source_id_by_candidate: dict[str, str] = {}
@@ -199,7 +219,7 @@ def build_corpus(
     # Scope names are explicitly unreviewed stubs (no coordinates). When the
     # enricher resolved a place of the same name, the richer extracted record
     # wins and the duplicate stub is dropped, so no place is double-listed.
-    period_label = date_label or f"{date_earliest.year}-{date_latest.year}"
+    period_label = date_label or f"{year_label(lo_year)}-{year_label(hi_year)}"
     scope_places: list[PlaceEntity] = []
     for index, place_name in enumerate(dict.fromkeys(geographic_scope)):
         scope_places.append(
