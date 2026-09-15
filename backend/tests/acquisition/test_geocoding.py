@@ -23,6 +23,7 @@ from chronicle.acquisition.geocoding import (
     PeriodAwareGeocoder,
     WikidataGeoProvider,
     WorldHistoricalGazetteerProvider,
+    _name_variants,
 )
 from chronicle.contracts.enums import DatePrecision, LocationPrecision
 from chronicle.contracts.shared import HistoricalDate
@@ -297,3 +298,37 @@ def test_geocoder_returns_none_when_nothing_resolves():
     secondary = _StubProvider("wikidata", result=None)
 
     assert PeriodAwareGeocoder([primary, secondary]).resolve("Nowhere", _period()) is None
+
+
+def test_name_variants_strips_glosses_and_qualifiers():
+    assert _name_variants("Paris, France") == ["Paris, France", "Paris"]
+    assert _name_variants("Cisalpine Gaul (modern northern Italy)") == [
+        "Cisalpine Gaul (modern northern Italy)",
+        "Cisalpine Gaul",
+    ]
+    assert _name_variants("Placeholdertown") == ["Placeholdertown"]  # nothing to simplify
+
+
+class _NameSensitiveProvider:
+    """Resolves only for an exact expected name — models a gazetteer/Wikidata label
+    that matches the cleaned form but not the glossed one."""
+
+    name = "exact"
+
+    def __init__(self, resolves_for: str) -> None:
+        self._resolves_for = resolves_for
+        self.seen: list[str] = []
+
+    def resolve(self, place_name: str, period: HistoricalDate):
+        self.seen.append(place_name)
+        return _resolution("exact") if place_name == self._resolves_for else None
+
+
+def test_geocoder_resolves_a_glossed_name_via_a_simplified_variant():
+    # "Sedan, France" matches no label, but its head "Sedan" does -- the live
+    # Franco-Prussian miss where prominent places got no coordinates.
+    provider = _NameSensitiveProvider(resolves_for="Sedan")
+    resolution = PeriodAwareGeocoder([provider]).resolve("Sedan, France", _period())
+
+    assert resolution is not None
+    assert provider.seen == ["Sedan, France", "Sedan"]  # specific first, then the head

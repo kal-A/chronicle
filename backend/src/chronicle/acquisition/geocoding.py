@@ -282,26 +282,58 @@ class WikidataGeoProvider:
         return None
 
 
+_GLOSS_RE = re.compile(r"\s*\([^)]*\)")
+
+
+def _name_variants(place_name: str) -> list[str]:
+    """Progressive simplifications of a place name, most specific first, so a name
+    the extractor wrote with a parenthetical gloss or a ", qualifier" tail still
+    resolves. Providers match a gazetteer/Wikidata *label*, which almost never
+    equals "Paris, France" or "Cisalpine Gaul (modern northern Italy)" verbatim, so
+    without this a well-identified place is left with no coordinates. Deduplicated
+    and order-preserving; pure string normalisation, never a per-place special
+    case (the stage stays subject-agnostic)."""
+
+    variants: list[str] = []
+
+    def add(candidate: str) -> None:
+        cleaned = candidate.strip().strip(",").strip()
+        if cleaned and cleaned not in variants:
+            variants.append(cleaned)
+
+    original = place_name.strip()
+    add(original)
+    de_glossed = _GLOSS_RE.sub("", original)
+    add(de_glossed)
+    # Drop a trailing ", <qualifier>" (", France", ", modern Italy") -> the head.
+    add(de_glossed.split(",", 1)[0])
+    add(original.split(",", 1)[0])
+    return variants
+
+
 class PeriodAwareGeocoder:
     """Resolve a place by trying period-aware providers in priority order.
 
     A provider that raises (transport failure) is skipped so one flaky source
     never blocks the rest -- mirroring the acquisition pipeline's per-source
-    resilience. Returns the first resolution, or None when no provider can place
-    the name in period (the caller then keeps the place at low precision with no
-    coordinates, never a fabricated one)."""
+    resilience. Each name is tried as progressively simpler variants (most specific
+    first) so a glossed or qualified name still resolves. Returns the first
+    resolution, or None when no provider can place any variant in period (the caller
+    then keeps the place at low precision with no coordinates, never a fabricated
+    one)."""
 
     def __init__(self, providers: list[GeoProvider]) -> None:
         self._providers = providers
 
     def resolve(self, place_name: str, period: HistoricalDate) -> GeoResolution | None:
-        for provider in self._providers:
-            try:
-                resolution = provider.resolve(place_name, period)
-            except ConnectorError:
-                continue
-            if resolution is not None:
-                return resolution
+        for variant in _name_variants(place_name):
+            for provider in self._providers:
+                try:
+                    resolution = provider.resolve(variant, period)
+                except ConnectorError:
+                    continue
+                if resolution is not None:
+                    return resolution
         return None
 
 
