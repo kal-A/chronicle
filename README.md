@@ -1,16 +1,16 @@
 # Chronicle
 
-An AI-powered historical investigation generator and interactive systems atlas. Chronicle builds bounded, source-backed draft investigations and provides a synchronized environment for inspecting claims, timelines, maps, relationships, evidence, disagreement, uncertainty, and gaps.
+Chronicle is a local-first, multi-agent AI research engine for historical investigation. It takes an arbitrary historical question, discovers and acquires public sources, builds a retrievable corpus, and runs a four-agent pipeline (Planner → Analyst → Critic → Guide) that returns either a cited answer or a principled abstention.
 
-Chronicle is not a history chatbot, not a Wikipedia clone, and not a graph-visualization demo. It's built to answer questions static articles and generic timelines can't: what did this actor know by this date, where do these accounts disagree, what evidence actually supports this interpretation, how did this earlier decision shape this later one.
+The system is designed around auditable research rather than chatbot-style output. Claims are grounded to retrieved evidence, disagreement and uncertainty are preserved, and failures are handled explicitly rather than fabricated over.
 
-The existing July Crisis Blank Cheque slice is the first golden renderer fixture. The initial supported generation domain is European diplomatic and political history, 1814–1914.
+**Stack:** Python, FastAPI, Pydantic, LangGraph, Ollama, React, TypeScript, Vite, Vitest.
 
 ## Status
 
-Chronicle is a local pre-alpha on the `phase-e-ai-core` branch. The versioned package/generic renderer, deterministic Python pipeline, two package-backed benchmark investigations, map-first workspace, four bounded AI roles, typed retrieval tools, FastAPI/SSE runtime, and live investigation Ask panel are implemented. The local runtime uses Ollama with `qwen2.5:7b-instruct`; ordinary tests use a deterministic provider.
+Chronicle is a local pre-alpha on the `phase-e-ai-core` branch. End-to-end generation is working with local models and free/open-source infrastructure: an arbitrary topic is scoped, its sources discovered and acquired from public connectors (Wikipedia, Project Gutenberg, Internet Archive, and in-repo document registers), chunked into a retrievable corpus, and investigated by the four bounded AI roles over typed retrieval tools — surfaced in a map-first workspace behind a FastAPI/SSE runtime. Time-indexed territory (control / influence / contested) resolves from sourced historical-boundary datasets and works across the BC/CE boundary. The local runtime uses Ollama with `qwen2.5:7b-instruct`; ordinary tests use a deterministic provider.
 
-Phase E6 is a working vertical slice but is not formally closed: generic-answer usefulness, semantic directionality/entailment, and CPU-only latency still need evaluation. Phase E7 is planned but not implemented. Chronicle does **not** yet provide open web/database research, document acquisition, a production database, authentication, Studio review workflows, or general new-topic generation. The landing page currently routes only to two disclosed curated packages. New collaborators should begin with the [complete engineering handoff](CHRONICLE_COMPLETE_ENGINEERING_HANDOFF.md); the [PRD](docs/product/CHRONICLE_PRODUCT_REQUIREMENTS.md), [progress report](docs/delivery/CHRONICLE_PROJECT_PROGRESS_REPORT.md), and [`plans/current-phase.md`](plans/current-phase.md) remain supporting records.
+The current limitation is **model consistency across the full multi-call pipeline** — not the absence of retrieval or generation capability. Chronicle is built test-first, with roughly 830 backend and 160 frontend tests currently passing. Still out of scope: a production database, authentication, and Studio review/publication workflows; generic-answer usefulness and CPU-only latency remain under evaluation (Phase E7 is planned, not implemented). New collaborators should begin with the [complete engineering handoff](CHRONICLE_COMPLETE_ENGINEERING_HANDOFF.md); the [PRD](docs/product/CHRONICLE_PRODUCT_REQUIREMENTS.md), [progress report](docs/delivery/CHRONICLE_PROJECT_PROGRESS_REPORT.md), and [`plans/current-phase.md`](plans/current-phase.md) remain supporting records.
 
 ## Project Structure
 
