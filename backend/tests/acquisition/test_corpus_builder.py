@@ -319,18 +319,26 @@ def _territory_enricher():
     fixture = Path(__file__).parent / "fixtures" / "boundaries"
 
     def enrich(passages):
+        from chronicle.contracts.enums import DatePrecision
+        from chronicle.contracts.shared import HistoricalDate
+
+        # The boundary fixture holds only BC snapshots, so the control period must
+        # be BC — both for grounding and the resolver's era-distance guard.
+        bc_period = HistoricalDate(
+            precision=DatePrecision.RANGE, earliestYear=-300, latestYear=-200, label="300–200 BC"
+        )
         provider = DeterministicModelProvider()
         provider.enqueue_value(ExtractedEvents(events=[]))
         provider.enqueue_value(
             ExtractedControlStates(controlStates=[
                 ExtractedControlState(
                     polity="Alpha", kind="controlled", basis="sovereign",
-                    fromYear=1665, toYear=1668, passageIds=[passages[0].id],
+                    fromYear=-280, toYear=-220, passageIds=[passages[0].id],
                 ),
             ])
         )
         return assemble_enrichment(
-            passages, _period(date(1660, 1, 1), date(1670, 12, 31), "1660-1670"),
+            passages, bc_period,
             "a placeholder subject", extractor=provider, geocoder=_StubGeocoder(),
             boundary_resolver=BoundaryResolver(fixture),
         )

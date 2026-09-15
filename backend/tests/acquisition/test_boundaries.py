@@ -58,6 +58,18 @@ def test_max_distance_caps_anachronistic_matches():
     assert resolver.resolve("Alpha", -500, max_distance_years=100) is None
 
 
+def test_pipeline_default_cap_rejects_name_era_collisions():
+    # The pipeline's era guard: an ancient claim must not borrow a snapshot from a
+    # wildly different era (the live "Sicily as of 1279" / "Iberia" collisions).
+    from chronicle.acquisition.boundaries import DEFAULT_MAX_DISTANCE_YEARS
+
+    resolver = _resolver()
+    # A near-in-era claim still resolves under the default cap ...
+    assert resolver.resolve("Alpha", -218, max_distance_years=DEFAULT_MAX_DISTANCE_YEARS) is not None
+    # ... but a claim ~2200 yrs from the only naming snapshot is omitted, not faked.
+    assert resolver.resolve("Alpha", 2000, max_distance_years=DEFAULT_MAX_DISTANCE_YEARS) is None
+
+
 def test_non_area_geometry_is_ignored():
     assert _resolver().resolve("Point Place", -150) is None
 

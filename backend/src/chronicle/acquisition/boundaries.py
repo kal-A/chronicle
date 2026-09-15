@@ -27,6 +27,16 @@ from pathlib import Path
 _DEFAULT_DIR = Path(__file__).resolve().parents[3] / "data" / "boundaries"
 _SOURCE_DATASET = "historical-basemaps"
 _LICENSE = "GPL-3.0"
+
+# Era guard for the pipeline: a naming snapshot farther than this from the claim
+# year is too anachronistic to stand in, so the caller omits the territory rather
+# than draw a wildly-wrong-era shape. Sized against the dataset: in the historical
+# era (~1000 BC onward) adjacent snapshots are at most ~300 years apart, so 400
+# admits every legitimate nearest-snapshot reach (e.g. Numidia 209 BC -> 100 BC,
+# ~109y) while rejecting name/era collisions such as ancient "Sicily"/"Sardinia"
+# matching a medieval snapshot ~1200-1500 years away. The resolver itself stays
+# unbounded by default; this is the pipeline's policy, applied in assembly.
+DEFAULT_MAX_DISTANCE_YEARS = 400
 _FILENAME = re.compile(r"^world_(bc)?(\d+)\.geojson$", re.IGNORECASE)
 _AREA_GEOMETRIES = ("Polygon", "MultiPolygon")
 

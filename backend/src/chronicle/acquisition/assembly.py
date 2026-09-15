@@ -55,7 +55,7 @@ from ..contracts.shared import (
     PlacePeriodRecord,
     year_label,
 )
-from .boundaries import BoundaryResolver
+from .boundaries import DEFAULT_MAX_DISTANCE_YEARS, BoundaryResolver
 from .control_state import extract_control_states
 from .extraction import ExtractedEvent, extract_events
 from .geocoding import GeoResolution, PeriodAwareGeocoder
@@ -266,9 +266,11 @@ def _assemble_control_states(
     geometry_id_by_key: dict[tuple[str, int], str] = {}
 
     for index, state in enumerate(extracted):
-        resolved = boundary_resolver.resolve(state.polity, state.fromYear)
+        resolved = boundary_resolver.resolve(
+            state.polity, state.fromYear, max_distance_years=DEFAULT_MAX_DISTANCE_YEARS
+        )
         if resolved is None:
-            continue  # no sourced polygon for this polity/period -> omitted
+            continue  # no period-appropriate sourced polygon -> omitted (never faked)
 
         key = (resolved.matched_name, resolved.attested_year)
         geometry_ref = geometry_id_by_key.get(key)

@@ -198,20 +198,29 @@ def _extractor_with_territory(
     return provider
 
 
+def _bc_boundary_period() -> HistoricalDate:
+    # The boundary fixture holds only BC snapshots (world_bc300 / world_bc200), so
+    # the period must be BC too — both for control-state grounding and for the
+    # resolver's era guard (ADR-005 / era-distance guard).
+    return HistoricalDate(
+        precision=DatePrecision.RANGE, earliestYear=-300, latestYear=-200, label="300–200 BC"
+    )
+
+
 def test_assembles_territory_from_resolved_control_states():
     states = [
         # Alpha is in the boundary fixture -> resolves to a sourced polygon.
         ExtractedControlState(
             polity="Alpha", kind="controlled", basis="sovereign",
-            fromYear=1665, toYear=1668, passageIds=["psg-0000-0000"],
+            fromYear=-280, toYear=-220, passageIds=["psg-0000-0000"],
         ),
         # Zeta is in no snapshot -> no geometry -> the state is omitted, not faked.
         ExtractedControlState(
-            polity="Zeta", kind="influence", fromYear=1665, toYear=1668, passageIds=["psg-0000-0000"],
+            polity="Zeta", kind="influence", fromYear=-280, toYear=-220, passageIds=["psg-0000-0000"],
         ),
     ]
     enrichment = assemble_enrichment(
-        _passages(), _period(), "A topic",
+        _passages(), _bc_boundary_period(), "A topic",
         extractor=_extractor_with_territory([], states),
         geocoder=_StubGeocoder({}),
         boundary_resolver=BoundaryResolver(_BOUNDARIES_FIXTURE),
