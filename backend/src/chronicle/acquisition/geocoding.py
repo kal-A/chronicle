@@ -202,9 +202,15 @@ class WikidataGeoProvider:
     Disambiguation is the whole point here. A bare label match for a common name
     (e.g. "London") returns dozens of namesakes in arbitrary order, so a naive
     first-match confidently mislocates -- observed live placing the 1666 Great
-    Fire of London in London, Ontario. Two historicity guards fix this:
-    (1) results are ordered by **sitelink count** (prominence), so the place the
-    world overwhelmingly means wins; (2) a candidate whose **inception postdates
+    Fire of London in London, Ontario. Three historicity guards fix this:
+    (1) the name is matched against **both the label and aliases**
+    (``rdfs:label|skos:altLabel``), so a place whose canonical label differs from
+    the queried name is still found -- observed live placing a Second-Punic-War
+    "Iberia" in Iberia, Missouri because the Iberian Peninsula is labelled
+    "Iberian Peninsula" and only namesakes matched the bare label; the peninsula
+    carries "Iberia" as an alias and, once surfaced, wins on prominence;
+    (2) results are ordered by **sitelink count** (prominence), so the place the
+    world overwhelmingly means wins; (3) a candidate whose **inception postdates
     the investigation** is rejected as anachronistic (a city founded in 1826
     cannot host a 1666 event) -- the same discipline as the gazetteer's
     period-overlap guard. A candidate with no inception is period-agnostic and
@@ -231,7 +237,11 @@ class WikidataGeoProvider:
         literal = _sparql_literal(place_name)
         query = (
             "SELECT ?place ?placeLabel ?coord ?sitelinks ?inception WHERE { "
-            f'?place rdfs:label "{literal}"@en . '
+            # Match the name as a label OR an alias: the intended place often
+            # carries the queried string only as an alias (e.g. the Iberian
+            # Peninsula's alias "Iberia"), and matching aliases surfaces it so
+            # prominence can pick it over bare-label namesakes.
+            f'?place rdfs:label|skos:altLabel "{literal}"@en . '
             "?place wdt:P625 ?coord . "
             "?place wikibase:sitelinks ?sitelinks . "
             "OPTIONAL { ?place wdt:P571 ?inception . } "

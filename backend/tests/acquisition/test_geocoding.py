@@ -145,6 +145,22 @@ def test_wikidata_resolves_a_point_from_sparql_wkt():
     assert resolution.provenanceUrl == "http://www.wikidata.org/entity/Q999"
 
 
+def test_wikidata_query_matches_labels_and_aliases():
+    # Disambiguation: the intended place often carries the queried name only as an
+    # alias (the Iberian Peninsula's alias "Iberia"), so the SPARQL must match
+    # rdfs:label OR skos:altLabel -- otherwise only bare-label namesakes surface
+    # (the live "Iberia" -> Iberia, Missouri mislocation).
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["query"] = request.url.params.get("query") or ""
+        return httpx.Response(200, json={"results": {"bindings": []}})
+
+    _wikidata(handler).resolve("Iberia", _period())
+
+    assert 'rdfs:label|skos:altLabel "Iberia"@en' in captured["query"]
+
+
 def test_wikidata_returns_none_on_no_bindings():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"results": {"bindings": []}})
