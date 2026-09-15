@@ -26,6 +26,7 @@ branches on the topic or which polity/event it is.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -34,7 +35,7 @@ from ..ai.models.metadata import ModelGenerationSettings
 from ..ai.models.protocol import ModelProvider
 from ..contracts.shared import HistoricalDate, Passage
 
-CONTROL_STATE_PROMPT_VERSION = "p3-control-state-extraction-v1"
+CONTROL_STATE_PROMPT_VERSION = "p3-control-state-extraction-v2"
 
 _MAX_STATES = 12
 _MAX_PASSAGE_CHARS = 8_000
@@ -42,6 +43,28 @@ _MAX_COMPLETION_TOKENS = 1_400
 
 _KINDS = ("controlled", "influence", "contested")
 _BASES = ("sovereign", "occupied", "administered")
+
+# Generic vocabulary that signals territorial control in prose — never a topic,
+# polity, or event name, so the stage stays subject-agnostic (and clears the
+# anti-topic-branching guard). Used only to RANK which passages reach the model,
+# never to decide the extraction itself (the model + grounding guards do that).
+# Entries are word-start STEMS matched at a word boundary (see _CONTROL_SIGNAL_RE),
+# so morphology is caught (annex -> annexed/annexation) without substring false
+# positives (reign must not match "foreign"; cede must not match "conceded").
+_CONTROL_SIGNALS = frozenset(
+    {
+        "control", "ruled", "ruler", "ruling", "reign", "govern",
+        "administer", "administration", "annex", "cede", "ceded", "cession",
+        "occup", "conquer", "conquest", "captur", "seiz", "sovereign",
+        "province", "protectorate", "colony", "colonial", "dominion", "vassal",
+        "tributary", "subjugat", "incorporat", "partition", "territor",
+        "sphere of influence", "contest", "disput", "frontier",
+    }
+)
+
+# Word-start-anchored so a stem matches its morphology at a word boundary only:
+# "\\bannex" hits annex/annexed/annexation but "\\breign" cannot match "foreign".
+_CONTROL_SIGNAL_RE = tuple(re.compile(r"\b" + re.escape(term)) for term in _CONTROL_SIGNALS)
 
 
 class ExtractedControlState(BaseModel):
@@ -70,7 +93,10 @@ or "contested" (disputed between polities); for "controlled" you may add a basis
 polity's own homeland), "occupied" (another polity's land held by force), or "administered" (a
 colony, protectorate or client) — and, when the basis is occupied or administered, the name of the
 sovereign polity it belongs to; the first and last year the hold applied; and the ids of the
-passage(s) that state it. Cite only supplied passage ids. Do not invent polities, dates, or
+passage(s) that state it. Territorial control appears in prose as conquest, annexation, cession,
+occupation, rule or administration over a province or region, protectorates and colonies, and
+spheres of influence — extract these even when a passage states them only in passing. Cite only
+supplied passage ids. Do not invent polities, dates, or
 citations, and do not use outside knowledge. Use only years within the supplied range. If the
 passages describe no territorial control, return an empty controlStates list. Output only the schema."""
 
@@ -84,6 +110,41 @@ def _bounded_passages(passages: list[Passage]) -> list[Passage]:
             break
         chosen.append(passage)
     return chosen
+
+
+def _control_signal_score(excerpt: str) -> int:
+    """How many distinct generic control-signal stems a passage contains, matched at
+    a word boundary. A ranking heuristic only — the model and the grounding guards
+    make the real decision."""
+
+    lowered = excerpt.lower()
+    return sum(1 for pattern in _CONTROL_SIGNAL_RE if pattern.search(lowered))
+
+
+def _select_control_passages(passages: list[Passage]) -> list[Passage]:
+    """Fill the model's limited window with the passages most likely to describe
+    control. An acquired corpus is far larger than one prompt, and control claims
+    are scattered through it, so sending passages in document order starves the
+    extractor of the relevant text (the reason a real Franco-Prussian corpus
+    yielded no control states while explicit-control passages did). Rank by generic
+    control-signal density — never by topic — and keep the highest-signal passages
+    up to the char budget, presented in document order. When no passage carries any
+    signal, fall back to document order (unchanged behaviour, no regression)."""
+
+    scored = [(_control_signal_score(p.excerpt), index, p) for index, p in enumerate(passages)]
+    if not any(score for score, _index, _passage in scored):
+        return _bounded_passages(passages)
+
+    chosen: list[tuple[int, Passage]] = []
+    total = 0
+    for score, index, passage in sorted(scored, key=lambda item: (-item[0], item[1])):
+        if score == 0:
+            break  # only send passages that actually signal control
+        total += len(passage.excerpt)
+        if chosen and total > _MAX_PASSAGE_CHARS:
+            break
+        chosen.append((index, passage))
+    return [passage for _index, passage in sorted(chosen, key=lambda item: item[0])]
 
 
 def build_control_state_schema(passage_ids: list[str], lo: int, hi: int) -> dict[str, Any]:
@@ -130,7 +191,7 @@ def extract_control_states(
 ) -> list[ExtractedControlState]:
     """Propose grounded, in-period territorial control from the acquired passages."""
 
-    bounded = _bounded_passages(passages)
+    bounded = _select_control_passages(passages)
     if not bounded:
         return []  # nothing to extract from -> no model call, no invented claims
 

@@ -13,6 +13,8 @@ from datetime import date
 from chronicle.acquisition.control_state import (
     ExtractedControlState,
     ExtractedControlStates,
+    _control_signal_score,
+    _select_control_passages,
     extract_control_states,
 )
 from chronicle.ai.models.deterministic import DeterministicModelProvider
@@ -115,3 +117,54 @@ def test_sovereign_polity_requires_a_non_sovereign_basis_and_a_different_polity(
 def test_no_passages_makes_no_model_call():
     provider = DeterministicModelProvider()  # nothing enqueued -> would raise if called
     assert extract_control_states([], _period(), "A topic", provider) == []
+
+
+def _filler(index: int) -> Passage:
+    # ~1200 chars, no control-signal vocabulary.
+    return Passage(
+        id=f"f-{index:02d}", documentId="d-1", excerpt="Neutral placeholder narrative. " * 40, locator=f"f#{index}"
+    )
+
+
+def _control_passage(passage_id: str) -> Passage:
+    return Passage(
+        id=passage_id,
+        documentId="d-1",
+        excerpt="The realm annexed and controlled the northern province after the war.",
+        locator="c#1",
+    )
+
+
+def test_control_signal_score_ranks_control_prose_above_filler():
+    assert _control_signal_score(_control_passage("c").excerpt) > 0
+    assert _control_signal_score(_filler(0).excerpt) == 0
+
+
+def test_control_signal_score_matches_morphology_but_not_substring_false_positives():
+    # Word-boundary matching: stems catch inflections without spurious hits.
+    assert _control_signal_score("the empire annexed and occupied the province") >= 3
+    # "foreign" must NOT trigger "reign"; "conceded" must NOT trigger "cede".
+    assert _control_signal_score("the foreign minister conceded a point") == 0
+
+
+def test_selection_prefers_control_passages_over_filler_beyond_the_window():
+    # A control-relevant passage buried past the char budget behind many filler
+    # passages is still selected (the fix for the zero-yield Franco-Prussian run).
+    passages = [_filler(i) for i in range(10)] + [_control_passage("deep")]
+    selected = _select_control_passages(passages)
+    assert [p.id for p in selected] == ["deep"]  # only the signalling passage is sent
+
+
+def test_selection_falls_back_to_document_order_when_nothing_signals():
+    passages = [_filler(i) for i in range(3)]
+    selected = _select_control_passages(passages)
+    assert [p.id for p in selected] == ["f-00", "f-01", "f-02"]  # unchanged head order
+
+
+def test_extraction_grounds_a_state_citing_a_deep_control_passage():
+    # End to end: the buried control passage is selected, so a state citing its id
+    # is grounded (previously it fell outside the head window and would be dropped).
+    passages = [_filler(i) for i in range(10)] + [_control_passage("deep")]
+    provider = _provider([_state(passageIds=["deep"])])
+    result = extract_control_states(passages, _period(), "A topic", provider)
+    assert len(result) == 1 and result[0].passageIds == ["deep"]
