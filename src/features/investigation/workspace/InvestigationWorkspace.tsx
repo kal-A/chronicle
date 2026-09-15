@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useFocus } from '../focus/useFocus'
 import { MapView } from '../map/MapView'
+import { historicalYear } from '../map/territory'
 import { formatHistoricalDate } from '../model/formatHistoricalDate'
 import { describeFocus } from '../model/describeFocus'
 import type { Scene } from '../model/schema'
@@ -201,6 +202,9 @@ export function InvestigationWorkspace({
               onSelectFocus={(f) => setFocus(f, 'map')}
               placeIds={scoped.placeIds}
               eventIds={timeVisibleEventIds}
+              controlStates={investigation.controlStates}
+              territoryGeometries={investigation.territoryGeometries}
+              currentYear={activeEvent ? historicalYear(activeEvent.eventTime, 'end') : null}
             />
           )}
           {activeLens.visualizationType === 'map' ? (

@@ -713,6 +713,11 @@ function GeneratedMap({
           container: containerRef.current,
           style: {
             version: 8,
+            // Area-accurate globe projection (MapLibre 5): a true sphere, so
+            // territory/landmasses keep honest relative sizes instead of Web
+            // Mercator's toward-the-poles inflation. At regional zoom it reads as a
+            // gently curved flat map; zoomed out it is a real globe.
+            projection: { type: 'globe' },
             // Bundled OFL font glyphs (Noto Sans, in public/basemap/fonts/) power
             // the on-map name labels. Like the basemap they are served from the
             // app — no external font/tile fetch.
@@ -851,17 +856,26 @@ function GeneratedMap({
         mapRef.current = map
         map.getCanvas().setAttribute('tabindex', '-1') // keep the aria-hidden canvas out of tab order
 
-        map.fitBounds(
-          [
-            [bounds.minLng, bounds.minLat],
-            [bounds.maxLng, bounds.maxLat],
-          ],
-          // Cap zoom-in: 1:110m geography reads as a map at regional scale but
-          // blocky if you zoom past it, so a single located place lands on a
-          // regional frame rather than a coarse close-up (honest to the basemap
-          // precision; period city detail is the later OHM slice).
-          { padding: 28, maxZoom: 6, duration: 0 },
-        )
+        const fitToPlaces = () =>
+          map.fitBounds(
+            [
+              [bounds.minLng, bounds.minLat],
+              [bounds.maxLng, bounds.maxLat],
+            ],
+            // Cap zoom-in: 1:110m geography reads as a map at regional scale but
+            // blocky if you zoom past it, so a single located place lands on a
+            // regional frame rather than a coarse close-up (honest to the basemap
+            // precision; period city detail is the later OHM slice).
+            { padding: 28, maxZoom: 6, duration: 0 },
+          )
+        fitToPlaces()
+        // Re-fit once the style has loaded and the container is settled: the
+        // docked territory rail changes the map's width after first paint, so the
+        // initial fit can be against a stale viewport.
+        map.once('load', () => {
+          map.resize()
+          fitToPlaces()
+        })
 
         // A name label on hover — closeOnMove hides it during pan/zoom, so no
         // overlay drifts against the basemap. The accessible location list below
@@ -1002,43 +1016,48 @@ function GeneratedMap({
         >
           {labelsOn ? 'Hide place labels' : 'Show place labels'}
         </button>
+      </div>
+      <div className="chronicle-generated-map-stage">
+        <div ref={containerRef} aria-hidden="true" className="chronicle-generated-map" />
         {territoryOn && (
-          <div
-            className="chronicle-territory-legend"
-            role="group"
-            aria-label="Territory legend"
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '4px 12px',
-              alignItems: 'center',
-              fontSize: '.72rem',
-              color: '#9bc6cf',
-              marginLeft: 12,
-            }}
-          >
+          <aside className="chronicle-territory-rail" aria-label="Territory legend">
+            <p className="chronicle-territory-rail__title">Territory</p>
+            <p className="chronicle-territory-rail__note">Extents approximate — as mapped, illustrative.</p>
+            <h4>Polities</h4>
             {legend.polities.map((entry) => (
-              <span key={entry.polity} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                <i
-                  aria-hidden="true"
-                  style={{
-                    width: 14,
-                    height: 10,
-                    borderRadius: 2,
-                    background: colorForIndex(entry.colorIndex),
-                    display: 'inline-block',
-                  }}
-                />
+              <div key={entry.polity} className="chronicle-territory-rail__row">
+                <span className="chronicle-territory-rail__swatch" style={{ background: colorForIndex(entry.colorIndex) }} />
                 {entry.polity}
-              </span>
+              </div>
             ))}
-            {legend.hasControl && <span>· solid = control</span>}
-            {legend.hasInfluence && <span>· hatch = influence</span>}
-            {legend.hasContested && <span>· stripe = contested</span>}
-          </div>
+            <h4>State</h4>
+            {legend.hasControl && (
+              <div className="chronicle-territory-rail__row">
+                <span className="chronicle-territory-rail__swatch" style={{ background: 'rgba(155,198,207,.55)' }} />
+                Control
+              </div>
+            )}
+            {legend.hasInfluence && (
+              <div className="chronicle-territory-rail__row">
+                <span
+                  className="chronicle-territory-rail__swatch"
+                  style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent 0 3px, #9bc6cf 3px 4.5px)' }}
+                />
+                Influence
+              </div>
+            )}
+            {legend.hasContested && (
+              <div className="chronicle-territory-rail__row">
+                <span
+                  className="chronicle-territory-rail__swatch"
+                  style={{ backgroundImage: 'repeating-linear-gradient(45deg, #d98cc4 0 3px, #e6b84c 3px 6px)' }}
+                />
+                Contested
+              </div>
+            )}
+          </aside>
         )}
       </div>
-      <div ref={containerRef} aria-hidden="true" className="chronicle-generated-map" />
       <p className="chronicle-generated-map-note">
         Generated map — {located.length} located place{located.length === 1 ? '' : 's'} on a neutral
         physical basemap (Natural Earth coastlines &amp; rivers; no period-specific borders).

@@ -1180,6 +1180,65 @@ html:has(.chronicle-investigation-state) {
   background: #0b2231;
 }
 
+/* Style A: the territory legend is a rail docked beside the map, never over it. */
+.chronicle-generated-map-stage {
+  display: flex;
+  align-items: stretch;
+  min-height: clamp(320px, 48vh, 540px);
+}
+
+.chronicle-generated-map-stage .chronicle-generated-map {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.chronicle-territory-rail {
+  flex: 0 0 180px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border: 1px solid rgb(114 168 181 / 40%);
+  border-left: none;
+  background: #0a1c26;
+  color: #dfe8ea;
+  font-size: 0.72rem;
+}
+
+.chronicle-territory-rail__title {
+  margin: 0 0 2px;
+  color: #f4ecd9;
+  font-weight: 700;
+}
+
+.chronicle-territory-rail__note {
+  margin: 0 0 10px;
+  color: #8fb3bd;
+  font-size: 0.62rem;
+}
+
+.chronicle-territory-rail h4 {
+  margin: 12px 0 5px;
+  color: #6f9fac;
+  font-size: 0.56rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.chronicle-territory-rail__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.chronicle-territory-rail__swatch {
+  width: 16px;
+  height: 11px;
+  flex: none;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 2px;
+}
+
 .chronicle-generated-map-toolbar {
   display: flex;
   justify-content: flex-end;
