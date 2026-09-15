@@ -27,22 +27,74 @@ from .enums import (
 
 
 class HistoricalDate(BaseModel):
+    """A historically honest date interval, era-capable (ADR-005).
+
+    The canonical, always-derivable ordering key is a *signed astronomical year*
+    (``earliestYear``/``latestYear``: 1 = 1 CE, 0 = 1 BC, -1 = 2 BC, …). The
+    calendar dates (``earliest``/``latest``) are optional CE-only refinement that
+    add day/month precision; they must be omitted for BC. Order and interval math
+    use ``lower_key``/``upper_key`` so no consumer re-derives the cross-era key.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
     precision: DatePrecision
-    earliest: date
-    latest: date
+    earliest: date | None = None
+    latest: date | None = None
+    earliestYear: int | None = None
+    latestYear: int | None = None
     label: str | None = None
 
     @model_validator(mode="after")
+    def _bounds_derivable(self) -> "HistoricalDate":
+        # ADR-005 invariant 1: each bound must be derivable from a year or a date.
+        if self.earliest is None and self.earliestYear is None:
+            raise ValueError("HistoricalDate needs earliest or earliestYear")
+        if self.latest is None and self.latestYear is None:
+            raise ValueError("HistoricalDate needs latest or latestYear")
+        return self
+
+    @model_validator(mode="after")
+    def _year_and_date_agree(self) -> "HistoricalDate":
+        # ADR-005 invariant 2: a calendar date is CE-only and, when a year field
+        # is also given, they must name the same year.
+        if self.earliest is not None and self.earliestYear is not None:
+            if self.earliest.year != self.earliestYear:
+                raise ValueError("earliest.year must equal earliestYear")
+        if self.latest is not None and self.latestYear is not None:
+            if self.latest.year != self.latestYear:
+                raise ValueError("latest.year must equal latestYear")
+        return self
+
+    @property
+    def lower_key(self) -> tuple[int, int]:
+        """Total-order key for the lower bound: (signed year, day-of-year)."""
+
+        if self.earliest is not None:
+            return (self.earliest.year, self.earliest.timetuple().tm_yday)
+        return (self.earliestYear, 1)  # type: ignore[return-value]
+
+    @property
+    def upper_key(self) -> tuple[int, int]:
+        """Total-order key for the upper bound: (signed year, day-of-year)."""
+
+        if self.latest is not None:
+            return (self.latest.year, self.latest.timetuple().tm_yday)
+        return (self.latestYear, 366)  # type: ignore[return-value]
+
+    @model_validator(mode="after")
     def _earliest_not_after_latest(self) -> "HistoricalDate":
-        if self.earliest > self.latest:
+        if self.lower_key > self.upper_key:
             raise ValueError("earliest must not be after latest")
         return self
 
     @model_validator(mode="after")
     def _exact_requires_equal_bounds(self) -> "HistoricalDate":
-        if self.precision == DatePrecision.EXACT and self.earliest != self.latest:
+        # Compare the raw bounds, not the day-padded interval keys, so a year-only
+        # exact BC date (earliestYear == latestYear, no calendar date) is accepted.
+        if self.precision == DatePrecision.EXACT and (
+            self.earliest != self.latest or self.earliestYear != self.latestYear
+        ):
             raise ValueError("an exact HistoricalDate must have earliest === latest")
         return self
 

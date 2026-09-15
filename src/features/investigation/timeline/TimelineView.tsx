@@ -1,4 +1,5 @@
 import type { Scene } from '../model/schema'
+import { compareHistoricalDates } from '../model/schema'
 import type { FocusValue } from '../model/focus'
 import { formatHistoricalDate } from '../model/formatHistoricalDate'
 
@@ -21,7 +22,7 @@ export function TimelineView({
 }) {
   const events = [...scene.events]
     .filter((event) => !eventIds || eventIds.has(event.id))
-    .sort((a, b) => (a.eventTime.earliest < b.eventTime.earliest ? -1 : 1))
+    .sort((a, b) => compareHistoricalDates(a.eventTime, b.eventTime))
 
   if (events.length === 0) {
     return (

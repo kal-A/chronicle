@@ -1,6 +1,7 @@
 import type { GeneratedInvestigation } from '../../model/generatedInvestigation'
 import type { InvestigationLens } from '../../model/experiencePlan'
 import type { Scene } from '../../model/schema'
+import { compareHistoricalDates } from '../../model/schema'
 
 /**
  * Packages without an experiencePlan (the empty-content fixture, and any
@@ -24,7 +25,7 @@ export function resolveLenses(
 
 function synthesizeOverviewLens(scene: Scene): InvestigationLens {
   const sortedEvents = [...scene.events].sort((a, b) =>
-    a.eventTime.earliest.localeCompare(b.eventTime.earliest),
+    compareHistoricalDates(a.eventTime, b.eventTime),
   )
   return {
     id: OVERVIEW_LENS_ID,

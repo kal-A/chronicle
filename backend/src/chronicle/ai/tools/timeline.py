@@ -114,7 +114,7 @@ def _event_entries(events: list, related_record_limit: int) -> list[TimelineEven
         related_record_ids = budget.take(list(event.relatedRecordIds))
         if previous is None:
             chronology_relation = "first"
-        elif event.eventTime.earliest > previous.eventTime.latest:
+        elif event.eventTime.lower_key > previous.eventTime.upper_key:
             chronology_relation = "strictly-after"
         else:
             chronology_relation = "overlaps-or-uncertain"
@@ -154,8 +154,17 @@ def _event_entry(event) -> TimelineEventEntry:
     )
 
 
+def _date_key(value: date) -> tuple[int, int]:
+    """A filter date as the same (year, day-of-year) key HistoricalDate orders on."""
+    return (value.year, value.timetuple().tm_yday)
+
+
 def _overlaps(historical: HistoricalDate, start: date | None, end: date | None) -> bool:
-    return (start is None or historical.latest >= start) and (end is None or historical.earliest <= end)
+    # Compare on the cross-era ordering key so BC records (no calendar date) still
+    # filter correctly; CE filter dates keep day granularity (ADR-005).
+    return (start is None or historical.upper_key >= _date_key(start)) and (
+        end is None or historical.lower_key <= _date_key(end)
+    )
 
 
 def _passage_time_entries(corpus: InvestigationCorpus, passage_ids: set[str]) -> list[TimelinePassageTimeEntry]:
@@ -193,10 +202,10 @@ def _passage_time_entries(corpus: InvestigationCorpus, passage_ids: set[str]) ->
                     )
                 )
         unique = {
-            (role, target_id, value.earliest, value.latest, value.label): value
+            (role, target_id, value.lower_key, value.upper_key, value.label): value
             for role, target_id, value in represented
         }
-        for (role, target_id, _earliest, _latest, _label), historical in sorted(
+        for (role, target_id, _lower, _upper, _label), historical in sorted(
             unique.items(),
             key=lambda item: (
                 item[0][0].value,

@@ -38,9 +38,15 @@ export function encodeFocus(focus: FocusValue): URLSearchParams {
       params.set('entityType', focus.entityType)
       break
     case 'timeRange':
+      // Era-capable (ADR-005): ISO dates are CE-only; a BC range carries signed
+      // years instead. Serialize whichever bounds the range actually has.
       params.set('rangePrecision', focus.range.precision)
-      params.set('rangeEarliest', focus.range.earliest)
-      params.set('rangeLatest', focus.range.latest)
+      if (focus.range.earliest) params.set('rangeEarliest', focus.range.earliest)
+      if (focus.range.latest) params.set('rangeLatest', focus.range.latest)
+      if (focus.range.earliestYear != null)
+        params.set('rangeEarliestYear', String(focus.range.earliestYear))
+      if (focus.range.latestYear != null)
+        params.set('rangeLatestYear', String(focus.range.latestYear))
       if (focus.range.label) params.set('rangeLabel', focus.range.label)
       break
   }
@@ -101,13 +107,23 @@ export function decodeFocus(
     }
     case 'timeRange': {
       const precision = params.get('rangePrecision')
-      const earliest = params.get('rangeEarliest')
-      const latest = params.get('rangeLatest')
+      const earliest = params.get('rangeEarliest') ?? undefined
+      const latest = params.get('rangeLatest') ?? undefined
+      const earliestYear = params.get('rangeEarliestYear')
+      const latestYear = params.get('rangeLatestYear')
       const label = params.get('rangeLabel') ?? undefined
-      if (!precision || !earliest || !latest) return null
+      // A lower and upper bound must each be present as a date or a signed year.
+      if (!precision || (!earliest && !earliestYear) || (!latest && !latestYear)) return null
       candidate = {
         kind: 'timeRange',
-        range: { precision, earliest, latest, label },
+        range: {
+          precision,
+          ...(earliest ? { earliest } : {}),
+          ...(latest ? { latest } : {}),
+          ...(earliestYear ? { earliestYear: Number(earliestYear) } : {}),
+          ...(latestYear ? { latestYear: Number(latestYear) } : {}),
+          ...(label ? { label } : {}),
+        },
       }
       break
     }

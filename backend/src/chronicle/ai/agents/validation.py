@@ -141,8 +141,8 @@ def build_action_reference_index(
         actorIds=tuple(actors),
         evidenceRecordIds=tuple(evidence_ids),
         sourceIds=tuple(sorted(item.id for item in investigation.sources)),
-        earliest=investigation.scope.dateRange.earliest,
-        latest=investigation.scope.dateRange.latest,
+        earliestKey=investigation.scope.dateRange.lower_key,
+        latestKey=investigation.scope.dateRange.upper_key,
     )
 
 
@@ -311,7 +311,7 @@ def _action_error(action, index: ActionReferenceIndex) -> str | None:
         checks.append(([action.sourceId], index.sourceIds, "source"))
     elif isinstance(action, (SetTimeAction, SetTimeRangeAction)):
         value = action.date if isinstance(action, SetTimeAction) else action.range
-        if value.earliest < index.earliest or value.latest > index.latest:
+        if value.lower_key < index.earliestKey or value.upper_key > index.latestKey:
             return "time action falls outside the current investigation scope"
     for values, known, kind in checks:
         unknown = sorted(set(values) - set(known))

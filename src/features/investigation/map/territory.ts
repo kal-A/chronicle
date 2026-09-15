@@ -29,17 +29,19 @@ export function polityColorIndex(controlStates: ControlState[]): Map<string, num
   return index
 }
 
-/** Signed year of a HistoricalDate: parses "…BC"/"…BCE" from the label first (ISO
- * dates can't express BC), else the ISO year. Returns null when neither yields one. */
+/** Signed astronomical year of a HistoricalDate (ADR-005): the real
+ * `earliestYear`/`latestYear` field, else the ISO year, else a legacy parse of
+ * "…BC"/"…BCE" from the label (astronomical: N BC → 1 − N). Null when none yields one. */
 export function historicalYear(date: HistoricalDate | undefined, bound: 'start' | 'end'): number | null {
   if (!date) return null
+  const year = bound === 'start' ? date.earliestYear : date.latestYear
+  if (year != null) return year
+  const iso = bound === 'start' ? date.earliest : date.latest
+  if (iso) return Number(iso.slice(0, iso.indexOf('-', 1)))
   const label = date.label ?? ''
   const bc = label.match(/(\d+)\s*(?:BC|BCE)\b/i)
-  if (bc) return -Number(bc[1])
+  if (bc) return 1 - Number(bc[1])
   const ce = label.match(/\b(\d{1,4})\s*(?:AD|CE)?\b/)
-  const iso = bound === 'start' ? date.earliest : date.latest
-  const isoYear = iso ? Number(iso.slice(0, 4)) : NaN
-  if (!Number.isNaN(isoYear)) return isoYear
   return ce ? Number(ce[1]) : null
 }
 

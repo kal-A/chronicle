@@ -52,8 +52,17 @@ def _validate_ids(ids: list[str], known: dict, owner: str) -> None:
             raise UnknownRecordError(f'{owner} references unknown record "{record_id}"')
 
 
+def _date_key(value) -> tuple[int, int]:
+    """A filter date as the same (year, day-of-year) key HistoricalDate orders on."""
+    return (value.year, value.timetuple().tm_yday)
+
+
 def _intervals_overlap(historical: HistoricalDate, earliest, latest) -> bool:
-    return (earliest is None or historical.latest >= earliest) and (latest is None or historical.earliest <= latest)
+    # Cross-era comparison (ADR-005): order on the signed-year key so BC records
+    # (which carry no calendar date) still filter against CE date-range queries.
+    return (earliest is None or historical.upper_key >= _date_key(earliest)) and (
+        latest is None or historical.lower_key <= _date_key(latest)
+    )
 
 
 def _date_candidates(
@@ -101,8 +110,8 @@ def _matched_dates(
         key=lambda match: (
             match.role.value,
             match.linkedTargetId or "",
-            match.historicalDate.earliest,
-            match.historicalDate.latest,
+            match.historicalDate.lower_key,
+            match.historicalDate.upper_key,
         ),
     )
 

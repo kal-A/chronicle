@@ -14,6 +14,9 @@ import {
   ReviewStatusSchema,
   SourceSchema,
   VisibilitySchema,
+  compareKeys,
+  historicalDateLowerKey,
+  historicalDateUpperKey,
   type EvidenceLink,
 } from './schema'
 import {
@@ -908,7 +911,12 @@ export function validateGeneratedInvestigation(
       `ControlState "${controlState.id}"`,
       'TerritoryGeometry',
     )
-    if (controlState.validFrom.earliest > controlState.validTo.latest) {
+    if (
+      compareKeys(
+        historicalDateLowerKey(controlState.validFrom),
+        historicalDateUpperKey(controlState.validTo),
+      ) > 0
+    ) {
       fail(`ControlState "${controlState.id}" has validFrom after validTo`)
     }
     // Influence and contested reaches had no crisp frontier — they may not claim

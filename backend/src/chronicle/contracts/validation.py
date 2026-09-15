@@ -468,7 +468,7 @@ def validate_generated_investigation(data: Any) -> GeneratedInvestigation:
             f'ControlState "{control_state.id}"',
             "TerritoryGeometry",
         )
-        if control_state.validFrom.earliest > control_state.validTo.latest:
+        if control_state.validFrom.lower_key > control_state.validTo.upper_key:
             _fail(f'ControlState "{control_state.id}" has validFrom after validTo')
         # Influence and contested reaches had no crisp frontier — they may not
         # claim building/city precision, only region/approximate ("rendering

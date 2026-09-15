@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date
 from enum import Enum
 from typing import Annotated, Literal, Union
 
@@ -155,8 +154,10 @@ class ActionReferenceIndex(BaseModel):
     actorIds: tuple[str, ...] = ()
     evidenceRecordIds: tuple[str, ...] = ()
     sourceIds: tuple[str, ...] = ()
-    earliest: date
-    latest: date
+    # Scope bounds as HistoricalDate cross-era ordering keys (ADR-005), so a
+    # time action in a BC scope can be range-checked without a calendar date.
+    earliestKey: tuple[int, int]
+    latestKey: tuple[int, int]
 
 
 class AnswerValidationIssueCode(str, Enum):

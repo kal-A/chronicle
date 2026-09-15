@@ -120,6 +120,50 @@ describe('HistoricalDateSchema', () => {
     })
     expect(result.success).toBe(true)
   })
+
+  // ADR-005: era-capable dates.
+  it('accepts a BC range with signed years and no calendar date', () => {
+    const result = HistoricalDateSchema.safeParse({
+      precision: 'range',
+      earliestYear: -218, // 219 BC
+      latestYear: -201, // 202 BC
+      label: '219–202 BC',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects a bound with neither a date nor a signed year', () => {
+    const result = HistoricalDateSchema.safeParse({ precision: 'range', earliestYear: -218 })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects a calendar date that disagrees with its year field', () => {
+    const result = HistoricalDateSchema.safeParse({
+      precision: 'range',
+      earliest: '1914-01-01',
+      earliestYear: 1913,
+      latest: '1914-12-31',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects a BC range whose earliest year is after its latest', () => {
+    const result = HistoricalDateSchema.safeParse({
+      precision: 'range',
+      earliestYear: -100,
+      latestYear: -200,
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts an exact BC year (equal signed years, no date)', () => {
+    const result = HistoricalDateSchema.safeParse({
+      precision: 'exact',
+      earliestYear: -43, // 44 BC
+      latestYear: -43,
+    })
+    expect(result.success).toBe(true)
+  })
 })
 
 describe('LocationPrecisionSchema', () => {

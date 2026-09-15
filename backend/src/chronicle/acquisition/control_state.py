@@ -135,7 +135,7 @@ def extract_control_states(
         return []  # nothing to extract from -> no model call, no invented claims
 
     real_ids = {passage.id for passage in bounded}
-    lo, hi = period.earliest.year, period.latest.year
+    lo, hi = period.lower_key[0], period.upper_key[0]  # signed years, BC-safe (ADR-005)
     schema = build_control_state_schema(sorted(real_ids), lo, hi)
 
     payload = {

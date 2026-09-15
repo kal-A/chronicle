@@ -74,7 +74,7 @@ _PERIOD_NONOVERLAP = 2
 
 
 def _period_years(period: HistoricalDate) -> tuple[int, int]:
-    return period.earliest.year, period.latest.year
+    return period.lower_key[0], period.upper_key[0]  # signed years, BC-safe (ADR-005)
 
 
 _YEAR_RE = re.compile(r"-?\d{1,4}")

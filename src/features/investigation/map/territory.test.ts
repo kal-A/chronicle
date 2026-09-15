@@ -13,6 +13,12 @@ function date(earliest: string, latest: string, label?: string): HistoricalDate 
   return { precision: 'range', earliest, latest, ...(label ? { label } : {}) } as unknown as HistoricalDate
 }
 
+// A BC interval (ADR-005): signed astronomical years, no calendar date. e.g.
+// 218 BC = year -217. Chronicle stores the signed year, not the label.
+function bcDate(earliestYear: number, latestYear: number, label?: string): HistoricalDate {
+  return { precision: 'range', earliestYear, latestYear, ...(label ? { label } : {}) } as unknown as HistoricalDate
+}
+
 function control(
   id: string,
   polity: string,
@@ -62,11 +68,16 @@ describe('polityColorIndex', () => {
 })
 
 describe('historicalYear', () => {
-  it('reads BC from the label (ISO cannot express it)', () => {
-    expect(historicalYear(date('0218-01-01', '0218-12-31', '218 BC'), 'start')).toBe(-218)
+  it('reads the signed astronomical year for BC dates', () => {
+    // 218 BC = year -217; the field is the source of truth, not the label.
+    expect(historicalYear(bcDate(-217, -201, '218–202 BC'), 'start')).toBe(-217)
+    expect(historicalYear(bcDate(-217, -201, '218–202 BC'), 'end')).toBe(-201)
   })
   it('reads the ISO year for CE dates', () => {
     expect(historicalYear(date('1914-06-28', '1914-08-04'), 'start')).toBe(1914)
+  })
+  it('falls back to a legacy BC label when no field or date is present', () => {
+    expect(historicalYear({ precision: 'range', label: '44 BC' } as unknown as HistoricalDate, 'start')).toBe(-43)
   })
   it('returns null for an empty date', () => {
     expect(historicalYear(undefined, 'start')).toBeNull()

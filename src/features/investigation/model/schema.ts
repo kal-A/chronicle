@@ -21,21 +21,98 @@ export type DatePrecision = z.infer<typeof DatePrecisionSchema>
 
 const isoDate = z.iso.date()
 
+/**
+ * Era-capable date interval (ADR-005). The canonical ordering key is a signed
+ * astronomical year (`earliestYear`/`latestYear`: 1 = 1 CE, 0 = 1 BC, -1 = 2 BC,
+ * …); the ISO calendar dates are optional CE-only day/month precision and must be
+ * omitted for BC. Order/compare with the key helpers below so records that carry
+ * only a signed year (BC) still sort correctly against dated CE records.
+ */
+
+/** Structural view of a HistoricalDate's bounds — enough for the key helpers. */
+type DateBounds = {
+  earliest?: string
+  latest?: string
+  earliestYear?: number
+  latestYear?: number
+}
+
+/** Cross-era ordering key: [signed year, day-of-year]. */
+export type DateKey = readonly [number, number]
+
+function isoYear(iso: string): number {
+  return Number(iso.slice(0, iso.indexOf('-', 1)))
+}
+
+function isoDayOfYear(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number)
+  // setUTCFullYear avoids Date's 0-99 -> 1900s remap and respects leap years.
+  const jan1 = new Date(Date.UTC(2000, 0, 1))
+  jan1.setUTCFullYear(y)
+  const point = new Date(Date.UTC(2000, m - 1, d))
+  point.setUTCFullYear(y)
+  return Math.floor((point.getTime() - jan1.getTime()) / 86_400_000) + 1
+}
+
+export function historicalDateLowerKey(d: DateBounds): DateKey {
+  if (d.earliest !== undefined) return [isoYear(d.earliest), isoDayOfYear(d.earliest)]
+  return [d.earliestYear as number, 1]
+}
+
+export function historicalDateUpperKey(d: DateBounds): DateKey {
+  if (d.latest !== undefined) return [isoYear(d.latest), isoDayOfYear(d.latest)]
+  return [d.latestYear as number, 366]
+}
+
+/** Compare two cross-era keys: negative if a < b, 0 if equal, positive if a > b. */
+export function compareKeys(a: DateKey, b: DateKey): number {
+  return a[0] - b[0] || a[1] - b[1]
+}
+
+function keyLE(a: DateKey, b: DateKey): boolean {
+  return compareKeys(a, b) <= 0
+}
+
+/** Order two HistoricalDates by their lower bound (BC-safe). */
+export function compareHistoricalDates(a: DateBounds, b: DateBounds): number {
+  const [ay, ad] = historicalDateLowerKey(a)
+  const [by, bd] = historicalDateLowerKey(b)
+  return ay - by || ad - bd
+}
+
 export const HistoricalDateSchema = z
   .object({
     precision: DatePrecisionSchema,
-    earliest: isoDate,
-    latest: isoDate,
+    earliest: isoDate.optional(),
+    latest: isoDate.optional(),
+    earliestYear: z.number().int().optional(),
+    latestYear: z.number().int().optional(),
     label: z.string().min(1).optional(),
   })
-  .refine((d) => d.earliest <= d.latest, {
+  .refine((d) => d.earliest !== undefined || d.earliestYear !== undefined, {
+    message: 'HistoricalDate needs earliest or earliestYear',
+    path: ['earliest'],
+  })
+  .refine((d) => d.latest !== undefined || d.latestYear !== undefined, {
+    message: 'HistoricalDate needs latest or latestYear',
+    path: ['latest'],
+  })
+  .refine(
+    (d) => d.earliest === undefined || d.earliestYear === undefined || isoYear(d.earliest) === d.earliestYear,
+    { message: 'earliest.year must equal earliestYear', path: ['earliestYear'] },
+  )
+  .refine(
+    (d) => d.latest === undefined || d.latestYear === undefined || isoYear(d.latest) === d.latestYear,
+    { message: 'latest.year must equal latestYear', path: ['latestYear'] },
+  )
+  .refine((d) => keyLE(historicalDateLowerKey(d), historicalDateUpperKey(d)), {
     message: 'earliest must not be after latest',
     path: ['earliest'],
   })
-  .refine((d) => d.precision !== 'exact' || d.earliest === d.latest, {
-    message: 'an exact HistoricalDate must have earliest === latest',
-    path: ['precision'],
-  })
+  .refine(
+    (d) => d.precision !== 'exact' || (d.earliest === d.latest && d.earliestYear === d.latestYear),
+    { message: 'an exact HistoricalDate must have earliest === latest', path: ['precision'] },
+  )
 export type HistoricalDate = z.infer<typeof HistoricalDateSchema>
 
 export const LocationPrecisionSchema = z.enum([

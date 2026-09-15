@@ -161,6 +161,31 @@ def test_no_extracted_events_yields_empty_enrichment_and_no_geocoding():
     assert geocoder.calls == []  # nothing to locate -> no lookups
 
 
+def _bc_period() -> HistoricalDate:
+    return HistoricalDate(
+        precision=DatePrecision.RANGE,
+        earliestYear=-220,
+        latestYear=-200,
+        label="220–200 BC",
+    )
+
+
+def test_bc_event_time_is_era_capable():
+    # ADR-005: a BC event carries a signed year and NO calendar date (which is
+    # CE-only), rendered honestly as "N BC".
+    events = [ExtractedEvent(title="A siege", placeName="Placeholdertown", year=-218, passageIds=["psg-0000-0000"])]
+    geocoder = _StubGeocoder({"Placeholdertown": _resolution("Placeholdertown", 1.0, 2.0)})
+
+    enrichment = assemble_enrichment(
+        _passages(), _bc_period(), "A topic", extractor=_extractor(events), geocoder=geocoder
+    )
+
+    event_time = enrichment.events[0].eventTime
+    assert event_time.earliest is None and event_time.latest is None
+    assert event_time.earliestYear == -218 and event_time.latestYear == -218
+    assert event_time.label == "219 BC"
+
+
 def _extractor_with_territory(
     events: list[ExtractedEvent], states: list[ExtractedControlState]
 ) -> DeterministicModelProvider:

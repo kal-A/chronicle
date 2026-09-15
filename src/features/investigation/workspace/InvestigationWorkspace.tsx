@@ -5,6 +5,7 @@ import { MapView } from '../map/MapView'
 import { historicalYear } from '../map/territory'
 import { formatHistoricalDate } from '../model/formatHistoricalDate'
 import { describeFocus } from '../model/describeFocus'
+import { compareHistoricalDates } from '../model/schema'
 import type { Scene } from '../model/schema'
 import type { GeneratedInvestigation } from '../model/generatedInvestigation'
 import { WorkspaceHeader } from './WorkspaceHeader'
@@ -64,7 +65,7 @@ export function InvestigationWorkspace({
     () =>
       [...scene.events]
         .filter((event) => scoped.eventIds.has(event.id))
-        .sort((a, b) => a.eventTime.earliest.localeCompare(b.eventTime.earliest)),
+        .sort((a, b) => compareHistoricalDates(a.eventTime, b.eventTime)),
     [scene.events, scoped.eventIds],
   )
   const [selectedEventIndex, setSelectedEventIndex] = useState(() =>

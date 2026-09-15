@@ -140,11 +140,12 @@ def build_index(investigation: GeneratedInvestigation) -> CorpusIndex:
 
     timeline_order = {entry.eventId: entry.order for entry in investigation.timeline}
 
-    def _event_sort_key(event_id: str) -> tuple[int, int | date, str]:
+    def _event_sort_key(event_id: str) -> tuple[int, int | tuple[int, int], str]:
         event = index.events_by_id[event_id]
         if event_id in timeline_order:
             return (0, timeline_order[event_id], event_id)
-        return (1, event.eventTime.earliest, event_id)
+        # Order by the cross-era key (ADR-005) so BC events sort correctly.
+        return (1, event.eventTime.lower_key, event_id)
 
     index.events_sorted_by_date = sorted(index.events_by_id, key=_event_sort_key)
 

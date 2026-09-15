@@ -100,17 +100,30 @@ class Enrichment:
 def _period_label(period: HistoricalDate) -> str:
     if period.label:
         return period.label
-    return f"{period.earliest.year}-{period.latest.year}"
+    return f"{_year_label(period.lower_key[0])}-{_year_label(period.upper_key[0])}"
+
+
+def _year_label(year: int) -> str:
+    """Honest display of a signed astronomical year (ADR-005): '1914', '44 BC'."""
+
+    return str(year) if year >= 1 else f"{1 - year} BC"
 
 
 def _event_time(year: int) -> HistoricalDate:
-    """A year-known, day-unknown time: the whole year, honestly bounded."""
+    """A year-known, day-unknown time: the whole year, honestly bounded.
 
+    Era-capable (ADR-005): the signed year is always carried; the CE-only
+    calendar dates are added for year >= 1 (day precision) and omitted for BC.
+    """
+
+    ce = year >= 1
     return HistoricalDate(
         precision=DatePrecision.RANGE,
-        earliest=date(year, 1, 1),
-        latest=date(year, 12, 31),
-        label=str(year),
+        earliest=date(year, 1, 1) if ce else None,
+        latest=date(year, 12, 31) if ce else None,
+        earliestYear=year,
+        latestYear=year,
+        label=_year_label(year),
     )
 
 
