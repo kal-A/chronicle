@@ -34,12 +34,24 @@ from ..contracts.run import (
     InvestigationRequest,
     WorkspaceContextSnapshot,
 )
+from ...corpus.contracts import DEFAULT_RESULT_COUNT, PassageSearchRequest
 from ..models.metadata import ModelCallRecord
 from ..orchestration.finalization import FinalizationRunner
 from ..orchestration.graph import LangGraphAgentWorkflow
+from ..orchestration.policies import AgentExecutionPolicy
 from ..orchestration.runner import InvestigationRunner
 from ..orchestration.statuses import AgentRunStatus
 from ..tools import build_default_registry
+from .baseline_prompts import (
+    BASIC_RAG_PROMPT_VERSION,
+    SINGLE_PROMPT_PROMPT_VERSION,
+    EvaluationAnswer,
+    basic_rag_system,
+    basic_rag_user,
+    build_single_prompt_context,
+    single_prompt_system,
+    single_prompt_user,
+)
 from .contracts import StrategyId
 
 if TYPE_CHECKING:  # opaque handles / annotations only -- not needed at runtime
@@ -333,11 +345,122 @@ class FullWorkflowStrategy:
         )
 
 
+# --- baseline adapters -----------------------------------------------------
+
+
+def _baseline_result(
+    case: "EvaluationCase",
+    strategy_id: StrategyId,
+    provider: "ModelProvider",
+    generated,
+    *,
+    references: RetrievedReferenceIndex | None,
+    started: float,
+    repeat: int,
+) -> StrategyResult:
+    answer: EvaluationAnswer = generated.value
+    model_calls = [generated.modelCall]
+    statements = tuple(
+        EvaluationStatement(statementId=f"s-{index + 1}", text=item.text, citations=tuple(item.citations))
+        for index, item in enumerate(answer.statements)
+    )
+    return StrategyResult(
+        caseId=case.caseId,
+        strategyId=strategy_id,
+        corpusId=case.corpusId,
+        answerStatus=answer.status,
+        answerText=answer.directAnswer,
+        statements=statements,
+        references=references,
+        modelCallCount=len(model_calls),
+        latencyMs=(time.perf_counter() - started) * 1000,
+        repeat=repeat,
+        **_identity_fields(case, provider, model_calls),
+    )
+
+
+def _index_from_hits(hits) -> RetrievedReferenceIndex:
+    passage_ids, source_ids, document_ids, links = [], [], [], []
+    for hit in hits:
+        passage_ids.append(hit.passageId)
+        source_ids.append(hit.sourceId)
+        document_ids.append(hit.documentId)
+        links.extend(hit.evidenceLinks)
+    return RetrievedReferenceIndex(
+        evidenceLinks=list(links)[:16],
+        passageIds=tuple(passage_ids),
+        sourceIds=tuple(source_ids),
+        documentIds=tuple(document_ids),
+    )
+
+
+class SinglePromptStrategy:
+    """One model call over a retrieval-free, deterministically selected corpus
+    context. No typed tool or agent role is used."""
+
+    id = StrategyId.SINGLE_PROMPT
+
+    def run(self, evaluation_input: EvaluationInput) -> StrategyResult:
+        case, corpus, provider, repeat = (
+            evaluation_input.case,
+            evaluation_input.corpus,
+            evaluation_input.provider,
+            evaluation_input.repeat,
+        )
+        budget = AgentExecutionPolicy().maxAggregateRetrievalCharacters
+        context, _included = build_single_prompt_context(corpus, budget, case.benchmarkVersion)
+        started = time.perf_counter()
+        generated = provider.generate_structured(
+            system_prompt=single_prompt_system(),
+            user_prompt=single_prompt_user(case.question, context),
+            response_model=EvaluationAnswer,
+            prompt_version=SINGLE_PROMPT_PROMPT_VERSION,
+        )
+        return _baseline_result(
+            case, self.id, provider, generated, references=None, started=started, repeat=repeat
+        )
+
+
+class BasicRagStrategy:
+    """Deterministic search_passages retrieval under the production result cap,
+    then one model answer call. No planner or agent roles."""
+
+    id = StrategyId.BASIC_RAG
+
+    def run(self, evaluation_input: EvaluationInput) -> StrategyResult:
+        case, corpus, provider, repeat = (
+            evaluation_input.case,
+            evaluation_input.corpus,
+            evaluation_input.provider,
+            evaluation_input.repeat,
+        )
+        started = time.perf_counter()
+        search = corpus.search_passages(
+            PassageSearchRequest(
+                corpusId=corpus.corpus_id, query=case.question, maxResults=DEFAULT_RESULT_COUNT
+            )
+        )
+        retrieved = "\n".join(
+            f"[passage {hit.passageId} | source {hit.sourceId}] {hit.excerpt}" for hit in search.hits
+        )
+        generated = provider.generate_structured(
+            system_prompt=basic_rag_system(),
+            user_prompt=basic_rag_user(case.question, retrieved),
+            response_model=EvaluationAnswer,
+            prompt_version=BASIC_RAG_PROMPT_VERSION,
+        )
+        return _baseline_result(
+            case, self.id, provider, generated,
+            references=_index_from_hits(search.hits), started=started, repeat=repeat,
+        )
+
+
 def build_strategies() -> dict[StrategyId, EvaluationStrategy]:
-    """The available strategy adapters keyed by id. The single-prompt and
-    basic-RAG baselines are added in Task 4b."""
+    """All four comparable strategy adapters keyed by id."""
 
     return {
+        StrategyId.SINGLE_PROMPT: SinglePromptStrategy(),
+        StrategyId.BASIC_RAG: BasicRagStrategy(),
         StrategyId.PLANNER_ANALYST: PlannerAnalystStrategy(),
         StrategyId.FULL_WORKFLOW: FullWorkflowStrategy(),
     }
@@ -349,6 +472,8 @@ __all__ = [
     "StrategyResult",
     "EvaluationInput",
     "EvaluationStrategy",
+    "SinglePromptStrategy",
+    "BasicRagStrategy",
     "PlannerAnalystStrategy",
     "FullWorkflowStrategy",
     "build_strategies",

@@ -228,3 +228,94 @@ def test_full_workflow_adapter_reports_abstention_as_a_result_not_a_crash():
 
     assert result.answerStatus is AnswerStatus.ABSTAINED
     assert result.statements == ()
+
+
+# --- baseline adapters (Task 4b) -------------------------------------------
+
+from chronicle.ai.evaluation.baseline_prompts import (
+    EvaluationAnswer,
+    EvaluationAnswerStatement,
+    build_single_prompt_context,
+    single_prompt_system,
+    single_prompt_user,
+)
+from chronicle.ai.orchestration.policies import AgentExecutionPolicy
+
+
+def _baseline_answer() -> EvaluationAnswer:
+    return EvaluationAnswer(
+        status=AnswerStatus.ANSWERED,
+        directAnswer="The report records an assurance of support.",
+        statements=[
+            EvaluationAnswerStatement(
+                text="The report records an assurance of support.",
+                citations=[AnalysisCitation(toolCallId="baseline", passageId="jc-src-002-p1")],
+            )
+        ],
+    )
+
+
+def test_single_prompt_adapter_answers_without_retrieval():
+    case = _case("direct-reported-assurance")
+    corpus = CorpusRegistry().get_corpus(case.corpusId)
+    provider = DeterministicModelProvider()
+    provider.enqueue_value(_baseline_answer())
+
+    result = build_strategies()[StrategyId.SINGLE_PROMPT].run(
+        EvaluationInput(case=case, corpus=corpus, provider=provider)
+    )
+
+    assert result.strategyId is StrategyId.SINGLE_PROMPT
+    assert result.answerStatus is AnswerStatus.ANSWERED
+    assert result.statements and result.statements[0].statementId == "s-1"
+    assert result.references is None  # single prompt performs no retrieval
+    assert result.modelCallCount == 1
+
+
+def test_single_prompt_never_calls_search_passages(monkeypatch):
+    case = _case("direct-reported-assurance")
+    corpus = CorpusRegistry().get_corpus(case.corpusId)
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("single_prompt must not retrieve")
+
+    monkeypatch.setattr(corpus, "search_passages", _boom)
+    provider = DeterministicModelProvider()
+    provider.enqueue_value(_baseline_answer())
+
+    result = build_strategies()[StrategyId.SINGLE_PROMPT].run(
+        EvaluationInput(case=case, corpus=corpus, provider=provider)
+    )
+
+    assert result.answerStatus is AnswerStatus.ANSWERED
+
+
+def test_basic_rag_adapter_retrieves_then_answers():
+    case = _case("direct-reported-assurance")
+    corpus = CorpusRegistry().get_corpus(case.corpusId)
+    provider = DeterministicModelProvider()
+    provider.enqueue_value(_baseline_answer())
+
+    result = build_strategies()[StrategyId.BASIC_RAG].run(
+        EvaluationInput(case=case, corpus=corpus, provider=provider)
+    )
+
+    assert result.strategyId is StrategyId.BASIC_RAG
+    assert result.answerStatus is AnswerStatus.ANSWERED
+    assert result.references is not None  # retrieval produced a reference index
+    assert result.modelCallCount == 1
+
+
+def test_no_gold_rubric_field_reaches_a_baseline_prompt():
+    case = _case("missing-consistency-verification")  # carries an unacceptableClaims rubric
+    assert case.unacceptableClaims  # sanity: this case has a gold claim to leak
+    corpus = CorpusRegistry().get_corpus(case.corpusId)
+    context, _ = build_single_prompt_context(
+        corpus, AgentExecutionPolicy().maxAggregateRetrievalCharacters, case.benchmarkVersion
+    )
+    prompt = single_prompt_system() + "\n" + single_prompt_user(case.question, context)
+
+    for phrase in case.unacceptableClaims:
+        assert phrase not in prompt
+    assert "expectedAbstention" not in prompt
+    assert "unacceptableClaims" not in prompt
