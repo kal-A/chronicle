@@ -1,16 +1,18 @@
 # Chronicle
 
-Chronicle is a local-first, multi-agent AI research engine for historical investigation. It takes an arbitrary historical question, discovers and acquires public sources, builds a retrievable corpus, and runs a four-agent pipeline (Planner → Analyst → Critic → Guide) that returns either a cited answer or a principled abstention.
+Chronicle is a local-first, multi-agent AI research engine for historical investigation.
 
-The system is designed around auditable research rather than chatbot-style output: it is a map-first investigation workspace, not a general-purpose history chatbot. Claims are grounded to retrieved evidence, disagreement and uncertainty are preserved, and failures are handled explicitly rather than fabricated over.
+Given a historical question, it discovers and acquires public sources, builds a retrievable corpus, and runs a four-agent workflow — **Planner → Analyst → Critic → Guide** — designed to return either a source-backed, cited answer or a principled abstention rather than fabricate unsupported claims.
 
-**Stack:** Python, FastAPI, Pydantic, LangGraph, Ollama (`qwen2.5:7b-instruct`), local embeddings, React, TypeScript, Vite, Vitest. Run/corpus state is file-based with a local vector index; there is no external database.
+It pairs source retrieval with a map-first, auditable investigation workspace for exploring people, events, geography, evidence, disagreement, uncertainty, and cause-and-effect — not a general-purpose history chatbot.
+
+**Stack:** Python, FastAPI, Pydantic, LangGraph, Ollama, React, TypeScript, Vite, Vitest. Storage is file-based with a local vector index — no external database.
 
 ## Status
 
-Chronicle is a local pre-alpha on the `phase-e-ai-core` branch. End-to-end generation is working with local models and free/open-source infrastructure: an arbitrary topic is scoped, its sources discovered and acquired from public connectors (Wikipedia, Project Gutenberg, Internet Archive, and in-repo document registers), chunked into a retrievable corpus, and investigated by the four bounded AI roles over typed retrieval tools — surfaced in a map-first workspace behind a FastAPI/SSE runtime. Passage retrieval is lexical, with optional local-embedding semantic re-ranking of the lexical candidates. Time-indexed territory (control / influence / contested) resolves from sourced historical-boundary datasets and works across the BC/CE boundary. The local runtime uses Ollama with `qwen2.5:7b-instruct`; ordinary tests use a deterministic provider.
+Chronicle is in local pre-alpha. End-to-end generation works with local models and free/open-source infrastructure: a question is scoped, public sources are discovered and acquired, a retrievable corpus is built, and four bounded AI roles produce a cited answer or a principled abstention.
 
-The current limitation is **model consistency across the full multi-call pipeline** — not the absence of retrieval or generation capability. Chronicle is built test-first, with roughly 850 backend and 140 frontend tests currently passing, plus six Playwright end-to-end journeys. Still out of scope: an external database, authentication, and Studio review/publication workflows; generic-answer usefulness and CPU-only latency remain under evaluation (Phase E7 is planned, not implemented). New collaborators should begin with the [complete engineering handoff](CHRONICLE_COMPLETE_ENGINEERING_HANDOFF.md); the [PRD](docs/product/CHRONICLE_PRODUCT_REQUIREMENTS.md), [progress report](docs/delivery/CHRONICLE_PROJECT_PROGRESS_REPORT.md), and [`plans/current-phase.md`](plans/current-phase.md) remain supporting records.
+The main remaining limitation is **consistency across the full multi-call local-model pipeline** — not missing retrieval or generation capability. Chronicle is built test-first: roughly 850 backend and 140 frontend tests, plus six Playwright end-to-end journeys, currently pass. Out of scope for now: an external database, authentication, and Studio review/publication workflows; generic-answer usefulness and CPU-only latency remain under evaluation. See [How it works](#how-it-works) for the pipeline and [Current limitations](#current-limitations) for the detail.
 
 ## How it works
 
@@ -28,7 +30,7 @@ A question runs through a bounded pipeline; each stage is a distinct, typed unit
 10. **Grounding validation → cited answer or abstention** — deterministic validators check that every claim resolves to a retrieved passage/source; the run returns a cited answer or a principled abstention.
 11. **Frontend rendering** — a React/TypeScript workspace streams progress over SSE and renders the cited answer, evidence, and a data-driven map.
 
-Orchestration is an explicit LangGraph state machine (`graph.py`), not an autonomous agent swarm. Model calls use JSON-Schema-constrained structured outputs. A test-enforced anti-hardcoding guard keeps the corpus, tool, orchestration, acquisition, and evaluation code free of any specific subject name, so the same code path serves an arbitrary topic.
+Orchestration is an explicit LangGraph state machine (`graph.py`), not an autonomous agent swarm. Model calls run locally through Ollama (`qwen2.5:7b-instruct`) with JSON-Schema-constrained structured outputs; ordinary tests use a deterministic provider instead of live inference. The map renders time-indexed territory (control / influence / contested) resolved from sourced historical-boundary datasets, across the BC/CE boundary. A test-enforced anti-hardcoding guard keeps the corpus, tool, orchestration, acquisition, and evaluation code free of any specific subject name, so the same code path serves an arbitrary topic.
 
 ## Current limitations
 
@@ -42,7 +44,7 @@ Chronicle is honest about what is and isn't reliable:
 
 ## Why this exists
 
-Most AI history tools answer in fluent prose with no traceable basis. Chronicle is built the other way around: an investigation is an auditable object — evidence chains, source-backed claims, preserved disagreement and uncertainty, causal relationships, historical actors, and time-indexed geography — and an honest abstention is a valid result rather than a failure to paper over.
+Many general-purpose AI tools optimize for fluent answers over explicit evidence chains. Chronicle is built the other way around: an investigation is an auditable object — evidence chains, source-backed claims, preserved disagreement and uncertainty, causal relationships, historical actors, and time-indexed geography — and an honest abstention is a valid result rather than a failure to paper over.
 
 ## Project Structure
 
@@ -66,17 +68,17 @@ fixtures/              cross-runtime generated-investigation JSON fixtures
 
 ## Product Shape
 
-- **Generation pipeline** — the product core: scope, discovery, assessment, acquisition, extraction, criticism, geography, composition, and verification.
+- **Generation pipeline** — the product core (see [How it works](#how-it-works)).
 - **Chronicle Explore** — the inspection and navigation environment for generated investigations.
-- **Chronicle Studio** — later review, correction, enrichment, and publication tooling.
+- **Chronicle Studio** — later review, correction, enrichment, and publication tooling (not yet built).
 
 ## Development Model
 
-Chronicle is built in bounded, testable slices: versioned package/generic renderer → deterministic mock CLI → real discovery/acquisition → extraction/criticism/geography → generation UX/assistant/enrichment. See [`docs/delivery/revised-development-phases.md`](docs/delivery/revised-development-phases.md).
+Chronicle is built test-first, in bounded and independently testable vertical slices. See [`docs/delivery/revised-development-phases.md`](docs/delivery/revised-development-phases.md) for the phased roadmap.
 
 ## Cost Constraint
 
-Chronicle is developable and demonstrable entirely on free/open-source tooling: a React/TypeScript/Vite frontend, a Python/FastAPI backend with file-based run/corpus storage and a local vector index (no external database), and Ollama with open-weight models for local inference and embeddings. See [`AGENTS.md`](AGENTS.md) §5 for the full list and the policy on introducing paid dependencies.
+Chronicle is developable and demonstrable entirely on free and open-source tooling — no paid APIs or hosted infrastructure; local inference and embeddings run through Ollama with open-weight models. See [`AGENTS.md`](AGENTS.md) §5 for the policy on introducing paid dependencies.
 
 ## Getting Started
 
@@ -109,7 +111,8 @@ The current packages remain `prototype-curated`, not independently reviewed hist
 
 - GitHub: https://github.com/kal-A/chronicle
 - Start from `AGENTS.md`; Claude Code also reads `CLAUDE.md`.
-- Review the PRD and progress report above before changing architecture.
+- Orientation: the [complete engineering handoff](CHRONICLE_COMPLETE_ENGINEERING_HANDOFF.md), then the [PRD](docs/product/CHRONICLE_PRODUCT_REQUIREMENTS.md), [progress report](docs/delivery/CHRONICLE_PROJECT_PROGRESS_REPORT.md), and [`plans/current-phase.md`](plans/current-phase.md).
+- Review the PRD and progress report before changing architecture.
 - Do not expose the unauthenticated local API publicly or commit secrets/run artifacts.
 
 ## Contributing / Agent Workflow
