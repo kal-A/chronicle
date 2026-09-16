@@ -67,3 +67,164 @@ def test_evaluation_strategy_is_runtime_checkable():
 
     assert isinstance(_Stub(), EvaluationStrategy)
     assert not isinstance(object(), EvaluationStrategy)
+
+
+# --- agent-wrapping adapters (Task 4a) -------------------------------------
+
+from chronicle.ai.contracts.analysis import (
+    AnalysisCitation,
+    AnalysisDraft,
+    AnalysisStatement,
+    DirectnessAssessment,
+    StatementForm,
+    StatementKind,
+)
+from chronicle.ai.contracts.critique import CriticDecision, CriticVerdict
+from chronicle.ai.contracts.plan import (
+    InvestigationPlan,
+    PlanDisposition,
+    PlannedToolCall,
+    QuestionType,
+    ToolPurpose,
+)
+from chronicle.ai.evaluation.benchmark import load_evaluation_benchmark
+from chronicle.ai.evaluation.strategies import EvaluationInput, _run_id, build_strategies
+from chronicle.ai.models import DeterministicModelProvider
+from chronicle.ai.orchestration.runner import InvestigationRunner
+from chronicle.ai.tools import build_default_registry
+from chronicle.contracts.enums import EvidenceLinkRole
+from chronicle.corpus import CorpusRegistry
+
+
+def _case(slug: str):
+    return next(c for c in load_evaluation_benchmark() if c.caseId == slug)
+
+
+def _cold_fixture(corpus, run_id: str):
+    """A cold-question fixture: a search_passages plan (authorized without a
+    workspace selection, unlike the get_claim_evidence path) grounded against a
+    real retrieval bundle, plus an approving critic decision. Mirrors an actual
+    evaluation run, where no record is pre-selected."""
+    registry = build_default_registry()
+    plan = InvestigationPlan(
+        planId=f"plan-{run_id}",
+        runId=run_id,
+        corpusId=corpus.corpus_id,
+        disposition=PlanDisposition.PROCEED,
+        normalizedQuestion="What did the report say?",
+        questionType=QuestionType.DIRECT_EVIDENCE,
+        plannedToolCalls=[
+            PlannedToolCall(
+                callId="search",
+                toolName="search_passages",
+                purposeCode=ToolPurpose.FIND_SUPPORT,
+                arguments={"query": "support"},
+            )
+        ],
+    )
+    bundle = InvestigationRunner(registry).execute_initial(plan, corpus).bundle
+    link = bundle.referenceIndex.evidenceLinks[0]
+    statement = AnalysisStatement(
+        statementId="statement-1",
+        text="The retrieved report records an assurance of support.",
+        statementKind=StatementKind.FACT,
+        statementForm=StatementForm.EXTRACTED_RECORD,
+        basisRecordRefs=[link.targetId],
+        citations=[
+            AnalysisCitation(
+                toolCallId="search",
+                evidenceLinkId=link.evidenceLinkId,
+                passageId=link.passageId,
+                sourceId=link.sourceId,
+                targetType=link.targetType,
+                targetId=link.targetId,
+                role=EvidenceLinkRole(link.role),
+            )
+        ],
+        directness=DirectnessAssessment.DIRECT,
+    )
+    draft = AnalysisDraft(
+        analysisVersion="e3-analyst-v1",
+        runId=run_id,
+        planId=plan.planId,
+        corpusId=corpus.corpus_id,
+        status=AnswerStatus.ANSWERED,
+        statements=[statement],
+    )
+    decision = CriticDecision(
+        criticVersion="e4-critic-v1",
+        runId=run_id,
+        planId=plan.planId,
+        corpusId=corpus.corpus_id,
+        verdict=CriticVerdict.APPROVE,
+        acceptedStatementIds=[statement.statementId],
+        rationaleSummary="The statement is grounded and appropriately bounded.",
+    )
+    return plan, draft, decision
+
+
+def test_build_strategies_exposes_the_agent_adapters_as_the_protocol():
+    strategies = build_strategies()
+    assert StrategyId.PLANNER_ANALYST in strategies
+    assert StrategyId.FULL_WORKFLOW in strategies
+    assert all(isinstance(s, EvaluationStrategy) for s in strategies.values())
+    assert all(s.id is key for key, s in strategies.items())
+
+
+def test_planner_analyst_adapter_produces_grounded_statements():
+    case = _case("direct-reported-assurance")
+    corpus = CorpusRegistry().get_corpus(case.corpusId)
+    # The plan carries the run identity the adapter builds for the request; the
+    # planner enforces plan.runId == request.runId, exactly as in production.
+    plan, draft, _decision = _cold_fixture(corpus, _run_id(case, StrategyId.PLANNER_ANALYST, 0))
+    provider = DeterministicModelProvider()
+    provider.enqueue_value(plan)
+    provider.enqueue_value(draft)
+
+    result = build_strategies()[StrategyId.PLANNER_ANALYST].run(
+        EvaluationInput(case=case, corpus=corpus, provider=provider)
+    )
+
+    assert result.strategyId is StrategyId.PLANNER_ANALYST
+    assert result.answerStatus is AnswerStatus.ANSWERED
+    assert result.statements and result.statements[0].citations
+    assert result.references is not None
+    assert result.modelCallCount == 2  # planner + analyst; retrieval is not a model call
+    assert result.providerName == "deterministic"
+
+
+def test_full_workflow_adapter_normalizes_the_validated_answer():
+    case = _case("direct-reported-assurance")
+    corpus = CorpusRegistry().get_corpus(case.corpusId)
+    plan, draft, decision = _cold_fixture(corpus, _run_id(case, StrategyId.FULL_WORKFLOW, 0))
+    provider = DeterministicModelProvider()
+    for value in (plan, draft, decision):  # Guide composes deterministically (no model call)
+        provider.enqueue_value(value)
+
+    result = build_strategies()[StrategyId.FULL_WORKFLOW].run(
+        EvaluationInput(case=case, corpus=corpus, provider=provider)
+    )
+
+    assert result.strategyId is StrategyId.FULL_WORKFLOW
+    assert result.answerStatus is AnswerStatus.ANSWERED
+    assert result.answerText  # the Guide's composed directAnswer
+    assert result.statements and result.statements[0].citations
+    assert result.modelCallCount == 3  # planner + analyst + critic
+
+
+def test_full_workflow_adapter_reports_abstention_as_a_result_not_a_crash():
+    case = _case("direct-reported-assurance")
+    corpus = CorpusRegistry().get_corpus(case.corpusId)
+    plan, draft, _decision = _cold_fixture(corpus, _run_id(case, StrategyId.FULL_WORKFLOW, 0))
+    provider = DeterministicModelProvider()
+    provider.enqueue_value(plan)
+    provider.enqueue_value(draft)
+    provider.enqueue_malformed("critic cannot comply")
+    provider.enqueue_malformed("critic still cannot comply")
+
+    result = build_strategies()[StrategyId.FULL_WORKFLOW].run(
+        EvaluationInput(case=case, corpus=corpus, provider=provider)
+    )
+
+    assert result.answerStatus is AnswerStatus.ABSTAINED
+    assert result.statements == ()
