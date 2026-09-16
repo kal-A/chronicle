@@ -1,0 +1,12 @@
+{
+  "registryVersion": "e7-registry-v1",
+  "benchmarkVersion": "e7-v1",
+  "caseSchemaVersion": "e7-case-v1",
+  "caseFile": "cases.json",
+  "caseFileSha256": "PENDING",
+  "corpusIds": ["blank-cheque-golden", "concert-of-europe-1814-1822"],
+  "strategyIds": ["single_prompt", "basic_rag", "planner_analyst", "full_workflow"],
+  "generationSettings": {"temperature": 0.0},
+  "executionPolicy": "default",
+  "canonicalReportSchemaVersion": "e7-report-v1"
+}
