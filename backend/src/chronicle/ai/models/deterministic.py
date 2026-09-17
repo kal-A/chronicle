@@ -31,6 +31,7 @@ from .errors import (
     RetryExhaustedError,
     SchemaValidationError,
 )
+from .artifacts import ProviderIdentity
 from .metadata import (
     CostBasis,
     ModelCallRecord,
@@ -250,6 +251,18 @@ class DeterministicModelProvider:
 
     def health_check(self) -> ProviderHealth:
         return ProviderHealth(healthy=True, detail="deterministic provider is always healthy")
+
+    def provider_identity(self) -> ProviderIdentity:
+        # A stable synthetic digest derived from the provider version, so the
+        # deterministic provider satisfies the same audited identity contract as
+        # a live provider without pretending to be a real model build.
+        return ProviderIdentity(
+            providerName="deterministic",
+            providerVersion=self._provider_version,
+            modelName=DETERMINISTIC_MODEL_NAME,
+            modelVersion=None,
+            modelDigest=hashlib.sha256(self._provider_version.encode("utf-8")).hexdigest(),
+        )
 
     @property
     def provider_metadata(self) -> ProviderMetadata:

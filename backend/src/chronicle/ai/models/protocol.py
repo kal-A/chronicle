@@ -19,6 +19,7 @@ from typing import Any, Protocol, TypeVar, runtime_checkable
 
 from pydantic import BaseModel
 
+from .artifacts import ProviderIdentity
 from .metadata import ModelGenerationSettings, ProviderHealth, ProviderMetadata
 from ..contracts.structured_generation import StructuredGenerationResult, TextGenerationResult
 
@@ -60,6 +61,12 @@ class ModelProvider(Protocol):
         ...
 
     def health_check(self) -> ProviderHealth:
+        ...
+
+    def provider_identity(self) -> ProviderIdentity:
+        """Identify the provider and the exact model behind it. modelVersion /
+        modelDigest are None when the provider cannot report them, never
+        fabricated."""
         ...
 
     @property

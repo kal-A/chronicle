@@ -45,6 +45,7 @@ from .errors import (
     RetryExhaustedError,
     SchemaValidationError,
 )
+from .artifacts import ProviderIdentity
 from .metadata import (
     CostBasis,
     ModelCallRecord,
@@ -307,6 +308,27 @@ class OllamaModelProvider:
         if response.status_code != 200:
             return ProviderHealth(healthy=False, detail=f"Ollama returned HTTP {response.status_code}")
         return ProviderHealth(healthy=True, detail=f"Ollama reachable at {self._base_url}")
+
+    def provider_identity(self) -> ProviderIdentity:
+        # Read the real model digest from /api/tags; leave it None (never
+        # fabricated) if the server is unreachable or the model is not listed.
+        digest: str | None = None
+        try:
+            response = self._client.get("/api/tags", timeout=min(self._timeout, 5.0))
+            if response.status_code == 200:
+                for entry in response.json().get("models", []):
+                    if entry.get("name") == self._model:
+                        digest = entry.get("digest")
+                        break
+        except (httpx.HTTPError, ValueError):
+            digest = None
+        return ProviderIdentity(
+            providerName="ollama",
+            providerVersion=self._provider_version,
+            modelName=self._model,
+            modelVersion=None,
+            modelDigest=digest,
+        )
 
     @property
     def provider_metadata(self) -> ProviderMetadata:
