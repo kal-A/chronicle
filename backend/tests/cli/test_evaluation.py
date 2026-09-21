@@ -102,3 +102,48 @@ def test_evaluate_parser_routes_run_and_status(monkeypatch, tmp_path):
     assert cli_main.main(["evaluate", "status", str(tmp_path)]) == 0
     assert calls[0][0] == "run" and calls[0][1]["max_cases"] == 2
     assert calls[1] == ("status", str(tmp_path))
+
+
+def _seed_run(output):
+    evaluation_cli.cmd_evaluate_run(
+        profile="deterministic_full",
+        provider="deterministic",
+        output=str(output),
+        cases=None,
+        strategies="single_prompt",
+        max_cases=2,
+        repeats=1,
+        out=io.StringIO(),
+    )
+
+
+def test_evaluate_report_writes_json_and_markdown(tmp_path):
+    output = tmp_path / "run"
+    _seed_run(output)
+    out = io.StringIO()
+    exit_code = evaluation_cli.cmd_evaluate_report(str(output), out=out)
+    assert exit_code == 0
+    report = json.loads((output / "report.json").read_text(encoding="utf-8"))
+    assert report["reportSchemaVersion"] == "e7-report-v1"
+    assert (output / "report.md").read_text(encoding="utf-8").startswith("# Evaluation report")
+    assert "gates failed:" in out.getvalue()
+
+
+def test_evaluate_export_review_blinds_answers(tmp_path):
+    output = tmp_path / "run"
+    _seed_run(output)
+    review = tmp_path / "review.json"
+    key = tmp_path / "review.key.json"
+    out = io.StringIO()
+    exit_code = evaluation_cli.cmd_evaluate_export_review(
+        str(output), str(review), seed=3, key=str(key), out=out
+    )
+    assert exit_code == 0
+    blob = review.read_text(encoding="utf-8")
+    assert "single_prompt" not in blob and "deterministic" not in blob
+    assert len(json.loads(key.read_text(encoding="utf-8"))) == 2
+
+
+def test_evaluate_report_missing_run_is_reported(tmp_path):
+    out = io.StringIO()
+    assert evaluation_cli.cmd_evaluate_report(str(tmp_path / "nope"), out=out) == 2

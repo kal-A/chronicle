@@ -181,6 +181,16 @@ def _investigation_ids(investigation) -> set[str]:
     }
 
 
+def corpus_record_ids(registry: CorpusRegistry) -> dict[str, frozenset[str]]:
+    """Every record ID in each registered corpus, keyed by corpus. Used to detect
+    cross-corpus citation leakage when scoring strategy results."""
+
+    return {
+        corpus_id: frozenset(_investigation_ids(registry.get_corpus(corpus_id).get_investigation()))
+        for corpus_id in registry.list_corpus_ids()
+    }
+
+
 def validate_benchmark_references(
     cases: Iterable[BenchmarkCase], registry: CorpusRegistry
 ) -> BenchmarkReferenceValidationReport:

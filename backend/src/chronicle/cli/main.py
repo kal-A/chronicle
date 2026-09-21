@@ -95,6 +95,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_eval_run.add_argument("--repeats", type=int, default=1, help="Repeats per identity (default: 1)")
     p_eval_status = evaluate_sub.add_parser("status", help="Report a run's completed/remaining progress")
     p_eval_status.add_argument("run", help="Run output directory")
+    p_eval_report = evaluate_sub.add_parser("report", help="Score a run into JSON + Markdown reports")
+    p_eval_report.add_argument("run", help="Run output directory")
+    p_eval_report.add_argument("--json", dest="output_json", default=None, help="JSON report path")
+    p_eval_report.add_argument("--markdown", dest="output_md", default=None, help="Markdown report path")
+    p_eval_review = evaluate_sub.add_parser(
+        "export-review", help="Write a single-reviewer blinded export (answers only)"
+    )
+    p_eval_review.add_argument("run", help="Run output directory")
+    p_eval_review.add_argument("--output", required=True, help="Blinded review file path")
+    p_eval_review.add_argument("--key", default=None, help="Blinding key path (default: alongside --output)")
+    p_eval_review.add_argument("--seed", type=int, default=0, help="Answer-order shuffle seed")
 
     return parser
 
@@ -133,6 +144,12 @@ def main(argv: list[str] | None = None) -> int:
             )
         if args.evaluate_command == "status":
             return evaluation_cmds.cmd_evaluate_status(args.run)
+        if args.evaluate_command == "report":
+            return evaluation_cmds.cmd_evaluate_report(args.run, args.output_json, args.output_md)
+        if args.evaluate_command == "export-review":
+            return evaluation_cmds.cmd_evaluate_export_review(
+                args.run, args.output, args.seed, args.key
+            )
 
     store = RunStore(Path(args.runs_dir))
     if args.command == "generate":

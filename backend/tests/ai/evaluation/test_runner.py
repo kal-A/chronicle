@@ -169,3 +169,45 @@ def test_results_are_written_under_the_output_dir_only(tmp_path):
     )
     written = sorted(p.name for p in (output_dir / "results").glob("*.json"))
     assert written == sorted(f"{c.caseId}__single_prompt__r0.json" for c in cases)
+
+
+def test_deterministic_full_profile_runs_every_identity_end_to_end(tmp_path):
+    """The whole spine, 24 cases x 4 strategies: the runner drives all identities
+    without crashing and the report aggregates every strategy. The unscripted
+    deterministic provider yields principled abstentions, so this proves the
+    harness end to end (not answer quality, which needs scripted providers)."""
+
+    from chronicle.ai.evaluation.benchmark import corpus_record_ids
+    from chronicle.ai.evaluation.reporting import build_report, foreign_ids_by_corpus, render_json, render_markdown
+    from chronicle.ai.evaluation.runner import load_results
+    from chronicle.ai.evaluation.strategies import build_strategies
+
+    cases = load_evaluation_benchmark()
+    registry = load_registry()
+    corpus_registry = CorpusRegistry()
+    output_dir = tmp_path / "full"
+
+    manifest = run_benchmark(
+        registry,
+        cases,
+        build_strategies(),
+        _provider_factory,
+        corpus_registry,
+        profile=EvaluationProfile.DETERMINISTIC_FULL,
+        output_dir=output_dir,
+    )
+    assert len(manifest.completed) == len(cases) * 4
+    assert not manifest.remaining
+
+    results = [result for _identity, result in load_results(output_dir)]
+    report = build_report(
+        {c.caseId: c for c in cases},
+        results,
+        benchmark_version=registry.benchmarkVersion,
+        profile=EvaluationProfile.DETERMINISTIC_FULL,
+        foreign_ids_by_corpus=foreign_ids_by_corpus(corpus_record_ids(corpus_registry)),
+    )
+    assert len(report.aggregate.strategies) == 4
+    # Both renderers are byte-stable and non-empty.
+    assert render_json(report) == render_json(report)
+    assert render_markdown(report).startswith("# Evaluation report")

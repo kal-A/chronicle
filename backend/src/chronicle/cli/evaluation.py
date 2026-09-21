@@ -10,9 +10,20 @@ import sys
 from pathlib import Path
 from typing import TextIO
 
-from ..ai.evaluation.benchmark import load_evaluation_benchmark, load_registry
+from ..ai.evaluation.benchmark import (
+    corpus_record_ids,
+    load_evaluation_benchmark,
+    load_registry,
+)
 from ..ai.evaluation.contracts import EvaluationProfile, StrategyId
-from ..ai.evaluation.runner import load_manifest, run_benchmark
+from ..ai.evaluation.reporting import (
+    build_report,
+    export_review,
+    foreign_ids_by_corpus,
+    render_json,
+    render_markdown,
+)
+from ..ai.evaluation.runner import load_manifest, load_results, run_benchmark
 from ..ai.evaluation.strategies import build_strategies
 from ..ai.models.deterministic import DeterministicModelProvider
 from ..corpus.manifest import CorpusRegistry
@@ -94,4 +105,57 @@ def cmd_evaluate_status(run: str, out: TextIO = sys.stdout) -> int:
     print(f"  provider: {manifest.providerName} ({manifest.providerVersion})", file=out)
     print(f"  completed: {len(manifest.completed)} of {total}", file=out)
     print(f"  remaining: {len(manifest.remaining)}", file=out)
+    return 0
+
+
+def cmd_evaluate_report(
+    run: str,
+    output_json: str | None = None,
+    output_md: str | None = None,
+    out: TextIO = sys.stdout,
+) -> int:
+    manifest = load_manifest(Path(run))
+    if manifest is None:
+        print(f'No evaluation run found at "{run}"', file=out)
+        return 2
+    results = [result for _identity, result in load_results(run)]
+    if not results:
+        print(f'No results to report at "{run}"', file=out)
+        return 2
+
+    cases = {case.caseId: case for case in load_evaluation_benchmark()}
+    foreign = foreign_ids_by_corpus(corpus_record_ids(CorpusRegistry()))
+    report = build_report(
+        cases,
+        results,
+        benchmark_version=manifest.benchmarkVersion,
+        profile=manifest.profile,
+        foreign_ids_by_corpus=foreign,
+    )
+
+    json_path = Path(output_json) if output_json else Path(run) / "report.json"
+    md_path = Path(output_md) if output_md else Path(run) / "report.md"
+    json_path.write_text(render_json(report), encoding="utf-8")
+    md_path.write_text(render_markdown(report), encoding="utf-8")
+
+    failed = [g for g in report.gates if g.status == "fail"]
+    print(f"Report written: {json_path} , {md_path}", file=out)
+    print(f"  strategies: {len(report.aggregate.strategies)}", file=out)
+    print(f"  gates failed: {len(failed)}", file=out)
+    print(f"  flagged answers: {len(report.flagged)}", file=out)
+    return 0
+
+
+def cmd_evaluate_export_review(
+    run: str,
+    output: str,
+    seed: int,
+    key: str | None = None,
+    out: TextIO = sys.stdout,
+) -> int:
+    if load_manifest(Path(run)) is None:
+        print(f'No evaluation run found at "{run}"', file=out)
+        return 2
+    export_review(run, output, key_path=key, shuffle_seed=seed)
+    print(f"Blinded review written: {output}", file=out)
     return 0

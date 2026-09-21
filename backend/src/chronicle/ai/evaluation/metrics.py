@@ -6,12 +6,19 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from typing import TYPE_CHECKING
+
 from ...contracts.enums import EvidenceLinkRole
 from ..contracts.analysis import AnalysisCitation, AnalysisDraft, AnswerStatus
 from ..contracts.plan import InvestigationPlan, PlanDisposition
 from ..contracts.retrieval import RetrievedReferenceIndex
 from ..orchestration.policies import AgentExecutionPolicy
 from .benchmark import BenchmarkCase
+from .contracts import StrategyId
+
+if TYPE_CHECKING:  # StrategyResult lives in strategies.py (heavy imports); only annotated here
+    from .contracts import EvaluationCase
+    from .strategies import StrategyResult
 
 
 class EvaluationResult(BaseModel):
@@ -156,6 +163,100 @@ def evaluate_case(
             )
 
     return EvaluationResult(**values)
+
+
+class StrategyScore(BaseModel):
+    """Per-result deterministic metrics as raw numerator/denominator counts, so
+    they aggregate exactly. Human-only dimensions (semantic entailment,
+    usefulness) are never scored here -- they surface as ``incomplete`` gates."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    caseId: str
+    strategyId: StrategyId
+    repeat: int = Field(ge=0)
+    corpusId: str
+    answerStatus: AnswerStatus
+
+    citationValidNumerator: int = Field(ge=0)
+    citationValidDenominator: int = Field(ge=0)
+    coverageNumerator: int = Field(ge=0)
+    coverageDenominator: int = Field(ge=0)
+    requiredRecallNumerator: int = Field(ge=0)
+    requiredRecallDenominator: int = Field(ge=0)
+    roleRecallNumerator: int = Field(ge=0)
+    roleRecallDenominator: int = Field(ge=0)
+    temporalNumerator: int = Field(ge=0)
+    temporalDenominator: int = Field(ge=0)
+
+    forbiddenHits: tuple[str, ...] = ()
+    leakageHits: tuple[str, ...] = ()
+    unacceptableClaimHits: tuple[str, ...] = ()
+
+    abstentionExpected: bool = False
+    abstained: bool = False
+    abstentionCorrect: bool = True
+
+
+def score_result(
+    case: "EvaluationCase",
+    result: "StrategyResult",
+    *,
+    foreign_ids: frozenset[str] = frozenset(),
+) -> StrategyScore:
+    """Score one strategy result against a case's machine-checkable expectations.
+
+    ``foreign_ids`` are record IDs known to belong to *other* corpora; citing one
+    is cross-corpus leakage. Gold rubric fields are never consulted."""
+
+    statements = result.statements
+    citations = [citation for statement in statements for citation in statement.citations]
+    references = result.references
+
+    if references is not None:
+        valid_by_id = {id(c): _citation_is_valid(c, references) for c in citations}
+    else:
+        valid_by_id = {id(c): False for c in citations}
+
+    valid_citations = [c for c in citations if valid_by_id[id(c)]]
+    supported = sum(
+        any(valid_by_id[id(c)] for c in statement.citations) for statement in statements
+    )
+    valid_ids: set[str] = set().union(*(_citation_ids(c) for c in valid_citations)) if valid_citations else set()
+    all_cited_ids: set[str] = set().union(*(_citation_ids(c) for c in citations)) if citations else set()
+
+    required = set(case.requiredEvidenceIds)
+    required_events = {eid for constraint in case.temporalConstraints for eid in constraint.eventIds}
+    retrieved_events = set(references.eventIds) if references is not None else set()
+
+    normalized = "\n".join(statement.text.casefold() for statement in statements)
+    abstained = result.answerStatus is AnswerStatus.ABSTAINED
+
+    return StrategyScore(
+        caseId=case.caseId,
+        strategyId=result.strategyId,
+        repeat=result.repeat,
+        corpusId=result.corpusId,
+        answerStatus=result.answerStatus,
+        citationValidNumerator=sum(valid_by_id.values()),
+        citationValidDenominator=len(citations),
+        coverageNumerator=supported,
+        coverageDenominator=len(statements),
+        requiredRecallNumerator=len(valid_ids & required),
+        requiredRecallDenominator=len(required),
+        roleRecallNumerator=sum(c.role in case.expectedCitationRoles for c in valid_citations),
+        roleRecallDenominator=len(valid_citations) if case.expectedCitationRoles else 0,
+        temporalNumerator=len(required_events & retrieved_events),
+        temporalDenominator=len(required_events),
+        forbiddenHits=tuple(rid for rid in case.forbiddenEvidenceIds if rid in all_cited_ids),
+        leakageHits=tuple(sorted(all_cited_ids & foreign_ids)),
+        unacceptableClaimHits=tuple(
+            phrase for phrase in case.unacceptableClaims if phrase.casefold() in normalized
+        ),
+        abstentionExpected=case.expectedAbstention,
+        abstained=abstained,
+        abstentionCorrect=(abstained == case.expectedAbstention),
+    )
 
 
 class ObservationAvailability(str, Enum):

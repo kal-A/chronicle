@@ -194,3 +194,82 @@ def test_budget_observations_preserve_unavailable_values_and_detect_excesses() -
     assert by_name["analyst_model_calls"].availability is ObservationAvailability.UNAVAILABLE
     assert by_name["analyst_model_calls"].withinLimit is None
     assert by_name["planner_prompt_characters"].withinLimit is True
+
+
+# --- E7.5: per-result strategy scoring ------------------------------------
+
+from chronicle.ai.evaluation.contracts import EvaluationCase, EvaluationProfile, StrategyId
+from chronicle.ai.evaluation.metrics import score_result
+from chronicle.ai.evaluation.strategies import EvaluationStatement, StrategyResult
+
+
+def _e7_case(**kw) -> EvaluationCase:
+    base = dict(
+        caseId="direct-reported-assurance",
+        legacyAliases=("bc-01",),
+        benchmarkVersion="e7-v1",
+        corpusId="blank-cheque-golden",
+        question="What did the report state?",
+        category=QuestionType.DIRECT_EVIDENCE,
+        profiles=(EvaluationProfile.DETERMINISTIC_FULL,),
+        acceptableTools=("search_passages",),
+    )
+    base.update(kw)
+    return EvaluationCase(**base)
+
+
+def _e7_result(statements=(), *, status=AnswerStatus.ANSWERED, references=None, **kw) -> StrategyResult:
+    base = dict(
+        caseId="direct-reported-assurance",
+        strategyId=StrategyId.BASIC_RAG,
+        corpusId="blank-cheque-golden",
+        answerStatus=status,
+        answerText="",
+        statements=tuple(statements),
+        references=references,
+        modelCallCount=1,
+        latencyMs=0.0,
+        benchmarkVersion="e7-v1",
+        providerName="deterministic",
+        providerVersion="e1-deterministic-v1",
+        modelName="deterministic-test-model",
+        promptVersions=("eval-basic-rag-v1",),
+        repeat=0,
+    )
+    base.update(kw)
+    return StrategyResult(**base)
+
+
+def test_answered_result_with_zero_citations_fails_coverage_not_validity():
+    case = _e7_case()
+    result = _e7_result((EvaluationStatement(statementId="s1", text="a claim", citations=()),))
+    score = score_result(case, result)
+    # No citations at all -> validity denominator is 0 -> not applicable.
+    assert score.citationValidDenominator == 0
+    # But there is one statement and it is unsupported -> coverage 0/1.
+    assert score.coverageNumerator == 0 and score.coverageDenominator == 1
+
+
+def test_cross_corpus_id_is_a_hard_leakage_failure():
+    case = _e7_case()
+    citation = AnalysisCitation(toolCallId="baseline", passageId="foreign-passage-1")
+    result = _e7_result((EvaluationStatement(statementId="s1", text="x", citations=(citation,)),))
+    score = score_result(case, result, foreign_ids=frozenset({"foreign-passage-1"}))
+    assert "foreign-passage-1" in score.leakageHits
+
+
+def test_forbidden_evidence_hit_is_recorded_separately_from_leakage():
+    case = _e7_case(forbiddenEvidenceIds=("evidence-forbidden-1",))
+    citation = AnalysisCitation(toolCallId="baseline", passageId="evidence-forbidden-1")
+    result = _e7_result((EvaluationStatement(statementId="s1", text="x", citations=(citation,)),))
+    score = score_result(case, result)
+    assert "evidence-forbidden-1" in score.forbiddenHits
+    assert not score.leakageHits
+
+
+def test_abstention_correctness_reflects_expectation():
+    case = _e7_case(expectedAbstention=True)
+    answered = score_result(case, _e7_result(status=AnswerStatus.ANSWERED))
+    abstained = score_result(case, _e7_result(status=AnswerStatus.ABSTAINED))
+    assert answered.abstentionCorrect is False
+    assert abstained.abstentionCorrect is True
