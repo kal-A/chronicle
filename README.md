@@ -100,12 +100,31 @@ Backend and local assistant (PowerShell):
 py -3.11 -m venv backend/.venv
 backend/.venv/Scripts/python -m pip install -e "backend[test]"
 ollama pull qwen2.5:7b-instruct
-backend/.venv/Scripts/python -m uvicorn chronicle.api.app:app --app-dir backend/src --host 127.0.0.1 --port 8000
+backend/.venv/Scripts/python -m uvicorn "chronicle.api:create_default_app" --factory --host 127.0.0.1 --port 8000
 ```
 
 Run the frontend in another terminal with `npm run dev`. Vite proxies `/api` and `/health` to the local backend. Live-Ollama tests are opt-in; normal backend tests use the deterministic provider.
 
 The current packages remain `prototype-curated`, not independently reviewed historical publications.
+
+### Run the demo locally
+
+Two terminals, with [Ollama](https://ollama.com) running and `qwen2.5:7b-instruct` pulled:
+
+```powershell
+# terminal 1 — API (set the flag to enrich live-acquired corpora with events/geography/territory)
+$env:CHRONICLE_ENABLE_EXTRACTION = "1"
+backend/.venv/Scripts/python -m uvicorn "chronicle.api:create_default_app" --factory --host 127.0.0.1 --port 8000
+```
+
+```bash
+# terminal 2 — frontend
+npm run dev
+```
+
+Open http://localhost:5173 and either pick a **suggested topic** (a reviewed, curated corpus — fast and reliable) or type **any other question** (researched live from free public sources with the local model — minutes-scale and experimental). The four agents stream over SSE and the workspace renders the cited answer, evidence, and a data-driven map.
+
+> **Run one model workload at a time.** A full investigation loads a local model and saturates CPU; running a second concurrent model job (e.g. a live acquisition script) alongside a UI investigation can exhaust memory on a modest machine and kill the dev servers. Demo one investigation at a time, and close other large local models (e.g. a 14B) first.
 
 ## Collaborating
 
