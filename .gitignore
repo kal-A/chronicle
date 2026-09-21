@@ -28,6 +28,7 @@ backend/**/__pycache__
 backend/**/*.egg-info
 backend/.pytest_cache
 backend/runs
+backend/evaluation-runs/
 
 # Historical-boundaries dataset — a large (~69 MB) backend resolver input fetched
 # on demand, not committed. Populate with: python backend/scripts/fetch_boundaries.py

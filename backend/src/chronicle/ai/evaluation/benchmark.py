@@ -99,6 +99,34 @@ class BenchmarkValidationError(ValueError):
 #: The versioned case data. Kept out of code so this module holds no subject
 #: names and the anti-topic-branching guard can scan ``ai/evaluation``.
 _CASES_PATH = Path(__file__).resolve().parents[4] / "benchmarks" / "e7" / "cases.json"
+_REGISTRY_PATH = _CASES_PATH.parent / "registry.json"
+
+
+class BenchmarkRegistry(BaseModel):
+    """The versioned E7 benchmark manifest: which case file (and its hash), which
+    corpora/strategies are in scope, and the report/schema versions. Loaded from
+    ``benchmarks/e7/registry.json`` — the values are registration data, so this
+    code stays subject-agnostic."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    registryVersion: str = Field(min_length=1)
+    benchmarkVersion: str = Field(min_length=1)
+    caseSchemaVersion: str = Field(min_length=1)
+    caseFile: str = Field(min_length=1)
+    caseFileSha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    corpusIds: tuple[str, ...] = Field(min_length=1)
+    strategyIds: tuple[str, ...] = Field(min_length=1)
+    generationSettings: dict[str, float] = Field(default_factory=dict)
+    executionPolicy: str = Field(min_length=1)
+    canonicalReportSchemaVersion: str = Field(min_length=1)
+
+
+def load_registry(path: Path | None = None) -> BenchmarkRegistry:
+    """Load the E7 benchmark registry (defaults to the packaged registry.json)."""
+
+    registry_path = path or _REGISTRY_PATH
+    return BenchmarkRegistry.model_validate_json(registry_path.read_text(encoding="utf-8"))
 
 
 def load_evaluation_benchmark() -> tuple["EvaluationCase", ...]:

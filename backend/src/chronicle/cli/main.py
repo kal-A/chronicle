@@ -9,6 +9,7 @@ from pathlib import Path
 
 from ..storage.run_store import RunStore
 from . import commands
+from . import evaluation as evaluation_cmds
 
 DEFAULT_RUNS_DIR = Path(__file__).resolve().parents[3] / "runs"  # backend/runs
 
@@ -72,6 +73,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON input for the tool (corpusId filled in from --corpus-id if omitted)",
     )
 
+    p_evaluate = subparsers.add_parser(
+        "evaluate", help="Run the E7 comparative evaluation harness (Phase E7)"
+    )
+    evaluate_sub = p_evaluate.add_subparsers(dest="evaluate_command", required=True)
+    p_eval_run = evaluate_sub.add_parser("run", help="Execute a benchmark profile, resuming if interrupted")
+    p_eval_run.add_argument(
+        "--profile", default="deterministic_full", help="Evaluation profile (default: deterministic_full)"
+    )
+    p_eval_run.add_argument(
+        "--provider", default="deterministic", help="Model provider (Slice 1: deterministic)"
+    )
+    p_eval_run.add_argument(
+        "--output",
+        default=str(Path(__file__).resolve().parents[3] / "evaluation-runs" / "latest"),
+        help="Run output directory (default: backend/evaluation-runs/latest)",
+    )
+    p_eval_run.add_argument("--cases", default=None, help="Comma-separated caseId/legacy-alias filter")
+    p_eval_run.add_argument("--strategies", default=None, help="Comma-separated strategy id filter")
+    p_eval_run.add_argument("--max-cases", type=int, default=None, help="Cap the number of cases")
+    p_eval_run.add_argument("--repeats", type=int, default=1, help="Repeats per identity (default: 1)")
+    p_eval_status = evaluate_sub.add_parser("status", help="Report a run's completed/remaining progress")
+    p_eval_status.add_argument("run", help="Run output directory")
+
     return parser
 
 
@@ -95,6 +119,20 @@ def main(argv: list[str] | None = None) -> int:
             return commands.cmd_tools_list()
         if args.tools_command == "invoke":
             return commands.cmd_tools_invoke(args.tool_name, args.corpus_id, args.input)
+
+    if args.command == "evaluate":
+        if args.evaluate_command == "run":
+            return evaluation_cmds.cmd_evaluate_run(
+                profile=args.profile,
+                provider=args.provider,
+                output=args.output,
+                cases=args.cases,
+                strategies=args.strategies,
+                max_cases=args.max_cases,
+                repeats=args.repeats,
+            )
+        if args.evaluate_command == "status":
+            return evaluation_cmds.cmd_evaluate_status(args.run)
 
     store = RunStore(Path(args.runs_dir))
     if args.command == "generate":
