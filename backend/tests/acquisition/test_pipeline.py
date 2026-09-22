@@ -86,6 +86,53 @@ def test_discovery_respects_max_total():
     assert [c.candidateId for c in result.candidates] == ["x", "y"]
 
 
+def _titled(candidate_id, title, *, snippet=None):
+    return SourceCandidate(
+        candidateId=candidate_id,
+        connector="wikipedia",
+        title=title,
+        sourceType=SourceType.TERTIARY_REFERENCE,
+        fullTextAvailable=True,
+        rightsStatus=RightsStatus.LICENSED,
+        snippet=snippet,
+    )
+
+
+def test_discovery_drops_namesakes_and_keeps_on_topic_sources():
+    # The exact failure observed live: a topic search returns the real subject
+    # plus unrelated namesakes that share only the head word.
+    connector = FakeConnector(
+        "wikipedia",
+        [
+            _titled("real", "Anaconda Plan", snippet="Union strategy to blockade the Confederacy"),
+            _titled("film1", "Anaconda (1997 film)", snippet="A horror film about a giant snake"),
+            _titled("film2", "Anaconda 3: Offspring", snippet="A creature sequel about the snake"),
+            _titled("related", "Union blockade", snippet="The naval blockade of the Confederacy"),
+        ],
+        {},
+    )
+    query = DiscoveryQuery(topic="Anaconda Plan", terms=["blockade", "Confederacy"])
+    result = discover_sources([connector], query)
+
+    kept = [c.candidateId for c in result.candidates]
+    assert "real" in kept and "related" in kept
+    assert "film1" not in kept and "film2" not in kept
+    # The exact-phrase title outranks the term-only match.
+    assert kept[0] == "real"
+
+
+def test_discovery_keeps_all_when_topic_is_unambiguous_signal_free():
+    # A one-word topic with no scope terms carries no disambiguating signal, so
+    # recall wins: nothing is dropped.
+    connector = FakeConnector(
+        "wikipedia",
+        [_titled("a", "Anaconda (1997 film)"), _titled("b", "Anaconda Plan")],
+        {},
+    )
+    result = discover_sources([connector], DiscoveryQuery(topic="Anaconda"))
+    assert {c.candidateId for c in result.candidates} == {"a", "b"}
+
+
 # --- fetch cache -------------------------------------------------------------
 
 def test_fetch_cache_avoids_second_network_fetch(tmp_path):
