@@ -45,9 +45,13 @@ So the pipeline has no **retrieval floor**: a weak plan yields zero evidence ins
 
 ## Proposed slices
 
-1. **S1 — Passage-retrieval floor.** In the retrieval runner, after executing the planned calls, if no `search_passages` result is present, run one bounded `search_passages(question)` and merge its hits into the bundle/reference index under the existing per-tool and aggregate budgets. Tests: a plan that omits `search_passages` over a passages-only corpus still yields a non-empty reference index; budgets and citation validity are unchanged; a plan that already searched is not double-charged.
-2. **S2 — Planner steering.** Prompt/heuristic so descriptive questions over a draft corpus plan a `search_passages` call; verify with a deterministic-provider planner test.
-3. **S3 — Re-verify live.** Re-run the Anaconda investigation end to end (7B when memory allows, else 3B) and confirm a cited answer, not an abstention.
+1. **S1 — Passage-retrieval floor. ✅ done (`38cfe32`).** `InvestigationRunner(retrieval_floor=True)` (enabled in `create_default_app`) appends one bounded `search_passages(question)` when a plan omits it. Verified on the live Anaconda corpus: retrieved passages 0 → 2, the two exact defining passages. Off by default so deterministic tests / E7 are unchanged.
+2. **S2 — Planner steering. ✅ done (`43b523b`).** The planner system prompt now steers direct/descriptive questions to the passage-search tool. Verified live on 3B: the Anaconda plan changed from `DISPUTED_INTERPRETATION` + `get_map_context` (0 passages) to `DIRECT_EVIDENCE` + `search_passages` (the right tool) — the planner now plans correct retrieval on its own.
+3. **S3 — Re-verify live. Blocked on hardware.** With S1+S2 the retrieval side is solved, but the run still abstains because the **3B analyst cannot ground an answer even from perfect passages** — small-model *analyst* capacity. 7B grounded cited answers over the curated corpora, but 7B OOMs on the current machine (~1.8 GB free vs ~5 GB needed). S3 is a live 7B run once memory allows (free other apps or use a larger host); no further code is expected to be needed.
+
+## Status after S1 + S2
+
+The engine-logic chain for "search anything → grounded retrieval" is complete: acquisition (good), disambiguation (`8a7c0dd`), plan validation (`04d5977`), planner tool-selection (S2), and a retrieval floor backstop (S1). The **only** remaining blocker to a live *cited answer* is running a capable model at the analyst stage — a hardware/model constraint, not an engine defect.
 
 ## Verification target
 
