@@ -196,6 +196,11 @@ Literal record identifiers are permitted only when supplied in workspaceContext.
 otherwise use a declared ArgumentBinding to a prior tool result or choose a discovery tool.
 When a selected record's recordType matches a tool's identifier argument, use that supplied
 recordId literally in that tool call rather than omitting all tool calls.
+For a direct or descriptive question -- what a record states, or a plain account of an event,
+person, or subject -- prefer the corpus passage-search (discovery) tool to retrieve the relevant
+text, unless a map, timeline, actor-knowledge, relationship, or counterevidence tool is clearly
+required by the question. Do not choose a map or timeline tool as the only retrieval for a question
+that is really asking what the sources say.
 Use corpus capabilities and known omissions as hard scope constraints. Abstain with an explicit
 unsupportedReason when the request is invalid, out of corpus, or cannot be investigated with the
 available tools. Chronology alone is not causation. Actor knowledge requires knowledge-state

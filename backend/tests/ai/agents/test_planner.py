@@ -351,6 +351,21 @@ def test_prompt_is_topic_neutral_and_explicitly_forbids_answering_or_inventing_i
     assert prompt.toolSpecCharacters == len(json.dumps(prompt.serializedToolSpecs, sort_keys=True))
 
 
+def test_prompt_steers_descriptive_questions_to_passage_search():
+    # S2: a descriptive/direct question should prefer corpus passage search over a
+    # map/timeline tool, so a small model does not plan a call that retrieves nothing.
+    prompt = build_planner_prompt(
+        _request(),
+        _snapshot(),
+        [_spec()],
+        AgentExecutionPolicy(),
+        representation=ToolSpecRepresentation.CAPABILITY_FILTERED,
+    )
+    system = prompt.systemPrompt.lower()
+    assert "direct or descriptive" in system
+    assert "passage-search" in system
+
+
 def test_prompt_caps_advertised_tool_limits_to_execution_policy():
     specs = build_default_registry().list_specs()
     prompt = build_planner_prompt(
