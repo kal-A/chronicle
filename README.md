@@ -126,6 +126,16 @@ Open http://localhost:5173 and either pick a **suggested topic** (a reviewed, cu
 
 > **Run one model workload at a time.** A full investigation loads a local model and saturates CPU; running a second concurrent model job (e.g. a live acquisition script) alongside a UI investigation can exhaust memory on a modest machine and kill the dev servers. Demo one investigation at a time, and close other large local models (e.g. a 14B) first.
 
+**Low-memory machines.** The whole pipeline shares one Ollama model, selectable without a code change via `CHRONICLE_OLLAMA_MODEL` (default `qwen2.5:7b-instruct`, which needs ~5 GB free). On a machine with little free RAM, swap in a smaller model — `qwen2.5:3b-instruct` (~2 GB) is a reasonable floor; `qwen2.5:1.5b-instruct` runs but abstains and mis-structures more often. The pipeline is tuned for 7B, so smaller models trade answer quality for footprint. Pull the model first, then set the variable before starting the API:
+
+```powershell
+ollama pull qwen2.5:3b-instruct
+$env:CHRONICLE_OLLAMA_MODEL = "qwen2.5:3b-instruct"
+$env:CHRONICLE_OLLAMA_TIMEOUT = "240"   # optional: give a slower host more headroom
+```
+
+The API prints the resolved model to stderr at startup (`[chronicle] Ollama model=…`) so you can confirm the override took effect.
+
 ## Collaborating
 
 - GitHub: https://github.com/kal-A/chronicle

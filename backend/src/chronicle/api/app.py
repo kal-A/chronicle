@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 import os
+import sys
 from pathlib import Path
 from typing import Iterator
 from uuid import uuid4
@@ -16,7 +17,11 @@ from ..ai.agents import EvidenceAnalyst, HistoricalCritic, InvestigationGuide, I
 from ..ai.agents.planner_prompt import ToolSpecRepresentation
 from ..ai.contracts.run import AgentRunRecord, CorpusSnapshot, InvestigationRequest
 from ..ai.models import OllamaModelProvider
-from ..ai.models.ollama import resolve_timeout_from_env
+from ..ai.models.ollama import (
+    resolve_base_url_from_env,
+    resolve_model_from_env,
+    resolve_timeout_from_env,
+)
 from ..ai.orchestration.finalization import FinalizationRunner
 from ..ai.orchestration.manager import (
     AgentRunAlreadyActiveError,
@@ -299,6 +304,17 @@ def create_default_app() -> FastAPI:
     # the UI streams bounded progress while the request remains synchronous. A
     # larger, slower model can be given a higher ceiling via CHRONICLE_OLLAMA_TIMEOUT.
     provider = OllamaModelProvider(timeout=resolve_timeout_from_env(180.0))
+    # Operator-facing startup banner: the whole pipeline shares this one provider,
+    # so a low-memory host can swap in a smaller model with CHRONICLE_OLLAMA_MODEL
+    # (e.g. qwen2.5:3b-instruct) and confirm here that the override took effect.
+    print(
+        "[chronicle] Ollama model="
+        f"{resolve_model_from_env()} base_url={resolve_base_url_from_env()} "
+        f"extraction={_env_flag('CHRONICLE_ENABLE_EXTRACTION')} "
+        f"semantic={_env_flag('CHRONICLE_ENABLE_SEMANTIC')}",
+        file=sys.stderr,
+        flush=True,
+    )
     # Evidence-window cap tuned for local-model prompt-processing speed: on a
     # CPU-only host the analyst re-reads its whole retrieval bundle at ~13 tok/s,
     # so a fat aggregate window (the schema ceiling is 14k chars) can push a
