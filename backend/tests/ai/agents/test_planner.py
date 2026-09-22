@@ -554,7 +554,7 @@ def test_planner_supplies_a_strict_tool_specific_schema_to_the_model():
     assert claim_call["properties"]["dependsOn"]["maxItems"] == 0
 
 
-def test_planner_rejects_model_requested_result_limit_above_policy():
+def test_planner_clamps_model_requested_result_limit_to_policy():
     oversized = _plan().model_copy(
         update={
             "plannedToolCalls": [
@@ -585,8 +585,10 @@ def test_planner_rejects_model_requested_result_limit_above_policy():
     provider = DeterministicModelProvider()
     provider.enqueue_value(oversized)
 
-    with pytest.raises(PlannerValidationError, match="result limit"):
-        InvestigationPlanner(provider).plan(_request(), _snapshot(), [extended_spec])
+    # A benign overage is clamped to the per-tool budget, not rejected: the
+    # investigation proceeds instead of abstaining over a minor limit request.
+    plan = InvestigationPlanner(provider).plan(_request(), _snapshot(), [extended_spec])
+    assert plan.plannedToolCalls[0].arguments["maxResults"] == 4  # policy max, clamped from 5
 
 
 def test_planner_rejects_forward_or_duplicate_argument_bindings():

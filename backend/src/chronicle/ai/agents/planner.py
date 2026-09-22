@@ -9,6 +9,7 @@ from typing import Any, Mapping, Sequence
 from ..contracts.plan import (
     InvestigationPlan,
     PlanDisposition,
+    PlannedToolCall,
     QuestionType,
     RequiredEvidenceType,
 )
@@ -121,7 +122,7 @@ class InvestigationPlanner:
                 maxCompletionTokens=self._policy.plannerMaxCompletionTokens,
             ),
         )
-        candidate = result.value
+        candidate = self._clamp_result_limits(result.value)
         try:
             self._validate_candidate(candidate, request, corpus_snapshot, specs)
         except PlannerValidationError as exc:
@@ -138,6 +139,34 @@ class InvestigationPlanner:
             representation=self._representation,
         )
         return candidate
+
+    def _clamp_result_limits(self, plan: InvestigationPlan) -> InvestigationPlan:
+        """Clamp a model-requested result limit down to the per-tool budget rather
+        than rejecting the whole plan. Small local models routinely ask for a few
+        more results than the policy allows; a benign overage must not sink an
+        otherwise valid investigation (this was a frequent cause of spurious
+        abstention on auto-acquired corpora). The runner re-checks the budget at
+        execution time, so the clamp is belt-and-suspenders, not the only guard."""
+
+        cap = self._policy.maxResultsPerTool
+        clamped_calls: list[PlannedToolCall] = []
+        changed = False
+        for call in plan.plannedToolCalls:
+            overrides: dict[str, int] = {}
+            for limit_name in ("maxResults", "maxPaths"):
+                value = call.arguments.get(limit_name)
+                if isinstance(value, int) and not isinstance(value, bool) and value > cap:
+                    overrides[limit_name] = cap
+            if overrides:
+                changed = True
+                clamped_calls.append(
+                    call.model_copy(update={"arguments": {**call.arguments, **overrides}})
+                )
+            else:
+                clamped_calls.append(call)
+        if not changed:
+            return plan
+        return plan.model_copy(update={"plannedToolCalls": clamped_calls})
 
     def _validate_candidate(
         self,
@@ -193,17 +222,6 @@ class InvestigationPlanner:
                 bound_arguments=bound_arguments,
                 corpus_id=corpus.corpusId,
             )
-            for limit_name in ("maxResults", "maxPaths"):
-                requested_limit = call.arguments.get(limit_name)
-                if (
-                    isinstance(requested_limit, int)
-                    and not isinstance(requested_limit, bool)
-                    and requested_limit > self._policy.maxResultsPerTool
-                ):
-                    raise PlannerValidationError(
-                        f'tool "{call.toolName}" requested a result limit above '
-                        f"{self._policy.maxResultsPerTool}"
-                    )
             _validate_literal_record_ids(
                 call.arguments,
                 trusted_ids=trusted_ids,
