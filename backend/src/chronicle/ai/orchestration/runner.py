@@ -13,7 +13,7 @@ from ...corpus.contracts import EvidenceLinkProjection
 from ...corpus.protocol import InvestigationCorpus
 from ...storage.agent_run_store import AgentRunStore
 from ...workflow.hashing import stable_json_hash
-from ..contracts.plan import InvestigationPlan, PlannedToolCall, PlanDisposition
+from ..contracts.plan import InvestigationPlan, PlannedToolCall, PlanDisposition, ToolPurpose
 from ..contracts.retrieval import RetrievalBundle, RetrievedReferenceIndex, ToolResultEnvelope
 from ..contracts.run import AgentStageName, AgentStageRecord, AgentStageStatus
 from ..tools.contracts import ToolCallRecord, ToolCallStatus, ToolExecutionContext
@@ -32,6 +32,14 @@ class RetrievalExecution:
 
 class PlanExecutionValidationError(ValueError):
     """The complete plan cannot be safely dispatched against this corpus."""
+
+
+#: The always-available corpus-text search tool. When the retrieval floor is on
+#: and a plan omits it, the runner appends one bounded call so the analyst always
+#: sees the most relevant passages even if the planner chose a tool that retrieves
+#: nothing over a draft (passages-only) corpus. A tool name, not a subject.
+_PASSAGE_SEARCH_TOOL = "search_passages"
+_FLOOR_CALL_ID = "floor-search-passages"
 
 
 _RECORD_ID_FIELDS: dict[str, tuple[str, ...]] = {
@@ -69,10 +77,15 @@ class InvestigationRunner:
         policy: AgentExecutionPolicy | None = None,
         allowed_tool_names: Iterable[str] | None = None,
         utc_clock: Callable[[], datetime] | None = None,
+        retrieval_floor: bool = False,
     ) -> None:
         self.registry = registry
         self.store = store
         self.policy = policy or AgentExecutionPolicy()
+        # Opt-in (default off so deterministic tests and the E7 harness are
+        # unaffected); the live app turns it on so "search anything" always
+        # retrieves the corpus text.
+        self._retrieval_floor = retrieval_floor
         registered = {definition.name for definition in registry.list()}
         self.allowed_tool_names = frozenset(
             registered if allowed_tool_names is None else allowed_tool_names
@@ -119,12 +132,49 @@ class InvestigationRunner:
         return self._execute_calls(
             plan,
             corpus,
-            calls=plan.plannedToolCalls,
+            calls=self._augment_with_floor(plan, corpus, plan.plannedToolCalls),
             existing=None,
             round_number=0,
             started_at=started_at,
             deadline_at=deadline_at,
         )
+
+    def _augment_with_floor(
+        self,
+        plan: InvestigationPlan,
+        corpus: InvestigationCorpus,
+        calls: list[PlannedToolCall],
+    ) -> list[PlannedToolCall]:
+        """Append one bounded ``search_passages`` when the plan omits it, so a weak
+        or off-target plan still retrieves the corpus text. Off unless the runner
+        was built with ``retrieval_floor=True``. No-op when the plan already
+        searches, when the tool is unavailable for this corpus, or when a planned
+        call already uses the floor's reserved id."""
+
+        if not self._retrieval_floor:
+            return calls
+        if any(call.toolName == _PASSAGE_SEARCH_TOOL for call in calls):
+            return calls
+        if any(call.callId == _FLOOR_CALL_ID for call in calls):
+            return calls
+        if _PASSAGE_SEARCH_TOOL not in self.allowed_tool_names:
+            return calls
+        try:
+            definition = self.registry.get(_PASSAGE_SEARCH_TOOL)
+        except ToolError:
+            return calls
+        if definition.required_capabilities - corpus.get_manifest().supportedCapabilities:
+            return calls
+        query = (plan.normalizedQuestion or "").strip()
+        if not query:
+            return calls
+        floor_call = PlannedToolCall(
+            callId=_FLOOR_CALL_ID,
+            toolName=_PASSAGE_SEARCH_TOOL,
+            purposeCode=ToolPurpose.SEARCH_CONTEXT,
+            arguments={"query": query, "maxResults": self.policy.maxResultsPerTool},
+        )
+        return [*calls, floor_call]
 
     def execute_follow_up(
         self,

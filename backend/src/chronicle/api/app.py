@@ -329,7 +329,12 @@ def create_default_app() -> FastAPI:
         maxAggregateRetrievalCharacters=8_000,
     )
     analyst = EvidenceAnalyst(provider, policy)
-    retrieval = InvestigationRunner(build_default_registry(), store=store, policy=policy)
+    # retrieval_floor: over an auto-acquired (passages-only) corpus a small local
+    # model may plan a tool that retrieves nothing; the floor guarantees one
+    # bounded search_passages so "search anything" still returns grounded text.
+    retrieval = InvestigationRunner(
+        build_default_registry(), store=store, policy=policy, retrieval_floor=True
+    )
     workflow = LangGraphAgentWorkflow(
         planner=InvestigationPlanner(
             provider,
