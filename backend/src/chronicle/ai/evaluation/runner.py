@@ -295,6 +295,20 @@ def _ref_kwargs(identity: ResultIdentity, results_dir: Path, output_dir: Path) -
     }
 
 
+def load_results(output_dir: Path | str) -> list[tuple[ResultIdentity, StrategyResult]]:
+    """Every persisted (identity, result) pair in a run, ordered by filename."""
+
+    results_dir = Path(output_dir) / _RESULTS_DIRNAME
+    pairs: list[tuple[ResultIdentity, StrategyResult]] = []
+    if not results_dir.is_dir():
+        return pairs
+    for path in sorted(results_dir.glob("*.json")):
+        persisted = _load_persisted(path)
+        if persisted is not None:
+            pairs.append((persisted.identity, persisted.result))
+    return pairs
+
+
 def load_manifest(output_dir: Path | str) -> RunManifest | None:
     """Read a run's manifest, or ``None`` when the directory has no run."""
 
@@ -313,4 +327,5 @@ __all__ = [
     "RunManifest",
     "run_benchmark",
     "load_manifest",
+    "load_results",
 ]
