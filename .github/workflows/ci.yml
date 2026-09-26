@@ -1,0 +1,78 @@
+name: CI
+
+# Runs the backend and frontend suites automatically on every push to the
+# main lines of development and on every pull request into master.
+#
+# Everything here uses the repository's own canonical commands (backend
+# pyproject / root package.json scripts). No step needs personal credentials,
+# API keys, a GPU, a local Ollama daemon, or live network sources — those tests
+# are deselected by design (see "Excluded from CI" in .github/workflows/README.md).
+
+on:
+  push:
+    branches: [master, phase-e-ai-core]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Install backend (editable, with test extra)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+
+      # pyproject addopts already deselect the local_ollama_integration and
+      # live_network_integration markers, so this run needs no Ollama, no
+      # network sources, and no credentials.
+      - name: Run backend test suite
+        run: pytest
+
+  frontend:
+    name: Frontend (lint · typecheck · vitest · build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install (locked)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Unit tests (Vitest)
+        run: npx vitest run
+
+      - name: Production build
+        run: npm run build
