@@ -1,0 +1,268 @@
+{
+  "runs_dir": "runs",
+  "files_scanned": 134,
+  "runs_with_measured_latency": 55,
+  "by_model": {
+    "qwen2.5:14b-instruct": {
+      "runs": 9,
+      "statuses": {
+        "answer_ready": 5,
+        "failed": 3,
+        "abstained": 1
+      },
+      "end_to_end_stage_sum": {
+        "n": 9,
+        "mean_s": 911.4,
+        "min_s": 182.9,
+        "max_s": 1550.6,
+        "stdev_s": 458.3
+      },
+      "per_stage": {
+        "planner": {
+          "stage": {
+            "n": 9,
+            "mean_s": 216.6,
+            "min_s": 108.1,
+            "max_s": 365.0,
+            "stdev_s": 94.2
+          },
+          "model_generation": {
+            "n": 9,
+            "mean_s": 216.6,
+            "min_s": 108.1,
+            "max_s": 365.0,
+            "stdev_s": 94.2
+          }
+        },
+        "retrieval": {
+          "stage": {
+            "n": 10,
+            "mean_s": 0.1,
+            "min_s": 0.0,
+            "max_s": 0.1,
+            "stdev_s": 0.0
+          },
+          "model_generation": {
+            "n": 0
+          }
+        },
+        "analyst": {
+          "stage": {
+            "n": 7,
+            "mean_s": 497.6,
+            "min_s": 293.1,
+            "max_s": 1202.3,
+            "stdev_s": 324.5
+          },
+          "model_generation": {
+            "n": 7,
+            "mean_s": 497.6,
+            "min_s": 293.1,
+            "max_s": 1202.3,
+            "stdev_s": 324.5
+          }
+        },
+        "critic": {
+          "stage": {
+            "n": 6,
+            "mean_s": 302.7,
+            "min_s": 240.9,
+            "max_s": 396.8,
+            "stdev_s": 51.2
+          },
+          "model_generation": {
+            "n": 6,
+            "mean_s": 302.7,
+            "min_s": 240.9,
+            "max_s": 396.8,
+            "stdev_s": 51.2
+          }
+        },
+        "guide": {
+          "stage": {
+            "n": 6,
+            "mean_s": 158.8,
+            "min_s": 84.3,
+            "max_s": 381.3,
+            "stdev_s": 114.8
+          },
+          "model_generation": {
+            "n": 6,
+            "mean_s": 158.8,
+            "min_s": 84.3,
+            "max_s": 381.3,
+            "stdev_s": 114.8
+          }
+        }
+      }
+    },
+    "qwen2.5:3b-instruct": {
+      "runs": 1,
+      "statuses": {
+        "abstained": 1
+      },
+      "end_to_end_stage_sum": {
+        "n": 1,
+        "mean_s": 147.8,
+        "min_s": 147.8,
+        "max_s": 147.8,
+        "stdev_s": 0.0
+      },
+      "per_stage": {
+        "planner": {
+          "stage": {
+            "n": 1,
+            "mean_s": 43.9,
+            "min_s": 43.9,
+            "max_s": 43.9,
+            "stdev_s": 0.0
+          },
+          "model_generation": {
+            "n": 1,
+            "mean_s": 43.9,
+            "min_s": 43.9,
+            "max_s": 43.9,
+            "stdev_s": 0.0
+          }
+        },
+        "retrieval": {
+          "stage": {
+            "n": 1,
+            "mean_s": 0.3,
+            "min_s": 0.3,
+            "max_s": 0.3,
+            "stdev_s": 0.0
+          },
+          "model_generation": {
+            "n": 0
+          }
+        },
+        "analyst": {
+          "stage": {
+            "n": 1,
+            "mean_s": 65.4,
+            "min_s": 65.4,
+            "max_s": 65.4,
+            "stdev_s": 0.0
+          },
+          "model_generation": {
+            "n": 1,
+            "mean_s": 65.4,
+            "min_s": 65.4,
+            "max_s": 65.4,
+            "stdev_s": 0.0
+          }
+        },
+        "critic": {
+          "stage": {
+            "n": 1,
+            "mean_s": 38.2,
+            "min_s": 38.2,
+            "max_s": 38.2,
+            "stdev_s": 0.0
+          },
+          "model_generation": {
+            "n": 1,
+            "mean_s": 38.2,
+            "min_s": 38.2,
+            "max_s": 38.2,
+            "stdev_s": 0.0
+          }
+        }
+      }
+    },
+    "qwen2.5:7b-instruct": {
+      "runs": 45,
+      "statuses": {
+        "abstained": 20,
+        "failed": 17,
+        "answer_ready": 8
+      },
+      "end_to_end_stage_sum": {
+        "n": 45,
+        "mean_s": 286.0,
+        "min_s": 54.2,
+        "max_s": 715.4,
+        "stdev_s": 185.0
+      },
+      "per_stage": {
+        "planner": {
+          "stage": {
+            "n": 46,
+            "mean_s": 84.7,
+            "min_s": 48.9,
+            "max_s": 138.9,
+            "stdev_s": 25.8
+          },
+          "model_generation": {
+            "n": 46,
+            "mean_s": 84.7,
+            "min_s": 48.9,
+            "max_s": 138.9,
+            "stdev_s": 25.8
+          }
+        },
+        "retrieval": {
+          "stage": {
+            "n": 35,
+            "mean_s": 0.1,
+            "min_s": 0.0,
+            "max_s": 0.3,
+            "stdev_s": 0.1
+          },
+          "model_generation": {
+            "n": 0
+          }
+        },
+        "analyst": {
+          "stage": {
+            "n": 29,
+            "mean_s": 212.6,
+            "min_s": 96.3,
+            "max_s": 340.4,
+            "stdev_s": 86.8
+          },
+          "model_generation": {
+            "n": 29,
+            "mean_s": 212.6,
+            "min_s": 96.3,
+            "max_s": 340.4,
+            "stdev_s": 86.8
+          }
+        },
+        "critic": {
+          "stage": {
+            "n": 18,
+            "mean_s": 131.6,
+            "min_s": 65.7,
+            "max_s": 233.3,
+            "stdev_s": 60.3
+          },
+          "model_generation": {
+            "n": 18,
+            "mean_s": 131.6,
+            "min_s": 65.7,
+            "max_s": 233.3,
+            "stdev_s": 60.3
+          }
+        },
+        "guide": {
+          "stage": {
+            "n": 6,
+            "mean_s": 72.6,
+            "min_s": 41.0,
+            "max_s": 139.6,
+            "stdev_s": 45.7
+          },
+          "model_generation": {
+            "n": 6,
+            "mean_s": 72.6,
+            "min_s": 41.0,
+            "max_s": 139.6,
+            "stdev_s": 45.7
+          }
+        }
+      }
+    }
+  }
+}
