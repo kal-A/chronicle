@@ -115,3 +115,15 @@ class SemanticReranker:
         seen = set(ordered)
         ordered.extend(passage_id for passage_id in candidate_ids if passage_id not in seen)
         return ordered
+
+    def recall(self, query: str, *, k: int = 8) -> list[tuple[str, float]]:
+        """Return the top-``k`` semantically nearest passage ids over the *whole*
+        index (not just a lexical candidate set), each with its similarity score.
+
+        This is the recall lane: unlike :meth:`order`, which can only reorder
+        passages the lexical search already surfaced, this can surface passages
+        the lexical lane missed entirely (e.g. relevant passages that share no
+        query tokens). An empty index returns ``[]``, so a corpus with no
+        semantic index degrades to pure lexical retrieval.
+        """
+        return semantic_search(query, self._embedder, self._store, k=k)

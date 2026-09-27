@@ -1,0 +1,111 @@
+{
+  "generatedAt": "2026-09-27T17:17:47.998633+00:00",
+  "corpusShape": "passages-only draft (no claims/relationships/dates)",
+  "k": 2,
+  "embedder": "frozen synthetic (deterministic; no Ollama)",
+  "aggregate": {
+    "relevantAvailable": 5,
+    "lexicalRelevantRetrieved": 2,
+    "hybridRelevantRetrieved": 4,
+    "recallGain": 2,
+    "lexicalRecall": 0.4,
+    "hybridRecall": 0.8,
+    "duplicatePassageIdsTotal": 0
+  },
+  "cases": [
+    {
+      "caseId": "reworded-relevant",
+      "intent": "Relevant evidence is worded differently from the query; lexical can reach only one of three relevant sources, the rest are semantic-only.",
+      "query": "harbor blockade",
+      "k": 2,
+      "relevantAvailable": 3,
+      "lexicalReturned": 2,
+      "hybridReturned": 2,
+      "lexicalRelevant": 1,
+      "hybridRelevant": 2,
+      "recallGain": 1,
+      "lexicalDistinctSources": 2,
+      "hybridDistinctSources": 2,
+      "duplicatePassageIds": 0,
+      "retrievalDepthCandidates": 8,
+      "lexicalMs": 0.525,
+      "hybridMs": 0.579,
+      "lexicalTitles": [
+        "Blockade Dispatch",
+        "Harbor Festival"
+      ],
+      "hybridTitles": [
+        "Blockade Dispatch",
+        "Coastal Interdiction"
+      ]
+    },
+    {
+      "caseId": "pure-recall-lexical-empty",
+      "intent": "Query shares no token with any source; the one relevant source is reachable only semantically (lexical returns nothing relevant).",
+      "query": "mountain railway",
+      "k": 2,
+      "relevantAvailable": 1,
+      "lexicalReturned": 0,
+      "hybridReturned": 1,
+      "lexicalRelevant": 0,
+      "hybridRelevant": 1,
+      "recallGain": 1,
+      "lexicalDistinctSources": 0,
+      "hybridDistinctSources": 1,
+      "duplicatePassageIds": 0,
+      "retrievalDepthCandidates": 8,
+      "lexicalMs": 0.174,
+      "hybridMs": 0.341,
+      "lexicalTitles": [],
+      "hybridTitles": [
+        "Alpine Rail"
+      ]
+    },
+    {
+      "caseId": "aligned-no-regression",
+      "intent": "Lexical already reaches the single relevant source; hybrid must retain it and not displace it (control).",
+      "query": "harbor festival regatta",
+      "k": 2,
+      "relevantAvailable": 1,
+      "lexicalReturned": 2,
+      "hybridReturned": 2,
+      "lexicalRelevant": 1,
+      "hybridRelevant": 1,
+      "recallGain": 0,
+      "lexicalDistinctSources": 2,
+      "hybridDistinctSources": 2,
+      "duplicatePassageIds": 0,
+      "retrievalDepthCandidates": 8,
+      "lexicalMs": 0.257,
+      "hybridMs": 0.4,
+      "lexicalTitles": [
+        "Harbor Festival",
+        "Blockade Dispatch"
+      ],
+      "hybridTitles": [
+        "Harbor Festival",
+        "Blockade Dispatch"
+      ]
+    },
+    {
+      "caseId": "absent-evidence",
+      "intent": "No source is about the query's concept; neither lane should find relevant evidence (measures the precision cost of unconditional semantic recall).",
+      "query": "diplomatic congress protocol",
+      "k": 2,
+      "relevantAvailable": 0,
+      "lexicalReturned": 0,
+      "hybridReturned": 0,
+      "lexicalRelevant": 0,
+      "hybridRelevant": 0,
+      "recallGain": 0,
+      "lexicalDistinctSources": 0,
+      "hybridDistinctSources": 0,
+      "duplicatePassageIds": 0,
+      "retrievalDepthCandidates": 8,
+      "lexicalMs": 0.163,
+      "hybridMs": 0.212,
+      "lexicalTitles": [],
+      "hybridTitles": []
+    }
+  ]
+}
