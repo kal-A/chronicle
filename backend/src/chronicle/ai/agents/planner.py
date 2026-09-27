@@ -95,7 +95,9 @@ class InvestigationPlanner:
             raise PlannerValidationError("request and corpus snapshot identity do not match")
 
         specs = available_tool_specs(tool_specs, corpus_snapshot, request)
-        response_schema = build_planner_response_schema(request, specs)
+        response_schema = build_planner_response_schema(
+            request, specs, max_tool_calls=self._policy.maxInitialToolCalls
+        )
         try:
             prompt = build_planner_prompt(
                 request,

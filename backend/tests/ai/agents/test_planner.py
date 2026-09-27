@@ -344,7 +344,7 @@ def test_prompt_is_topic_neutral_and_explicitly_forbids_answering_or_inventing_i
     combined = f"{prompt.systemPrompt}\n{prompt.userPrompt}".lower()
     assert "do not answer" in combined
     assert "do not invent" in combined
-    assert "proceed requires exactly one plannedtoolcall" in combined
+    assert "complementary passage" in combined and "distinct queries" in combined
     assert "abstain requires zero plannedtoolcalls" in combined
     assert "blank cheque" not in combined
     assert "concert of europe" not in combined
@@ -564,7 +564,10 @@ def test_planner_supplies_a_strict_tool_specific_schema_to_the_model():
         "bindings",
         "dependsOn",
     }
-    assert schema["properties"]["plannedToolCalls"]["maxItems"] == 1
+    # The planner passes policy.maxInitialToolCalls (default 3), so an
+    # evidence-seeking question can be decomposed into several complementary
+    # searches (E10 breadth); the default builder call still caps at 1.
+    assert schema["properties"]["plannedToolCalls"]["maxItems"] == 3
     assert claim_call["properties"]["bindings"]["maxItems"] == 0
     assert claim_call["properties"]["dependsOn"]["maxItems"] == 0
 

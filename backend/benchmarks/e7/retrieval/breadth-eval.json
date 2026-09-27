@@ -1,0 +1,82 @@
+{
+  "generatedAt": "2026-09-27T21:43:59.787923+00:00",
+  "k": 2,
+  "embedder": "frozen synthetic (deterministic; no Ollama)",
+  "cases": [
+    {
+      "caseId": "multi-aspect",
+      "intent": "Answer needs evidence from three aspects, each in its own source; one broad query reaches one aspect, decomposition reaches all three.",
+      "relevantAvailable": 6,
+      "single": {
+        "distinctRelevant": 2,
+        "aspectsCovered": 1,
+        "relevantSources": 1,
+        "noiseRetrieved": 0,
+        "chars": 1000,
+        "ms": 1.893,
+        "recall": 0.333
+      },
+      "decomposed": {
+        "distinctRelevant": 6,
+        "aspectsCovered": 3,
+        "relevantSources": 3,
+        "noiseRetrieved": 0,
+        "chars": 4386,
+        "ms": 3.82,
+        "recall": 1.0,
+        "duplicateRate": 0.0,
+        "subqueries": 3
+      }
+    },
+    {
+      "caseId": "dominant-relevant-source",
+      "intent": "All relevant evidence lives in one source spanning three aspects; breadth improves distinct relevant passages even though source diversity stays 1.",
+      "relevantAvailable": 6,
+      "single": {
+        "distinctRelevant": 2,
+        "aspectsCovered": 1,
+        "relevantSources": 1,
+        "noiseRetrieved": 0,
+        "chars": 1000,
+        "ms": 0.921,
+        "recall": 0.333
+      },
+      "decomposed": {
+        "distinctRelevant": 6,
+        "aspectsCovered": 3,
+        "relevantSources": 1,
+        "noiseRetrieved": 0,
+        "chars": 4386,
+        "ms": 5.166,
+        "recall": 1.0,
+        "duplicateRate": 0.0,
+        "subqueries": 3
+      }
+    },
+    {
+      "caseId": "dominant-noise-source",
+      "intent": "One relevant source plus two larger namesake noise sources (mirrors the Anaconda films). Decomposition must NOT pull noise passages to diversify.",
+      "relevantAvailable": 4,
+      "single": {
+        "distinctRelevant": 2,
+        "aspectsCovered": 1,
+        "relevantSources": 1,
+        "noiseRetrieved": 0,
+        "chars": 1000,
+        "ms": 4.532,
+        "recall": 0.5
+      },
+      "decomposed": {
+        "distinctRelevant": 4,
+        "aspectsCovered": 2,
+        "relevantSources": 2,
+        "noiseRetrieved": 0,
+        "chars": 2876,
+        "ms": 8.487,
+        "recall": 1.0,
+        "duplicateRate": 0.0,
+        "subqueries": 3
+      }
+    }
+  ]
+}

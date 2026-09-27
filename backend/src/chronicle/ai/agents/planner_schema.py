@@ -90,8 +90,15 @@ def contextual_tool_specs(
 def build_planner_response_schema(
     request: InvestigationRequest,
     specs: Sequence[ToolSpec],
+    *,
+    max_tool_calls: int = 1,
 ) -> dict[str, Any]:
-    """Couple each advertised tool name to its real, trusted argument schema."""
+    """Couple each advertised tool name to its real, trusted argument schema.
+
+    ``max_tool_calls`` caps ``plannedToolCalls`` (the runner's initial tool-call
+    budget). It defaults to 1 for backward compatibility; the deployed planner
+    passes ``policy.maxInitialToolCalls`` so an evidence-seeking question can be
+    decomposed into several complementary searches (E10 breadth)."""
 
     schema = deepcopy(InvestigationPlan.model_json_schema())
     schema["required"] = list(schema["properties"])
@@ -130,7 +137,7 @@ def build_planner_response_schema(
     planned_calls = schema["properties"]["plannedToolCalls"]
     if variants:
         planned_calls["items"] = {"oneOf": variants}
-        planned_calls["maxItems"] = 1
+        planned_calls["maxItems"] = max(1, max_tool_calls)
     else:
         planned_calls["items"] = {}
         planned_calls["maxItems"] = 0

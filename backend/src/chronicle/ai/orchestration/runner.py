@@ -9,7 +9,17 @@ from typing import Callable, Iterable
 
 from pydantic import BaseModel, ValidationError
 
+import re
+
 from ...corpus.contracts import EvidenceLinkProjection
+from ...corpus.package_corpus import (
+    CAPABILITY_CLAIMS,
+    CAPABILITY_KNOWLEDGE_STATES,
+    CAPABILITY_MAP_CONTEXT,
+    CAPABILITY_PASSAGES,
+    CAPABILITY_RELATIONSHIPS,
+    CAPABILITY_TIMELINE,
+)
 from ...corpus.protocol import InvestigationCorpus
 from ...storage.agent_run_store import AgentRunStore
 from ...workflow.hashing import stable_json_hash
@@ -145,17 +155,27 @@ class InvestigationRunner:
         corpus: InvestigationCorpus,
         calls: list[PlannedToolCall],
     ) -> list[PlannedToolCall]:
-        """Append one bounded ``search_passages`` when the plan omits it, so a weak
-        or off-target plan still retrieves the corpus text. Off unless the runner
-        was built with ``retrieval_floor=True``. No-op when the plan already
-        searches, when the tool is unavailable for this corpus, or when a planned
-        call already uses the floor's reserved id."""
+        """Guarantee investigation-grade passage retrieval breadth.
+
+        Two backstops, both opt-in (``retrieval_floor=True``) and both no-ops when
+        the plan already provides them, so deterministic tests and the E7 harness
+        are unaffected:
+
+        * **Floor** (any corpus): if the plan omits ``search_passages`` entirely,
+          append one for the normalized question, so a weak/off-target plan still
+          retrieves the corpus text.
+        * **Breadth** (passages-only *draft* corpora only): ensure up to
+          ``maxInitialToolCalls`` complementary passage searches with distinct
+          queries, so a plan that under-decomposes an evidence-seeking question
+          still assembles complementary evidence. Curated/synthesized corpora,
+          which the planner drives with claim/relationship/timeline tools, are
+          left untouched.
+
+        All added calls stay within the runner's existing budget; the aggregate
+        character/result/total-call caps in ``_execute_calls`` remain the ceiling.
+        """
 
         if not self._retrieval_floor:
-            return calls
-        if any(call.toolName == _PASSAGE_SEARCH_TOOL for call in calls):
-            return calls
-        if any(call.callId == _FLOOR_CALL_ID for call in calls):
             return calls
         if _PASSAGE_SEARCH_TOOL not in self.allowed_tool_names:
             return calls
@@ -168,13 +188,43 @@ class InvestigationRunner:
         query = (plan.normalizedQuestion or "").strip()
         if not query:
             return calls
-        floor_call = PlannedToolCall(
-            callId=_FLOOR_CALL_ID,
+
+        augmented = list(calls)
+        existing_queries = [
+            str(call.arguments.get("query", "")).strip().casefold()
+            for call in augmented
+            if call.toolName == _PASSAGE_SEARCH_TOOL
+        ]
+
+        # Floor: no passage search at all -> add one for the normalized question.
+        if not any(call.toolName == _PASSAGE_SEARCH_TOOL for call in augmented) and not any(
+            call.callId == _FLOOR_CALL_ID for call in augmented
+        ):
+            augmented.append(self._breadth_call(query, index=0))
+            existing_queries.append(query.casefold())
+
+        # Breadth: only for passages-only draft corpora, and never past the
+        # initial tool-call budget (the single follow-up round stays reserved).
+        if _is_passages_only_draft(corpus):
+            target = self.policy.maxInitialToolCalls
+            search_count = sum(call.toolName == _PASSAGE_SEARCH_TOOL for call in augmented)
+            if search_count < target:
+                derived = _derive_breadth_queries(query, existing_queries, target - search_count)
+                for offset, derived_query in enumerate(derived):
+                    augmented.append(self._breadth_call(derived_query, index=search_count + offset))
+        return augmented
+
+    def _breadth_call(self, query: str, *, index: int) -> PlannedToolCall:
+        """A runner-owned bounded ``search_passages`` call. The first keeps the
+        historical floor id; extras get a unique suffixed id."""
+
+        call_id = _FLOOR_CALL_ID if index == 0 else f"{_FLOOR_CALL_ID}-{index}"
+        return PlannedToolCall(
+            callId=call_id,
             toolName=_PASSAGE_SEARCH_TOOL,
             purposeCode=ToolPurpose.SEARCH_CONTEXT,
             arguments={"query": query, "maxResults": self.policy.maxResultsPerTool},
         )
-        return [*calls, floor_call]
 
     def execute_follow_up(
         self,
@@ -748,6 +798,87 @@ def _empty_bundle(plan: InvestigationPlan, *, partial: bool) -> RetrievalBundle:
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+#: Capabilities that mark a corpus as structured (curated/synthesized). Their
+#: absence, with passages present, is what distinguishes a passages-only draft
+#: corpus -- the only shape the breadth backstop applies to.
+_STRUCTURED_CAPABILITIES = frozenset(
+    {
+        CAPABILITY_CLAIMS,
+        CAPABILITY_RELATIONSHIPS,
+        CAPABILITY_TIMELINE,
+        CAPABILITY_KNOWLEDGE_STATES,
+        CAPABILITY_MAP_CONTEXT,
+    }
+)
+
+#: Function/question words carry no disambiguating retrieval signal, so they are
+#: dropped when deriving complementary backstop sub-queries. Deliberately generic
+#: (no subject vocabulary) so the anti-topic-branching guard still holds.
+_BREADTH_STOPWORDS = frozenset(
+    {
+        "the", "a", "an", "of", "and", "or", "to", "in", "on", "for", "was", "were",
+        "is", "are", "be", "by", "with", "at", "as", "its", "it", "that", "this",
+        "from", "about", "into", "over", "what", "who", "whom", "when", "where",
+        "why", "how", "did", "do", "does", "which", "shape", "shaped",
+    }
+)
+_BREADTH_WORD_RE = re.compile(r"[A-Za-z0-9]+")
+
+
+def _is_passages_only_draft(corpus: InvestigationCorpus) -> bool:
+    """A corpus whose only retrieval surface is passage search (an auto-acquired
+    draft): passages present, no claims/relationships/timeline/knowledge/map."""
+
+    capabilities = set(corpus.get_manifest().supportedCapabilities)
+    return CAPABILITY_PASSAGES in capabilities and not (capabilities & _STRUCTURED_CAPABILITIES)
+
+
+def _partition(items: list[str], groups: int) -> list[list[str]]:
+    """Split ``items`` into ``groups`` contiguous, near-equal, non-empty groups."""
+
+    groups = max(1, min(groups, len(items)))
+    size, extra = divmod(len(items), groups)
+    partitioned: list[list[str]] = []
+    start = 0
+    for index in range(groups):
+        length = size + (1 if index < extra else 0)
+        partitioned.append(items[start : start + length])
+        start += length
+    return [group for group in partitioned if group]
+
+
+def _derive_breadth_queries(base_query: str, existing: list[str], n: int) -> list[str]:
+    """Derive up to ``n`` complementary, lexically-distinct sub-queries from the
+    normalized question by partitioning its salient content tokens into facets.
+
+    A deterministic backstop for when the planner under-decomposes: cruder than
+    the planner's semantic decomposition, but safe -- overlapping results dedupe
+    to no gain, distinct results add breadth. ``existing`` (casefolded) queries
+    are never reproduced."""
+
+    if n <= 0:
+        return []
+    tokens = [
+        token
+        for token in _BREADTH_WORD_RE.findall(base_query.casefold())
+        if len(token) >= 3 and token not in _BREADTH_STOPWORDS
+    ]
+    tokens = list(dict.fromkeys(tokens))
+    if len(tokens) < 2:
+        return []
+    seen = set(existing)
+    derived: list[str] = []
+    for group in _partition(tokens, max(n, 2)):
+        query = " ".join(group)
+        key = query.casefold()
+        if query and key not in seen:
+            derived.append(query)
+            seen.add(key)
+        if len(derived) >= n:
+            break
+    return derived
 
 
 def _bounded_error(error: object) -> str:

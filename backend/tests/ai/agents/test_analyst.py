@@ -183,17 +183,16 @@ def test_analyst_schema_forces_inferred_synthesis_over_passage_only_evidence(tmp
 
     schema = build_analyst_response_schema(bundle)
 
-    variants = schema["$defs"]["AnalysisStatement"]["oneOf"]
-    assert variants
-    for variant in variants:
-        assert variant["properties"]["statementForm"] == {
-            "const": "evidence_synthesis",
-            "type": "string",
-        }
-        assert variant["properties"]["directness"] == {
-            "const": "inferred",
-            "type": "string",
-        }
+    # Compact single statement object (no combinatorial per-kind oneOf).
+    statement = schema["$defs"]["AnalysisStatement"]
+    assert statement["properties"]["statementForm"] == {
+        "const": "evidence_synthesis",
+        "type": "string",
+    }
+    assert statement["properties"]["directness"] == {
+        "const": "inferred",
+        "type": "string",
+    }
 
 
 def test_analyst_schema_requires_a_synthesis_when_passages_were_retrieved(tmp_path):
@@ -218,10 +217,7 @@ def test_analyst_schema_excludes_knowledge_kind_without_a_knowledge_basis(tmp_pa
     # knowledge claim that would only force an abstention.
     _plan, bundle = _passage_only_context(tmp_path)
     schema = build_analyst_response_schema(bundle)
-    kinds = {
-        variant["properties"]["statementKind"]["const"]
-        for variant in schema["$defs"]["AnalysisStatement"]["oneOf"]
-    }
+    kinds = set(schema["$defs"]["AnalysisStatement"]["properties"]["statementKind"]["enum"])
     assert "knowledge" not in kinds
     assert kinds  # other kinds remain available
 
@@ -257,9 +253,9 @@ def test_analyst_schema_allows_direct_extraction_when_evidence_links_present():
 
     schema = build_analyst_response_schema(bundle)
 
-    for variant in schema["$defs"]["AnalysisStatement"]["oneOf"]:
-        assert "const" not in variant["properties"]["statementForm"]
-        assert "const" not in variant["properties"]["directness"]
+    statement = schema["$defs"]["AnalysisStatement"]
+    assert "const" not in statement["properties"]["statementForm"]
+    assert "const" not in statement["properties"]["directness"]
 
 
 def test_analyst_grounds_an_inferred_synthesis_over_passage_only_evidence(tmp_path):
@@ -346,44 +342,35 @@ def test_analyst_constrains_statement_fields_and_citations_to_retrieved_evidence
     schema = provider.response_schema
     assert schema is not None
     assert set(schema["required"]) == set(schema["properties"])
-    statement_variants = schema["$defs"]["AnalysisStatement"]["oneOf"]
-    fact = next(
-        variant
-        for variant in statement_variants
-        if variant["properties"]["statementKind"].get("const") == "fact"
-    )
-    assert fact["properties"]["knowledgeAwareness"] == {"type": "null"}
-    assert fact["properties"]["evidenceClassification"] == {"type": "null"}
-    assert fact["properties"]["geographicPrecision"] == {"type": "null"}
-    assert fact["properties"]["requiresHumanReview"] == {
+    # Compact single statement object: fields are constrained by enums, not a
+    # oneOf of full per-kind copies. The same field-level constraints hold.
+    statement = schema["$defs"]["AnalysisStatement"]
+    assert statement["properties"]["knowledgeAwareness"] == {"type": "null"}
+    assert statement["properties"]["evidenceClassification"] == {"type": "null"}
+    assert statement["properties"]["geographicPrecision"] == {"type": "null"}
+    assert statement["properties"]["requiresHumanReview"] == {
         "const": True,
         "type": "boolean",
     }
-    assert set(fact["properties"]["temporalRoles"]["items"]["enum"]) == {
+    assert set(statement["properties"]["temporalRoles"]["items"]["enum"]) == {
         "sent_time",
         "source_date",
     }
     # This claim-evidence bundle carries no knowledge-state / awareness record,
-    # so a KNOWLEDGE statement could never ground: the variant is excluded.
-    kinds = {
-        variant["properties"]["statementKind"].get("const")
-        for variant in statement_variants
-    }
-    assert "knowledge" not in kinds
+    # so a KNOWLEDGE statement could never ground: the kind is excluded.
+    assert "knowledge" not in set(statement["properties"]["statementKind"]["enum"])
 
+    # Compact single citation object: each retrieved value is offered as an enum.
+    # The exact (call, passage, source, target, role) co-occurrence is enforced by
+    # grounding.validate_grounding, not the schema.
     link = bundle.referenceIndex.evidenceLinks[0]
-    citation_variants = schema["$defs"]["AnalysisCitation"]["oneOf"]
-    exact_link = next(
-        variant
-        for variant in citation_variants
-        if variant["properties"]["evidenceLinkId"].get("const")
-        == link.evidenceLinkId
-    )
-    assert exact_link["properties"]["toolCallId"]["const"] == "claim-call"
-    assert exact_link["properties"]["passageId"]["const"] == link.passageId
-    assert exact_link["properties"]["sourceId"]["const"] == link.sourceId
-    assert exact_link["properties"]["targetId"]["const"] == link.targetId
-    assert exact_link["properties"]["role"]["const"] == link.role
+    citation = schema["$defs"]["AnalysisCitation"]["properties"]
+    assert "claim-call" in citation["toolCallId"]["enum"]
+    assert link.evidenceLinkId in citation["evidenceLinkId"]["anyOf"][0]["enum"]
+    assert link.passageId in citation["passageId"]["anyOf"][0]["enum"]
+    assert link.sourceId in citation["sourceId"]["anyOf"][0]["enum"]
+    assert link.targetId in citation["targetId"]["enum"]
+    assert link.targetType in citation["targetType"]["anyOf"][0]["enum"]
 
 
 def test_analyst_rejects_identity_substitution_with_a_grounding_report():

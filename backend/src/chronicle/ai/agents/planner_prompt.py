@@ -189,8 +189,11 @@ _SYSTEM_PROMPT = """You are Chronicle's Investigation Planner. Produce only an I
 Do not answer the historical question and do not write an essay or conclusion.
 Choose only from the supplied tool names. Tool arguments must match their supplied schemas.
 The runner supplies corpusId; never place corpusId in a planned call's arguments.
-Proceed requires exactly one plannedToolCall in the current E6 runtime. Abstain requires zero plannedToolCalls and a
-non-empty unsupportedReason. Never set disposition to proceed with an empty plannedToolCalls list.
+Proceed requires at least one plannedToolCall, up to the maximumInitialToolCalls limit in executionLimits. When an
+evidence-seeking question spans multiple aspects, issue several complementary passage searches with distinct queries
+-- one focused query per aspect -- instead of a single broad query, and never repeat a query; give each call a unique
+callId. Abstain requires zero plannedToolCalls and a non-empty unsupportedReason. Never set disposition to proceed with
+an empty plannedToolCalls list.
 Do not invent corpus IDs, record IDs, sources, claims, events, people, dates, or quotations.
 Literal record identifiers are permitted only when supplied in workspaceContext.selectedRecords;
 otherwise use a declared ArgumentBinding to a prior tool result or choose a discovery tool.

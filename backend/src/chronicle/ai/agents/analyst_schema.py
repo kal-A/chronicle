@@ -38,11 +38,18 @@ def build_analyst_response_schema(bundle: RetrievalBundle) -> dict[str, Any]:
         ]
     properties["suggestedFollowUpToolCall"] = {"type": "null"}
 
-    citations = _citation_variants(bundle)
+    # AnalysisCitation is a single object whose fields are enum-constrained to the
+    # retrieved values, rather than a oneOf of one fully-materialized constant
+    # object per (call, record). The emitted contract is unchanged; the exact
+    # co-occurrence of (toolCallId, passage/source/target/role) is re-enforced
+    # deterministically by grounding.validate_grounding, which is authoritative.
+    # This removes combinatorial schema growth in the number of retrieved records.
+    index = _citable_index(bundle)
+    has_citable = bool(index["recordIds"] and index["callIds"])
     schema["$defs"]["AnalysisCitation"] = (
-        {"oneOf": citations} if citations else {"not": {}}
+        _compact_citation_schema(index) if has_citable else {"not": {}}
     )
-    if not citations:
+    if not has_citable:
         properties["status"] = {"const": "abstained", "type": "string"}
         properties["statements"]["maxItems"] = 0
         properties["abstentionReason"] = {
@@ -76,13 +83,16 @@ def build_analyst_response_schema(bundle: RetrievalBundle) -> dict[str, Any]:
     kinds = list(StatementKind)
     if not _has_knowledge_basis(bundle):
         # A KNOWLEDGE statement needs a retrieved knowledge-state / awareness
-        # record to ground; without one the variant can only force an abstention.
+        # record to ground; without one the kind can only force an abstention.
         kinds = [kind for kind in kinds if kind is not StatementKind.KNOWLEDGE]
-    statement_variants = [
-        _statement_variant(base_statement, kind, constraints, allow_direct_extraction)
-        for kind in kinds
-    ]
-    schema["$defs"]["AnalysisStatement"] = {"oneOf": statement_variants}
+    # A single statement object with statementKind enum-constrained to the allowed
+    # kinds, rather than a oneOf of one full copy per kind. The KNOWLEDGE<->awareness
+    # and synthesis<->inferred bindings are re-enforced by the AnalysisStatement
+    # Pydantic validators and grounding, which are authoritative -- so this removes
+    # duplication (constant schema size in the number of kinds), not validation.
+    schema["$defs"]["AnalysisStatement"] = _statement_schema(
+        base_statement, kinds, constraints, allow_direct_extraction
+    )
     return _strip_generation_annotations(schema)
 
 
@@ -131,14 +141,14 @@ def _bundle_is_truncated(bundle: RetrievalBundle) -> bool:
     return False
 
 
-def _statement_variant(
+def _statement_schema(
     base: dict[str, Any],
-    kind: StatementKind,
+    kinds: list[StatementKind],
     constraints: dict[str, set[str]],
     allow_direct_extraction: bool = True,
 ) -> dict[str, Any]:
     properties = deepcopy(base["properties"])
-    properties["statementKind"] = {"const": kind.value, "type": "string"}
+    properties["statementKind"] = {"enum": [kind.value for kind in kinds], "type": "string"}
     if not allow_direct_extraction:
         # No retrieved evidence-link or directness metadata exists in this bundle
         # (a passage-only, auto-acquired corpus), so an EXTRACTED_RECORD/DIRECT
@@ -147,9 +157,12 @@ def _statement_variant(
         # inferred synthesis over the retrieved passages, flagged for review.
         properties["statementForm"] = {"const": "evidence_synthesis", "type": "string"}
         properties["directness"] = {"const": "inferred", "type": "string"}
+    # knowledgeAwareness is allowed (Awareness-or-null) only when KNOWLEDGE is a
+    # permitted kind; otherwise it is null. The AnalysisStatement Pydantic validator
+    # enforces the exact KNOWLEDGE<->awareness pairing per statement.
     properties["knowledgeAwareness"] = (
-        {"$ref": "#/$defs/Awareness"}
-        if kind is StatementKind.KNOWLEDGE
+        {"anyOf": [{"$ref": "#/$defs/Awareness"}, {"type": "null"}]}
+        if StatementKind.KNOWLEDGE in kinds
         else {"type": "null"}
     )
     properties["evidenceClassification"] = _optional_retrieved_enum(
@@ -279,104 +292,87 @@ def _has_direct_extraction_basis(bundle: RetrievalBundle) -> bool:
     return False
 
 
-def _citation_variants(bundle: RetrievalBundle) -> list[dict[str, Any]]:
-    variants: list[dict[str, Any]] = []
-    seen: set[tuple[str, ...]] = set()
+def _citable_index(bundle: RetrievalBundle) -> dict[str, set[str] | list[str]]:
+    """Gather the retrieved values a citation may legally reference, matching the
+    sets grounding.validate_grounding resolves against. ``callIds`` lists only
+    calls that returned at least one record (citing a record-less call can never
+    resolve); ``recordIds`` is the union of per-call record ids plus the reference
+    index, i.e. exactly grounding's accepted target set."""
+
+    call_ids: list[str] = []
+    record_ids: set[str] = set()
+    evidence_link_ids: set[str] = set()
+    target_types: set[str] = set()
     for result in bundle.results:
         if result.output is None:
             continue
-        data = result.output.model_dump(mode="json")
-        record_ids: set[str] = set()
-        for node in _walk(data):
+        per_call: set[str] = set()
+        for node in _walk(result.output.model_dump(mode="json")):
             for name, value in node.items():
-                if (
-                    name not in {"corpusId", "packageId", "toolCallId"}
-                    and name.endswith("Id")
-                    and isinstance(value, str)
-                ):
-                    record_ids.add(value)
+                if name in {"corpusId", "packageId", "toolCallId"}:
+                    continue
+                if name.endswith("Id") and isinstance(value, str):
+                    per_call.add(value)
                 elif name.endswith("Ids") and isinstance(value, list):
-                    record_ids.update(item for item in value if isinstance(item, str))
-
-            if not _is_evidence_link(node):
-                continue
-            signature = (
-                result.plannedCallId,
-                node["evidenceLinkId"],
-                node["passageId"],
-                node["sourceId"],
-                node["targetType"],
-                node["targetId"],
-                node["role"],
-            )
-            if signature in seen:
-                continue
-            seen.add(signature)
-            variants.append(_exact_citation(*signature))
-
-        linked_ids = {
-            value
-            for signature in seen
-            if signature[0] == result.plannedCallId
-            for value in signature[1:6]
-        }
-        for record_id in sorted(record_ids - linked_ids):
-            signature = (result.plannedCallId, record_id)
-            if signature in seen:
-                continue
-            seen.add(signature)
-            variants.append(_record_citation(result.plannedCallId, record_id))
-    return variants
-
-
-def _exact_citation(
-    tool_call_id: str,
-    evidence_link_id: str,
-    passage_id: str,
-    source_id: str,
-    target_type: str,
-    target_id: str,
-    role: str,
-) -> dict[str, Any]:
-    values = {
-        "toolCallId": tool_call_id,
-        "evidenceLinkId": evidence_link_id,
-        "passageId": passage_id,
-        "sourceId": source_id,
-        "targetType": target_type,
-        "targetId": target_id,
-        "role": role,
+                    per_call.update(item for item in value if isinstance(item, str))
+            if _is_evidence_link(node):
+                evidence_link_ids.add(node["evidenceLinkId"])
+                target_types.add(node["targetType"])
+        if per_call:
+            call_ids.append(result.plannedCallId)
+            record_ids |= per_call
+    index = bundle.referenceIndex
+    record_ids |= set(index.passageIds) | set(index.sourceIds) | set(index.documentIds)
+    record_ids |= set(index.claimIds) | set(index.relationshipIds) | set(index.eventIds)
+    record_ids |= set(index.knowledgeStateIds) | set(index.placeIds) | set(index.mapSceneIds)
+    return {
+        "callIds": call_ids,
+        "recordIds": record_ids,
+        "passageIds": set(index.passageIds),
+        "sourceIds": set(index.sourceIds),
+        "evidenceLinkIds": evidence_link_ids,
+        "targetTypes": target_types,
     }
-    return _constant_object(values)
 
 
-def _record_citation(tool_call_id: str, record_id: str) -> dict[str, Any]:
-    return _constant_object(
-        {
-            "toolCallId": tool_call_id,
-            "evidenceLinkId": None,
-            "passageId": None,
-            "sourceId": None,
-            "targetType": None,
-            "targetId": record_id,
-            "role": None,
-        }
+def _compact_citation_schema(index: dict[str, set[str] | list[str]]) -> dict[str, Any]:
+    """One citation object with per-field enums over the retrieved values. The
+    emitted fields are exactly AnalysisCitation's; grounding re-enforces that the
+    (toolCallId, passage/source/target/role) tuple actually co-occurred, so this
+    does not accept any combination grounding would reject."""
+
+    def enum_or_null(values: set[str] | list[str]) -> dict[str, Any]:
+        ordered = sorted(values)
+        if not ordered:
+            return {"type": "null"}
+        return {"anyOf": [{"enum": ordered, "type": "string"}, {"type": "null"}]}
+
+    role_schema = (
+        {"anyOf": [{"$ref": "#/$defs/EvidenceLinkRole"}, {"type": "null"}]}
+        if index["evidenceLinkIds"]
+        else {"type": "null"}
     )
-
-
-def _constant_object(values: dict[str, str | None]) -> dict[str, Any]:
     return {
         "type": "object",
         "additionalProperties": False,
         "properties": {
-            name: (
-                {"type": "null"}
-                if value is None
-                else {"const": value, "type": "string"}
-            )
-            for name, value in values.items()
+            "toolCallId": {"enum": sorted(index["callIds"]), "type": "string"},
+            "evidenceLinkId": enum_or_null(index["evidenceLinkIds"]),
+            "passageId": enum_or_null(index["passageIds"]),
+            "sourceId": enum_or_null(index["sourceIds"]),
+            "targetType": enum_or_null(index["targetTypes"]),
+            "targetId": {"enum": sorted(index["recordIds"]), "type": "string"},
+            "role": role_schema,
         },
-        "required": list(values),
+        "required": [
+            "toolCallId",
+            "evidenceLinkId",
+            "passageId",
+            "sourceId",
+            "targetType",
+            "targetId",
+            "role",
+        ],
     }
 
 
