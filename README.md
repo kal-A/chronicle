@@ -82,28 +82,53 @@ Chronicle is developable and demonstrable entirely on free and open-source tooli
 
 ## Getting Started
 
-Frontend:
+### Prerequisites
+
+- **Python 3.11+** and **Node.js 20+** (with `npm`) on your `PATH`.
+- **[Ollama](https://ollama.com)** — required only to run *live investigations*, not
+  for setup or the test suite (tests use a deterministic provider). Installing Ollama and
+  pulling a model is a manual step; the model download is multiple GB and is never done
+  silently (see [Low-memory machines](#run-the-demo-locally) below for model sizes).
+
+### One-command setup
+
+From a fresh clone:
 
 ```bash
-npm install
-npm run dev          # start the Vite dev server
-npm run lint          # oxlint
-npm run typecheck    # tsc -b --noEmit
-npm test              # vitest (unit/component tests + axe-core checks)
-npm run build         # production build
-npm run test:e2e      # Playwright journey (builds + previews first)
+python bootstrap.py
 ```
 
-Backend and local assistant (PowerShell):
+This checks prerequisites (and fails clearly if Node/npm/Python are missing), creates
+`backend/.venv` and installs the backend (editable, with its test extra), installs the
+frontend with `npm ci`, creates `.env` from `.env.example` (non-secret config), ensures the
+local runtime directories exist, and reports Ollama/model status **without** downloading
+model weights. Pass `--pull-model` to also fetch the default model (large download), or
+`--pull-model=qwen2.5:3b-instruct` for the low-memory one. It is idempotent — safe to re-run.
 
-```powershell
-py -3.11 -m venv backend/.venv
-backend/.venv/Scripts/python -m pip install -e "backend[test]"
-ollama pull qwen2.5:7b-instruct
+### Start the app
+
+Two terminals (paths below are Windows; on macOS/Linux use `backend/.venv/bin/python`):
+
+```bash
+# terminal 1 — backend API
 backend/.venv/Scripts/python -m uvicorn "chronicle.api:create_default_app" --factory --host 127.0.0.1 --port 8000
+# terminal 2 — frontend (Vite proxies /api and /health to the backend)
+npm run dev
 ```
 
-Run the frontend in another terminal with `npm run dev`. Vite proxies `/api` and `/health` to the local backend. Live-Ollama tests are opt-in; normal backend tests use the deterministic provider.
+### Verify the install
+
+```bash
+# backend (from the backend/ directory) — deterministic provider, no Ollama needed
+.venv/Scripts/python -m pytest
+# frontend (from the repo root) — the same checks CI runs
+npm run lint && npm run typecheck && npx vitest run && npm run build
+```
+
+Live-Ollama and live-network tests are opt-in (deselected by default); see
+[`.github/workflows/README.md`](.github/workflows/README.md). Prefer to set up by hand?
+The individual steps `bootstrap.py` runs are `python -m venv backend/.venv` →
+`pip install -e "backend[test]"` → `npm ci` → copy `.env.example` to `.env`.
 
 The current packages remain `prototype-curated`, not independently reviewed historical publications.
 
