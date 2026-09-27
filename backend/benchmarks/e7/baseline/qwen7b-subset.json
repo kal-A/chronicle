@@ -1,0 +1,18 @@
+{
+  "manifestVersion": "qwen7b-baseline-1",
+  "preRegisteredBeforeRun": true,
+  "benchmarkVersion": "e7-v1",
+  "model": "qwen2.5:7b-instruct",
+  "strategy": "full_workflow",
+  "provider": "ollama",
+  "selectionRationale": "A bounded, representative subset of the existing 24 e7-v1 cases: 3 per curated corpus, spanning distinct categories, with 4 answerable (retrieval/grounding-dependent) cases and 2 expected-abstention cases (one per corpus). Chosen before running to avoid post-hoc cherry-picking. Not the full 24x4 matrix; enough to expose real 7B behavior on grounding vs abstention across both corpora and several question types. Case expectations, metrics, prompts, and scoring are unchanged.",
+  "cases": [
+    {"caseId": "direct-source-date", "corpus": "concert-of-europe-1814-1822", "category": "direct_evidence", "expectedAbstention": false, "why": "simplest grounding: retrieve and cite a single dated fact"},
+    {"caseId": "relationship-doctrine-to-intervention", "corpus": "concert-of-europe-1814-1822", "category": "relationship_trace", "expectedAbstention": false, "why": "harder answerable case requiring a relationship between records"},
+    {"caseId": "actor-knowledge-unsupported-personal", "corpus": "concert-of-europe-1814-1822", "category": "actor_knowledge", "expectedAbstention": true, "why": "expected abstention: actor-knowledge claim with no knowledge-state evidence"},
+    {"caseId": "direct-reported-assurance", "corpus": "blank-cheque-golden", "category": "direct_evidence", "expectedAbstention": false, "why": "simple grounding on the second corpus"},
+    {"caseId": "actor-knowledge-supported-awareness", "corpus": "blank-cheque-golden", "category": "actor_knowledge", "expectedAbstention": false, "why": "answerable actor-knowledge case: tests grounding on knowledge-state evidence (a design strength)"},
+    {"caseId": "missing-exact-receipt-hour", "corpus": "blank-cheque-golden", "category": "missing_evidence", "expectedAbstention": true, "why": "expected abstention: a specific fact absent from the corpus"}
+  ],
+  "command": "CHRONICLE_OLLAMA_MODEL=qwen2.5:7b-instruct chronicle evaluate run --profile deterministic_full --provider ollama --strategies full_workflow --cases direct-source-date,relationship-doctrine-to-intervention,actor-knowledge-unsupported-personal,direct-reported-assurance,actor-knowledge-supported-awareness,missing-exact-receipt-hour --output evaluation-runs/qwen7b-baseline"
+}
