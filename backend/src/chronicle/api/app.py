@@ -13,8 +13,6 @@ from fastapi import FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from ..ai.agents import EvidenceAnalyst, HistoricalCritic, InvestigationGuide, InvestigationPlanner
-from ..ai.agents.planner_prompt import ToolSpecRepresentation
 from ..ai.contracts.run import AgentRunRecord, CorpusSnapshot, InvestigationRequest
 from ..ai.models import OllamaModelProvider
 from ..ai.models.ollama import (
@@ -22,7 +20,7 @@ from ..ai.models.ollama import (
     resolve_model_from_env,
     resolve_timeout_from_env,
 )
-from ..ai.orchestration.finalization import FinalizationRunner
+from ..ai.orchestration.factory import build_default_workflow, default_execution_policy
 from ..ai.orchestration.manager import (
     AgentRunAlreadyActiveError,
     AgentRunAlreadyExistsError,
@@ -31,11 +29,7 @@ from ..ai.orchestration.manager import (
     AgentRunNotCancellableError,
     AgentRunNotResumableError,
 )
-from ..ai.orchestration.policies import AgentExecutionPolicy
-from ..ai.orchestration.graph import LangGraphAgentWorkflow
-from ..ai.orchestration.runner import InvestigationRunner
 from ..ai.orchestration.statuses import AgentRunStatus
-from ..ai.tools import build_default_registry
 from ..acquisition.build_service import CorpusBuildService
 from ..acquisition.defaults import (
     default_boundary_resolver,
@@ -315,43 +309,13 @@ def create_default_app() -> FastAPI:
         file=sys.stderr,
         flush=True,
     )
-    # Evidence-window cap tuned for local-model prompt-processing speed: on a
-    # CPU-only host the analyst re-reads its whole retrieval bundle at ~13 tok/s,
-    # so a fat aggregate window (the schema ceiling is 14k chars) can push a
-    # single analyst call past its timeout. Capping the AGGREGATE at 8k lets the
-    # runner stop after ~2 tool calls (~6.4k chars) -- it truncates gracefully
-    # (marks the bundle truncated) rather than rejecting, roughly halving the
-    # analyst prompt model-independently. The per-tool-output ceiling stays at
-    # its default: it is a hard rejection gate, not a trimmer, so lowering it
-    # below a normal two-passage result (~3.2k chars) only fails the retrieval.
-    policy = AgentExecutionPolicy(
-        maxResultsPerTool=2,
-        maxAggregateRetrievalCharacters=8_000,
-    )
-    analyst = EvidenceAnalyst(provider, policy)
-    # retrieval_floor: over an auto-acquired (passages-only) corpus a small local
-    # model may plan a tool that retrieves nothing; the floor guarantees one
-    # bounded search_passages so "search anything" still returns grounded text.
-    retrieval = InvestigationRunner(
-        build_default_registry(), store=store, policy=policy, retrieval_floor=True
-    )
-    workflow = LangGraphAgentWorkflow(
-        planner=InvestigationPlanner(
-            provider,
-            policy,
-            representation=ToolSpecRepresentation.COMPACT,
-        ),
-        retrieval_runner=retrieval,
-        analyst=analyst,
-        finalization_runner=FinalizationRunner(
-            retrieval_runner=retrieval,
-            analyst=analyst,
-            critic=HistoricalCritic(provider, policy),
-            guide=InvestigationGuide(provider, policy),
-            store=store,
-        ),
-        store=store,
-    )
+    # The deployed execution policy + four-agent workflow are assembled by the
+    # shared factory (ai/orchestration/factory.py) so this path and the E7
+    # full_workflow evaluation strategy exercise the identical configuration
+    # (policy/budgets, the passage-retrieval floor, COMPACT planner specs). The
+    # policy is also handed to the scope resolver below.
+    policy = default_execution_policy()
+    workflow = build_default_workflow(provider, store, policy=policy)
     manager = AgentRunManager(
         workflow=workflow,
         store=store,

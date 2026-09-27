@@ -19,8 +19,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..agents import (
     EvidenceAnalyst,
-    HistoricalCritic,
-    InvestigationGuide,
     InvestigationPlanner,
 )
 from ..agents.analyst import AnalystValidationError
@@ -36,8 +34,7 @@ from ..contracts.run import (
 )
 from ...corpus.contracts import DEFAULT_RESULT_COUNT, PassageSearchRequest
 from ..models.metadata import ModelCallRecord
-from ..orchestration.finalization import FinalizationRunner
-from ..orchestration.graph import LangGraphAgentWorkflow
+from ..orchestration.factory import build_default_workflow
 from ..orchestration.policies import AgentExecutionPolicy
 from ..orchestration.runner import InvestigationRunner
 from ..orchestration.statuses import AgentRunStatus
@@ -282,24 +279,13 @@ class FullWorkflowStrategy:
             evaluation_input.repeat,
         )
         run_id = _run_id(case, self.id, repeat)
-        registry = build_default_registry()
         started = time.perf_counter()
         with tempfile.TemporaryDirectory(prefix="chronicle-eval-") as tmp:
             store = AgentRunStore(Path(tmp))
-            retrieval = InvestigationRunner(registry, store=store)
-            workflow = LangGraphAgentWorkflow(
-                planner=InvestigationPlanner(provider),
-                retrieval_runner=retrieval,
-                analyst=EvidenceAnalyst(provider),
-                finalization_runner=FinalizationRunner(
-                    retrieval_runner=retrieval,
-                    analyst=EvidenceAnalyst(provider),
-                    critic=HistoricalCritic(provider),
-                    guide=InvestigationGuide(provider),
-                    store=store,
-                ),
-                store=store,
-            )
+            # Built by the shared factory so the evaluated workflow is the same
+            # configuration the deployed API runs (policy/budgets, retrieval
+            # floor, COMPACT planner specs) -- not a parallel eval-only config.
+            workflow = build_default_workflow(provider, store)
             record = AgentRunRecord(
                 runId=run_id,
                 request=_request(case, corpus, run_id),

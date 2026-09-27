@@ -90,6 +90,7 @@ from chronicle.ai.contracts.plan import (
 from chronicle.ai.evaluation.benchmark import load_evaluation_benchmark
 from chronicle.ai.evaluation.strategies import EvaluationInput, _run_id, build_strategies
 from chronicle.ai.models import DeterministicModelProvider
+from chronicle.ai.orchestration.factory import default_execution_policy
 from chronicle.ai.orchestration.runner import InvestigationRunner
 from chronicle.ai.tools import build_default_registry
 from chronicle.contracts.enums import EvidenceLinkRole
@@ -122,7 +123,17 @@ def _cold_fixture(corpus, run_id: str):
             )
         ],
     )
-    bundle = InvestigationRunner(registry).execute_initial(plan, corpus).bundle
+    # Compute the expected evidence link under the shared production retrieval
+    # config (default_execution_policy + floor) that the full_workflow strategy
+    # now uses, so the scripted citation resolves against the workflow's real
+    # bundle. The top hit is also present in the simpler planner_analyst bundle.
+    bundle = (
+        InvestigationRunner(
+            registry, policy=default_execution_policy(), retrieval_floor=True
+        )
+        .execute_initial(plan, corpus)
+        .bundle
+    )
     link = bundle.referenceIndex.evidenceLinks[0]
     statement = AnalysisStatement(
         statementId="statement-1",
@@ -150,6 +161,13 @@ def _cold_fixture(corpus, run_id: str):
         corpusId=corpus.corpus_id,
         status=AnswerStatus.ANSWERED,
         statements=[statement],
+        # Under the shared production policy the aggregate retrieval window is
+        # capped, so this bundle is truncated; a valid grounded draft must
+        # disclose that (grounding rejects an undisclosed truncation). Harmless
+        # for the non-truncating planner_analyst baseline that shares this fixture.
+        limitations=[
+            "Retrieval was truncated; this reflects only the returned records, not the full corpus."
+        ],
     )
     decision = CriticDecision(
         criticVersion="e4-critic-v1",

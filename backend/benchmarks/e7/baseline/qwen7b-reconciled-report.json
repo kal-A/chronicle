@@ -1,0 +1,156 @@
+{
+  "reportSchemaVersion": "e7-report-v1",
+  "benchmarkVersion": "e7-v1",
+  "profile": "deterministic_full",
+  "aggregate": {
+    "strategies": [
+      {
+        "strategyId": "full_workflow",
+        "resultCount": 6,
+        "metrics": [
+          {
+            "name": "citation_validity",
+            "numerator": 3,
+            "denominator": 3,
+            "value": 1.0,
+            "applicability": "applicable",
+            "contributingCases": [
+              "direct-reported-assurance",
+              "relationship-doctrine-to-intervention"
+            ]
+          },
+          {
+            "name": "citation_coverage",
+            "numerator": 3,
+            "denominator": 3,
+            "value": 1.0,
+            "applicability": "applicable",
+            "contributingCases": [
+              "direct-reported-assurance",
+              "relationship-doctrine-to-intervention"
+            ]
+          },
+          {
+            "name": "required_evidence_recall",
+            "numerator": 1,
+            "denominator": 7,
+            "value": 0.14285714285714285,
+            "applicability": "applicable",
+            "contributingCases": [
+              "actor-knowledge-supported-awareness",
+              "direct-reported-assurance",
+              "direct-source-date",
+              "missing-exact-receipt-hour",
+              "relationship-doctrine-to-intervention"
+            ]
+          },
+          {
+            "name": "role_recall",
+            "numerator": 3,
+            "denominator": 3,
+            "value": 1.0,
+            "applicability": "applicable",
+            "contributingCases": [
+              "direct-reported-assurance",
+              "relationship-doctrine-to-intervention"
+            ]
+          },
+          {
+            "name": "temporal_coverage",
+            "numerator": 0,
+            "denominator": 0,
+            "value": null,
+            "applicability": "not_applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "abstention_correct",
+            "numerator": 4,
+            "denominator": 6,
+            "value": 0.6666666666666666,
+            "applicability": "applicable",
+            "contributingCases": [
+              "actor-knowledge-supported-awareness",
+              "direct-source-date"
+            ]
+          },
+          {
+            "name": "forbidden_evidence_hits",
+            "numerator": 0,
+            "denominator": 6,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "cross_corpus_leakage",
+            "numerator": 0,
+            "denominator": 6,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "unacceptable_claims",
+            "numerator": 0,
+            "denominator": 6,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": []
+          }
+        ]
+      }
+    ]
+  },
+  "gates": [
+    {
+      "gateId": "no_forbidden_evidence",
+      "strategyId": "full_workflow",
+      "status": "pass",
+      "detail": "0 forbidden citation(s)"
+    },
+    {
+      "gateId": "no_cross_corpus_leakage",
+      "strategyId": "full_workflow",
+      "status": "pass",
+      "detail": "0 cross-corpus citation(s)"
+    },
+    {
+      "gateId": "citation_validity",
+      "strategyId": "full_workflow",
+      "status": "pass",
+      "detail": "citation_validity=1.000 (threshold 0.95)"
+    },
+    {
+      "gateId": "citation_coverage",
+      "strategyId": "full_workflow",
+      "status": "pass",
+      "detail": "citation_coverage=1.000 (threshold 0.80)"
+    },
+    {
+      "gateId": "required_evidence_recall",
+      "strategyId": "full_workflow",
+      "status": "fail",
+      "detail": "required_evidence_recall=0.143 (threshold 0.80)"
+    },
+    {
+      "gateId": "abstention_correctness",
+      "strategyId": "full_workflow",
+      "status": "fail",
+      "detail": "4/6 abstention decisions correct"
+    },
+    {
+      "gateId": "semantic_entailment",
+      "strategyId": null,
+      "status": "incomplete",
+      "detail": "requires the single blinded human review (Slice 2)"
+    },
+    {
+      "gateId": "usefulness",
+      "strategyId": null,
+      "status": "incomplete",
+      "detail": "requires the single blinded human review (Slice 2)"
+    }
+  ],
+  "flagged": []
+}

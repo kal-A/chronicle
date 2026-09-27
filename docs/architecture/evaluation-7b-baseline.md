@@ -87,13 +87,13 @@ by the eval path, so runtime is measured from result-file timestamps.)
 2. **No fabrication.** Forbidden-evidence, cross-corpus-leakage, and unacceptable-claim hits
    are all 0 — the deterministic safety invariants hold on the real 7B run: it abstains
    rather than inventing evidence.
-3. **Interpretation caveat (factual, not changed here):** the E7 `full_workflow` strategy
-   builds retrieval as `InvestigationRunner(registry, store=store)` — with the **default**
-   execution policy and **without** the retrieval floor that the deployed
-   `create_default_app` enables (`retrieval_floor=True`, tightened budgets). So this baseline
-   measures the harness strategy *as defined*, which abstains more readily than the deployed
-   configuration. Reconciling the eval strategy with the deployed config is a separate,
-   later decision — deliberately not made in this baseline phase.
+3. **Interpretation caveat (now reconciled):** at the time of this baseline the E7
+   `full_workflow` strategy built retrieval with the **default** policy and **without** the
+   retrieval floor, unlike the deployed `create_default_app`. That divergence has since been
+   **reconciled** — both now build through the shared `build_default_workflow` factory — and
+   the 6-case subset was rerun on the production-equivalent config. See
+   [`eval-deployed-config-reconciliation.md`](./eval-deployed-config-reconciliation.md) for
+   the before/after and the follow-on end-to-end acceptance trace.
 
 ## Separation of automated vs semantic
 
