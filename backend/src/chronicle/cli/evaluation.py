@@ -1,7 +1,10 @@
 """`chronicle evaluate` command implementations (E7.4).
 
-Thin and directly testable (no argparse here). Slice 1 exercises only the
-deterministic provider; ``ollama`` is accepted but reserved for Slice 2.
+Thin and directly testable (no argparse here). The ``deterministic`` provider
+is the fast, reproducible default (a null/scripted provider -- a floor + safety
+baseline). The ``ollama`` provider runs the real local model over the same
+cases/metrics for a model-quality baseline; it needs a running Ollama daemon
+and is slow/CPU-bound (bound the run with --max-cases / --strategies).
 """
 
 from __future__ import annotations
@@ -26,12 +29,19 @@ from ..ai.evaluation.reporting import (
 from ..ai.evaluation.runner import load_manifest, load_results, run_benchmark
 from ..ai.evaluation.strategies import build_strategies
 from ..ai.models.deterministic import DeterministicModelProvider
+from ..ai.models.ollama import OllamaModelProvider, resolve_timeout_from_env
 from ..corpus.manifest import CorpusRegistry
 
 
 def _provider_factory(provider: str):
     if provider == "deterministic":
         return lambda case, strategy, repeat: DeterministicModelProvider()
+    if provider == "ollama":
+        # Real local-model baseline. Shares one provider config across the run;
+        # the model tag comes from CHRONICLE_OLLAMA_MODEL (see ollama.py). Slow
+        # and CPU-bound -- bound the run with --max-cases / --strategies.
+        timeout = resolve_timeout_from_env(300.0)
+        return lambda case, strategy, repeat: OllamaModelProvider(timeout=timeout)
     return None
 
 

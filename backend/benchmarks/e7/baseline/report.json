@@ -1,0 +1,648 @@
+{
+  "reportSchemaVersion": "e7-report-v1",
+  "benchmarkVersion": "e7-v1",
+  "profile": "deterministic_full",
+  "aggregate": {
+    "strategies": [
+      {
+        "strategyId": "single_prompt",
+        "resultCount": 24,
+        "metrics": [
+          {
+            "name": "citation_validity",
+            "numerator": 0,
+            "denominator": 0,
+            "value": null,
+            "applicability": "not_applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "citation_coverage",
+            "numerator": 0,
+            "denominator": 0,
+            "value": null,
+            "applicability": "not_applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "required_evidence_recall",
+            "numerator": 0,
+            "denominator": 40,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": [
+              "actor-knowledge-supported-awareness",
+              "counterevidence-extension-limits",
+              "direct-attributed-posture",
+              "direct-contextual-letter-role",
+              "direct-intervention-principle",
+              "direct-preserved-marginal-reaction",
+              "direct-quotation-vs-paraphrase",
+              "direct-reported-assurance",
+              "direct-source-date",
+              "disputed-causal-interpretations",
+              "explanation-connection-strength",
+              "invalid-premise-endorsement",
+              "invalid-premise-single-cause",
+              "missing-absent-perspectives",
+              "missing-exact-receipt-hour",
+              "relationship-doctrine-to-intervention",
+              "source-comparison-primary-vs-historiography",
+              "source-comparison-state-paper",
+              "timeline-assurance-report-order",
+              "timeline-congress-intervention-order"
+            ]
+          },
+          {
+            "name": "role_recall",
+            "numerator": 0,
+            "denominator": 0,
+            "value": null,
+            "applicability": "not_applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "temporal_coverage",
+            "numerator": 0,
+            "denominator": 6,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": [
+              "timeline-assurance-report-order",
+              "timeline-congress-intervention-order"
+            ]
+          },
+          {
+            "name": "abstention_correct",
+            "numerator": 7,
+            "denominator": 24,
+            "value": 0.2916666666666667,
+            "applicability": "applicable",
+            "contributingCases": [
+              "actor-knowledge-supported-awareness",
+              "counterevidence-extension-limits",
+              "direct-attributed-posture",
+              "direct-contextual-letter-role",
+              "direct-intervention-principle",
+              "direct-preserved-marginal-reaction",
+              "direct-quotation-vs-paraphrase",
+              "direct-reported-assurance",
+              "direct-source-date",
+              "disputed-causal-interpretations",
+              "explanation-connection-strength",
+              "invalid-premise-single-cause",
+              "relationship-doctrine-to-intervention",
+              "source-comparison-primary-vs-historiography",
+              "source-comparison-state-paper",
+              "timeline-assurance-report-order",
+              "timeline-congress-intervention-order"
+            ]
+          },
+          {
+            "name": "forbidden_evidence_hits",
+            "numerator": 0,
+            "denominator": 24,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "cross_corpus_leakage",
+            "numerator": 0,
+            "denominator": 24,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "unacceptable_claims",
+            "numerator": 0,
+            "denominator": 24,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": []
+          }
+        ]
+      },
+      {
+        "strategyId": "basic_rag",
+        "resultCount": 24,
+        "metrics": [
+          {
+            "name": "citation_validity",
+            "numerator": 0,
+            "denominator": 0,
+            "value": null,
+            "applicability": "not_applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "citation_coverage",
+            "numerator": 0,
+            "denominator": 0,
+            "value": null,
+            "applicability": "not_applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "required_evidence_recall",
+            "numerator": 0,
+            "denominator": 40,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": [
+              "actor-knowledge-supported-awareness",
+              "counterevidence-extension-limits",
+              "direct-attributed-posture",
+              "direct-contextual-letter-role",
+              "direct-intervention-principle",
+              "direct-preserved-marginal-reaction",
+              "direct-quotation-vs-paraphrase",
+              "direct-reported-assurance",
+              "direct-source-date",
+              "disputed-causal-interpretations",
+              "explanation-connection-strength",
+              "invalid-premise-endorsement",
+              "invalid-premise-single-cause",
+              "missing-absent-perspectives",
+              "missing-exact-receipt-hour",
+              "relationship-doctrine-to-intervention",
+              "source-comparison-primary-vs-historiography",
+              "source-comparison-state-paper",
+              "timeline-assurance-report-order",
+              "timeline-congress-intervention-order"
+            ]
+          },
+          {
+            "name": "role_recall",
+            "numerator": 0,
+            "denominator": 0,
+            "value": null,
+            "applicability": "not_applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "temporal_coverage",
+            "numerator": 0,
+            "denominator": 6,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": [
+              "timeline-assurance-report-order",
+              "timeline-congress-intervention-order"
+            ]
+          },
+          {
+            "name": "abstention_correct",
+            "numerator": 7,
+            "denominator": 24,
+            "value": 0.2916666666666667,
+            "applicability": "applicable",
+            "contributingCases": [
+              "actor-knowledge-supported-awareness",
+              "counterevidence-extension-limits",
+              "direct-attributed-posture",
+              "direct-contextual-letter-role",
+              "direct-intervention-principle",
+              "direct-preserved-marginal-reaction",
+              "direct-quotation-vs-paraphrase",
+              "direct-reported-assurance",
+              "direct-source-date",
+              "disputed-causal-interpretations",
+              "explanation-connection-strength",
+              "invalid-premise-single-cause",
+              "relationship-doctrine-to-intervention",
+              "source-comparison-primary-vs-historiography",
+              "source-comparison-state-paper",
+              "timeline-assurance-report-order",
+              "timeline-congress-intervention-order"
+            ]
+          },
+          {
+            "name": "forbidden_evidence_hits",
+            "numerator": 0,
+            "denominator": 24,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "cross_corpus_leakage",
+            "numerator": 0,
+            "denominator": 24,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "unacceptable_claims",
+            "numerator": 0,
+            "denominator": 24,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": []
+          }
+        ]
+      },
+      {
+        "strategyId": "planner_analyst",
+        "resultCount": 24,
+        "metrics": [
+          {
+            "name": "citation_validity",
+            "numerator": 0,
+            "denominator": 0,
+            "value": null,
+            "applicability": "not_applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "citation_coverage",
+            "numerator": 0,
+            "denominator": 0,
+            "value": null,
+            "applicability": "not_applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "required_evidence_recall",
+            "numerator": 0,
+            "denominator": 40,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": [
+              "actor-knowledge-supported-awareness",
+              "counterevidence-extension-limits",
+              "direct-attributed-posture",
+              "direct-contextual-letter-role",
+              "direct-intervention-principle",
+              "direct-preserved-marginal-reaction",
+              "direct-quotation-vs-paraphrase",
+              "direct-reported-assurance",
+              "direct-source-date",
+              "disputed-causal-interpretations",
+              "explanation-connection-strength",
+              "invalid-premise-endorsement",
+              "invalid-premise-single-cause",
+              "missing-absent-perspectives",
+              "missing-exact-receipt-hour",
+              "relationship-doctrine-to-intervention",
+              "source-comparison-primary-vs-historiography",
+              "source-comparison-state-paper",
+              "timeline-assurance-report-order",
+              "timeline-congress-intervention-order"
+            ]
+          },
+          {
+            "name": "role_recall",
+            "numerator": 0,
+            "denominator": 0,
+            "value": null,
+            "applicability": "not_applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "temporal_coverage",
+            "numerator": 0,
+            "denominator": 6,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": [
+              "timeline-assurance-report-order",
+              "timeline-congress-intervention-order"
+            ]
+          },
+          {
+            "name": "abstention_correct",
+            "numerator": 7,
+            "denominator": 24,
+            "value": 0.2916666666666667,
+            "applicability": "applicable",
+            "contributingCases": [
+              "actor-knowledge-supported-awareness",
+              "counterevidence-extension-limits",
+              "direct-attributed-posture",
+              "direct-contextual-letter-role",
+              "direct-intervention-principle",
+              "direct-preserved-marginal-reaction",
+              "direct-quotation-vs-paraphrase",
+              "direct-reported-assurance",
+              "direct-source-date",
+              "disputed-causal-interpretations",
+              "explanation-connection-strength",
+              "invalid-premise-single-cause",
+              "relationship-doctrine-to-intervention",
+              "source-comparison-primary-vs-historiography",
+              "source-comparison-state-paper",
+              "timeline-assurance-report-order",
+              "timeline-congress-intervention-order"
+            ]
+          },
+          {
+            "name": "forbidden_evidence_hits",
+            "numerator": 0,
+            "denominator": 24,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "cross_corpus_leakage",
+            "numerator": 0,
+            "denominator": 24,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "unacceptable_claims",
+            "numerator": 0,
+            "denominator": 24,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": []
+          }
+        ]
+      },
+      {
+        "strategyId": "full_workflow",
+        "resultCount": 24,
+        "metrics": [
+          {
+            "name": "citation_validity",
+            "numerator": 0,
+            "denominator": 0,
+            "value": null,
+            "applicability": "not_applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "citation_coverage",
+            "numerator": 0,
+            "denominator": 0,
+            "value": null,
+            "applicability": "not_applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "required_evidence_recall",
+            "numerator": 0,
+            "denominator": 40,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": [
+              "actor-knowledge-supported-awareness",
+              "counterevidence-extension-limits",
+              "direct-attributed-posture",
+              "direct-contextual-letter-role",
+              "direct-intervention-principle",
+              "direct-preserved-marginal-reaction",
+              "direct-quotation-vs-paraphrase",
+              "direct-reported-assurance",
+              "direct-source-date",
+              "disputed-causal-interpretations",
+              "explanation-connection-strength",
+              "invalid-premise-endorsement",
+              "invalid-premise-single-cause",
+              "missing-absent-perspectives",
+              "missing-exact-receipt-hour",
+              "relationship-doctrine-to-intervention",
+              "source-comparison-primary-vs-historiography",
+              "source-comparison-state-paper",
+              "timeline-assurance-report-order",
+              "timeline-congress-intervention-order"
+            ]
+          },
+          {
+            "name": "role_recall",
+            "numerator": 0,
+            "denominator": 0,
+            "value": null,
+            "applicability": "not_applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "temporal_coverage",
+            "numerator": 0,
+            "denominator": 6,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": [
+              "timeline-assurance-report-order",
+              "timeline-congress-intervention-order"
+            ]
+          },
+          {
+            "name": "abstention_correct",
+            "numerator": 7,
+            "denominator": 24,
+            "value": 0.2916666666666667,
+            "applicability": "applicable",
+            "contributingCases": [
+              "actor-knowledge-supported-awareness",
+              "counterevidence-extension-limits",
+              "direct-attributed-posture",
+              "direct-contextual-letter-role",
+              "direct-intervention-principle",
+              "direct-preserved-marginal-reaction",
+              "direct-quotation-vs-paraphrase",
+              "direct-reported-assurance",
+              "direct-source-date",
+              "disputed-causal-interpretations",
+              "explanation-connection-strength",
+              "invalid-premise-single-cause",
+              "relationship-doctrine-to-intervention",
+              "source-comparison-primary-vs-historiography",
+              "source-comparison-state-paper",
+              "timeline-assurance-report-order",
+              "timeline-congress-intervention-order"
+            ]
+          },
+          {
+            "name": "forbidden_evidence_hits",
+            "numerator": 0,
+            "denominator": 24,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "cross_corpus_leakage",
+            "numerator": 0,
+            "denominator": 24,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": []
+          },
+          {
+            "name": "unacceptable_claims",
+            "numerator": 0,
+            "denominator": 24,
+            "value": 0.0,
+            "applicability": "applicable",
+            "contributingCases": []
+          }
+        ]
+      }
+    ]
+  },
+  "gates": [
+    {
+      "gateId": "no_forbidden_evidence",
+      "strategyId": "single_prompt",
+      "status": "pass",
+      "detail": "0 forbidden citation(s)"
+    },
+    {
+      "gateId": "no_cross_corpus_leakage",
+      "strategyId": "single_prompt",
+      "status": "pass",
+      "detail": "0 cross-corpus citation(s)"
+    },
+    {
+      "gateId": "citation_validity",
+      "strategyId": "single_prompt",
+      "status": "not_applicable",
+      "detail": "citation_validity has no applicable denominator"
+    },
+    {
+      "gateId": "citation_coverage",
+      "strategyId": "single_prompt",
+      "status": "not_applicable",
+      "detail": "citation_coverage has no applicable denominator"
+    },
+    {
+      "gateId": "required_evidence_recall",
+      "strategyId": "single_prompt",
+      "status": "fail",
+      "detail": "required_evidence_recall=0.000 (threshold 0.80)"
+    },
+    {
+      "gateId": "abstention_correctness",
+      "strategyId": "single_prompt",
+      "status": "fail",
+      "detail": "7/24 abstention decisions correct"
+    },
+    {
+      "gateId": "no_forbidden_evidence",
+      "strategyId": "basic_rag",
+      "status": "pass",
+      "detail": "0 forbidden citation(s)"
+    },
+    {
+      "gateId": "no_cross_corpus_leakage",
+      "strategyId": "basic_rag",
+      "status": "pass",
+      "detail": "0 cross-corpus citation(s)"
+    },
+    {
+      "gateId": "citation_validity",
+      "strategyId": "basic_rag",
+      "status": "not_applicable",
+      "detail": "citation_validity has no applicable denominator"
+    },
+    {
+      "gateId": "citation_coverage",
+      "strategyId": "basic_rag",
+      "status": "not_applicable",
+      "detail": "citation_coverage has no applicable denominator"
+    },
+    {
+      "gateId": "required_evidence_recall",
+      "strategyId": "basic_rag",
+      "status": "fail",
+      "detail": "required_evidence_recall=0.000 (threshold 0.80)"
+    },
+    {
+      "gateId": "abstention_correctness",
+      "strategyId": "basic_rag",
+      "status": "fail",
+      "detail": "7/24 abstention decisions correct"
+    },
+    {
+      "gateId": "no_forbidden_evidence",
+      "strategyId": "planner_analyst",
+      "status": "pass",
+      "detail": "0 forbidden citation(s)"
+    },
+    {
+      "gateId": "no_cross_corpus_leakage",
+      "strategyId": "planner_analyst",
+      "status": "pass",
+      "detail": "0 cross-corpus citation(s)"
+    },
+    {
+      "gateId": "citation_validity",
+      "strategyId": "planner_analyst",
+      "status": "not_applicable",
+      "detail": "citation_validity has no applicable denominator"
+    },
+    {
+      "gateId": "citation_coverage",
+      "strategyId": "planner_analyst",
+      "status": "not_applicable",
+      "detail": "citation_coverage has no applicable denominator"
+    },
+    {
+      "gateId": "required_evidence_recall",
+      "strategyId": "planner_analyst",
+      "status": "fail",
+      "detail": "required_evidence_recall=0.000 (threshold 0.80)"
+    },
+    {
+      "gateId": "abstention_correctness",
+      "strategyId": "planner_analyst",
+      "status": "fail",
+      "detail": "7/24 abstention decisions correct"
+    },
+    {
+      "gateId": "no_forbidden_evidence",
+      "strategyId": "full_workflow",
+      "status": "pass",
+      "detail": "0 forbidden citation(s)"
+    },
+    {
+      "gateId": "no_cross_corpus_leakage",
+      "strategyId": "full_workflow",
+      "status": "pass",
+      "detail": "0 cross-corpus citation(s)"
+    },
+    {
+      "gateId": "citation_validity",
+      "strategyId": "full_workflow",
+      "status": "not_applicable",
+      "detail": "citation_validity has no applicable denominator"
+    },
+    {
+      "gateId": "citation_coverage",
+      "strategyId": "full_workflow",
+      "status": "not_applicable",
+      "detail": "citation_coverage has no applicable denominator"
+    },
+    {
+      "gateId": "required_evidence_recall",
+      "strategyId": "full_workflow",
+      "status": "fail",
+      "detail": "required_evidence_recall=0.000 (threshold 0.80)"
+    },
+    {
+      "gateId": "abstention_correctness",
+      "strategyId": "full_workflow",
+      "status": "fail",
+      "detail": "7/24 abstention decisions correct"
+    },
+    {
+      "gateId": "semantic_entailment",
+      "strategyId": null,
+      "status": "incomplete",
+      "detail": "requires the single blinded human review (Slice 2)"
+    },
+    {
+      "gateId": "usefulness",
+      "strategyId": null,
+      "status": "incomplete",
+      "detail": "requires the single blinded human review (Slice 2)"
+    }
+  ],
+  "flagged": []
+}

@@ -82,7 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--profile", default="deterministic_full", help="Evaluation profile (default: deterministic_full)"
     )
     p_eval_run.add_argument(
-        "--provider", default="deterministic", help="Model provider (Slice 1: deterministic)"
+        "--provider", default="deterministic", help="Model provider: deterministic (default, fast floor) or ollama (real local model, slow)"
     )
     p_eval_run.add_argument(
         "--output",
