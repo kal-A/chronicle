@@ -31,6 +31,7 @@ from chronicle.ai.orchestration.runner import (
 from chronicle.ai.tools import build_default_registry
 from chronicle.contracts.enums import RightsStatus, SourceType
 from chronicle.corpus import CorpusRegistry
+from chronicle.corpus.contracts import PassageSearchRequest
 from chronicle.corpus.package_corpus import PackageBackedCorpus
 
 _QUESTION = "How did the coastal blockade shape the naval campaign strategy and supply lines"
@@ -68,6 +69,29 @@ def _draft_corpus(tmp_path) -> PackageBackedCorpus:
     path.write_text(json.dumps(investigation.model_dump(mode="json")), encoding="utf-8")
     return PackageBackedCorpus.load(
         corpus_id="draft", package_path=path, title="Draft", benchmark_role="test"
+    )
+
+
+def _magnet_corpus(tmp_path) -> PackageBackedCorpus:
+    """A draft corpus with several distinct passages that all share the query terms,
+    so excluding the top hit still leaves eligible distinct passages to fall through to."""
+    blocks = [
+        f"The coastal blockade cut supply lines, detail {word} for the evidence record. " * 12
+        for word in ("one", "two", "three", "four")
+    ]
+    sources = [_source("s1", "Blockade", "\n\n".join(blocks))]
+    passages = []
+    for s in sources:
+        passages.extend(chunk_source(s))
+    investigation = build_corpus(
+        topic="a naval campaign", interpreted_question=_QUESTION,
+        geographic_scope=["Region"], date_earliest=date(1860, 1, 1),
+        date_latest=date(1865, 12, 31), acquired=sources, passages=passages,
+    )
+    path = tmp_path / "magnet.json"
+    path.write_text(json.dumps(investigation.model_dump(mode="json")), encoding="utf-8")
+    return PackageBackedCorpus.load(
+        corpus_id="magnet", package_path=path, title="Magnet", benchmark_role="test"
     )
 
 
@@ -178,3 +202,52 @@ def test_factoid_question_stays_at_a_single_search(tmp_path):
     # No evidence-facet decomposition for a single-dimension lookup.
     assert len([c for c in augmented if c.toolName == _SEARCH]) == 1
     assert _derive_breadth_queries(_FACTOID, [], 2) == []
+
+
+# --- Design D: cross-query dedup-aware fall-through ----------------------------
+
+
+def test_exclude_passage_ids_falls_through_to_next_distinct(tmp_path):
+    """A search excluding its own top hit returns the next distinct passage, not the
+    excluded one -- the corpus-level fall-through primitive. Deterministic, no model."""
+    corpus = _magnet_corpus(tmp_path)
+    first = corpus.search_passages(
+        PassageSearchRequest(corpusId=corpus.corpus_id, query="blockade supply lines", maxResults=2)
+    )
+    seen = [h.passageId for h in first.hits]
+
+    second = corpus.search_passages(
+        PassageSearchRequest(
+            corpusId=corpus.corpus_id, query="blockade supply lines",
+            maxResults=2, excludePassageIds=seen,
+        )
+    )
+    returned = {h.passageId for h in second.hits}
+    assert not (returned & set(seen))   # already-assembled passages are skipped
+    assert returned                     # and the search still contributes distinct evidence
+
+
+def test_runner_dedup_assembly_no_duplicate_consumes_budget(tmp_path):
+    """Over a draft corpus the runner excludes already-assembled passages from each
+    later search, so a magnet passage is never returned twice (never double-charged to
+    the aggregate budget) and later searches contribute distinct passages."""
+    corpus = _magnet_corpus(tmp_path)
+    # Two queries that, lexically, both rank the same blockade passages first.
+    plan = _proceed_plan(corpus.corpus_id, ["coastal blockade", "blockade supply lines"])
+
+    bundle = _runner().execute_initial(plan, corpus).bundle
+
+    per_call_ids = [
+        [h.passageId for h in r.output.hits]
+        for r in bundle.results
+        if r.output is not None and hasattr(r.output, "hits")
+    ]
+    flat = [pid for ids in per_call_ids for pid in ids]
+    # No passage is returned by more than one search: duplicates never re-enter the
+    # bundle, so they never consume a result slot or aggregate characters.
+    assert len(flat) == len(set(flat))
+    assert len(bundle.referenceIndex.passageIds) == len(set(flat))
+    # Fall-through engaged: a later search contributed a passage the first did not.
+    assert len(per_call_ids) >= 2 and any(
+        set(later) - set(per_call_ids[0]) for later in per_call_ids[1:]
+    )

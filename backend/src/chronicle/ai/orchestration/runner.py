@@ -435,6 +435,21 @@ class InvestigationRunner:
             for field_name in ("maxResults", "maxPaths"):
                 if field_name in definition.input_model.model_fields:
                     raw_input[field_name] = min(raw_input.get(field_name, effective_results), effective_results)
+            if (
+                self._retrieval_floor
+                and call.toolName == _PASSAGE_SEARCH_TOOL
+                and "excludePassageIds" in definition.input_model.model_fields
+                and _is_passages_only_draft(corpus)
+            ):
+                # Dedup-aware fall-through (passages-only draft corpora): passages that
+                # earlier searches already assembled are excluded from this search's
+                # candidate pool, so a duplicate never consumes a result slot or the
+                # aggregate budget and the search contributes its next distinct passage.
+                # Sorted for a deterministic, auditable input hash. Only excludes already
+                # retrieved (still citable) passages, so relevance/grounding are unchanged.
+                assembled = _assembled_passage_ids(results)
+                if assembled:
+                    raw_input["excludePassageIds"] = sorted(assembled)
             input_hash = stable_json_hash(raw_input)
             sequence = len(results)
             execution_identity_hash = _execution_identity_hash(
@@ -833,6 +848,18 @@ def _is_passages_only_draft(corpus: InvestigationCorpus) -> bool:
 
     capabilities = set(corpus.get_manifest().supportedCapabilities)
     return CAPABILITY_PASSAGES in capabilities and not (capabilities & _STRUCTURED_CAPABILITIES)
+
+
+def _assembled_passage_ids(results: list[ToolResultEnvelope]) -> set[str]:
+    """Distinct passage ids already assembled into the evidence bundle by earlier
+    searches in this run (for dedup-aware fall-through)."""
+
+    seen: set[str] = set()
+    for item in results:
+        hits = getattr(item.output, "hits", None)
+        if hits:
+            seen.update(hit.passageId for hit in hits)
+    return seen
 
 
 #: Generic, subject-neutral evidence facets for decomposing an analytical,

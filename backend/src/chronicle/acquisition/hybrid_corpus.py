@@ -140,9 +140,12 @@ class HybridCorpus:
         recall_fn,
     ) -> PassageSearchResult:
         k = request.maxResults
-        lexical_ids = list(hit_by_id)  # lexical order
+        lexical_ids = list(hit_by_id)  # lexical order (inner already dropped excluded ids)
         recall_k = min(max(k * CANDIDATE_FACTOR, 8), MAX_RESULT_COUNT)
-        semantic = recall_fn(request.query, k=recall_k)
+        # The semantic lane must honour the same exclusion as the lexical lane, or a
+        # passage an earlier search already assembled could re-enter via recall.
+        excluded = set(request.excludePassageIds)
+        semantic = [(pid, score) for pid, score in recall_fn(request.query, k=recall_k) if pid not in excluded]
         semantic_score_by_id = {pid: score for pid, score in semantic}
 
         # Passages the lexical lane missed entirely, above the similarity guard,

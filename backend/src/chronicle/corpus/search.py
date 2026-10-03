@@ -158,8 +158,12 @@ def search_passages(index: CorpusIndex, request: PassageSearchRequest) -> Passag
         for entity_id in request.entityIds
     }
 
+    excluded_ids = set(request.excludePassageIds)
+
     hits: list[PassageSearchHit] = []
     for passage in index.passages_by_id.values():
+        if passage.id in excluded_ids:
+            continue
         document = index.documents_by_id.get(passage.documentId)
         if document is None:
             continue

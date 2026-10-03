@@ -80,6 +80,11 @@ class PassageSearchRequest(BaseModel):
 
     sourceIds: list[str] = Field(default_factory=list, max_length=MAX_FILTER_IDS)
     documentIds: list[str] = Field(default_factory=list, max_length=MAX_FILTER_IDS)
+    # Passages already assembled into the evidence bundle by earlier searches in the
+    # same run. They are filtered out of the candidate pool *before* the top-k cut, so
+    # a duplicate never consumes a result slot or the aggregate budget and a query
+    # whose best hit is already present falls through to its next distinct passage.
+    excludePassageIds: list[str] = Field(default_factory=list, max_length=MAX_FILTER_IDS)
     claimIds: list[str] = Field(default_factory=list, max_length=MAX_FILTER_IDS)
     relationshipIds: list[str] = Field(default_factory=list, max_length=MAX_FILTER_IDS)
     entityIds: list[str] = Field(default_factory=list, max_length=MAX_FILTER_IDS)
