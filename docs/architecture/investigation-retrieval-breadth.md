@@ -122,3 +122,78 @@ abstention, not weakened validation.
   breadth (a higher per-search `k`, stronger query diversification to reduce overlap, or accepting
   inferred synthesis for descriptive questions) is the next lever — deliberately out of scope here,
   and none is a grounding or validation change.
+
+## 7. E11 — evidence-oriented query diversification
+
+E10 proved the runner *can* issue several searches, but the #10 backstop derived them by **lexical
+token-partition** of the normalized question: it split the question's content tokens into contiguous
+chunks. On the Anaconda corpus that produced (a) a chunk that kept the subject tokens and so collided
+with the planner's own query on the magnet passage `psg-0000-0000`, (b) a generic-residue chunk
+(`"course american civil war"`) with no focused evidence need, and (c) over-decomposition of simple
+factoids. Two chunks converged on the magnet; the third added nothing. E11 corrects the *query design*
+(Design A) and the *assembly* (Design D).
+
+### 7.1 Design A — anchor-preserving evidence-facet decomposition (`684fb2a`)
+
+Each derived search is now `<concise subject anchor> <evidence-facet cue>`:
+
+- a **subject anchor** (salient question tokens minus stopwords and evidence-dimension words, capped
+  at 4) keeps every search lexically grounded in the subject;
+- a **generic, subject-neutral facet cue** (`mechanism` → "how it worked in practice", `consequences`
+  → "effects and outcomes", `chronology` → "sequence of events over time", plus `actors`,
+  `interpretation`, `definition`) steers the search toward one distinct evidence need. Facets are
+  ordered additive-first (the planner's broad query already covers the definitional magnet), and the
+  vocabulary carries no subject/historical terms, so the anti-topic-branching guarantee holds.
+
+An **analytical gate** (`_is_analytical_question`) derives facet searches only when the question seeks
+explanation (markers like *how / why / effect / shape / role*); a single-dimension factoid
+(*when / who / where*) derives **zero** extra searches and stays at one. Draft-corpus gating, `k=2`,
+the 8000-char budget, and all grounding/citation/critic/validation limits are unchanged.
+
+### 7.2 Design D — cross-query dedup-aware fall-through (`c6a89f1`)
+
+`search_passages` gained an `excludePassageIds` filter applied to the candidate pool **before** the
+top-k cut (lexical and semantic lanes both honour it). The runner injects the passage ids already
+assembled by earlier searches (sorted, for a deterministic and auditable input hash) into each
+passage search over a passages-only draft corpus. A duplicate therefore never consumes a result slot
+or aggregate characters, and a search whose best hit is already present **falls through** to its next
+distinct passage. Only already-retrieved (still-citable) passages are excluded, so relevance,
+grounding, citation and critic gates are untouched and no source diversity is manufactured. Gated to
+the same draft-corpus condition as the breadth backstop, so curated/synthesized corpora and the E7
+harness are byte-identical.
+
+### 7.3 Frozen evaluation (`benchmarks/e7/retrieval/run_breadth_eval.py`)
+
+Before = E10 token-partition, after = E11 facet decomposition, deployed budget, deterministic embedder:
+
+| Case | Distinct relevant (before→after) | Aspects (before→after) | Relevant sources | Noise | Broad overlap (before→after) | Derived searches |
+|---|---|---|---|---|---|---|
+| overlap-recoverable | 2→**6** | 1→**3** | 1→3 | 0/0 | 2→**0** | 2→2 |
+| single-source | 2→**6** | 1→**3** | 1→**1** (no manufactured diversity) | 0/0 | 2→0 | 2→2 |
+| noisy-sources | 2→**6** | 1→**3** | 1→3 | 0/**0** (namesake never pulled) | 2→0 | 2→2 |
+| single-dimension | 2→2 | 1→1 | 1→1 | 0/0 | 2→0 | **2→0** (factoid not decomposed) |
+
+Design D adds deterministic tests that a search excluding its top hit returns the next distinct
+passage, and that the runner never returns a passage from two searches (no duplicate consumes budget).
+
+### 7.4 Real Anaconda — 3 → 4 distinct passages
+
+| | Facet search `floor-search-passages-1` | Distinct bundle |
+|---|---|---|
+| After Design A only | `[psg-0000-0000 (magnet duplicate), psg-0000-0004]` | 3 passages / 2 sources |
+| After Design D | `[psg-0000-0009, psg-0000-0004]` (magnet excluded → fell through) | **4 passages / 2 sources** |
+
+Design D recovered `psg-0000-0009` (Scott's blockade "to envelop" — the mechanism evidence) that the
+magnet had displaced. `grounding.valid=True` (0 issues); the run abstains on a **principled critic
+decision** ("the passages describe the plan's aims, not its execution/outcomes"), not prompt overflow
+or weakened validation. Full backend suite 924 passed, 4 skipped; CI green on both commits.
+
+### 7.5 Remaining ceiling — the aggregate retrieval budget
+
+The bundle is now bound by the **8000-character aggregate retrieval budget**: after two searches
+(~6033/8000 chars, `truncated=True`) the third evidence-facet search starves and returns nothing, so
+the corpus's further relevant passages (e.g. the economic-consequence passages the #11 feasibility
+probe surfaced) never reach the analyst. The next lever is the retrieval-budget / evidence-packet
+efficiency question (#12): whether the four-passage ceiling is best addressed by a bounded budget
+increase, cross-facet budget reservation, payload compaction, or two-stage ID-then-hydrate retrieval —
+a separate, measured decision, not a grounding or validation change.
