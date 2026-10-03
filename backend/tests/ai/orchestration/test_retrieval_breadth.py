@@ -22,13 +22,19 @@ from chronicle.ai.contracts.plan import (
     ToolPurpose,
 )
 from chronicle.ai.orchestration.factory import default_execution_policy
-from chronicle.ai.orchestration.runner import InvestigationRunner, _derive_breadth_queries
+from chronicle.ai.orchestration.runner import (
+    InvestigationRunner,
+    _derive_breadth_queries,
+    _is_analytical_question,
+    _subject_anchor,
+)
 from chronicle.ai.tools import build_default_registry
 from chronicle.contracts.enums import RightsStatus, SourceType
 from chronicle.corpus import CorpusRegistry
 from chronicle.corpus.package_corpus import PackageBackedCorpus
 
 _QUESTION = "How did the coastal blockade shape the naval campaign strategy and supply lines"
+_FACTOID = "When was the coastal blockade naval campaign established"
 _SEARCH = "search_passages"
 
 
@@ -141,3 +147,34 @@ def test_derive_breadth_queries_are_distinct_and_non_empty():
 def test_derive_breadth_queries_empty_when_no_salient_tokens():
     assert _derive_breadth_queries("how did it", [], 2) == []
     assert _derive_breadth_queries(_QUESTION, [], 0) == []
+
+
+def test_derived_queries_share_a_subject_anchor_and_vary_by_facet():
+    anchor = _subject_anchor(_QUESTION)
+    derived = _derive_breadth_queries(_QUESTION, [], 2)
+
+    assert anchor and all(q.startswith(anchor + " ") for q in derived)
+    # The varying remainder (the evidence-facet cue) is distinct per query, and is
+    # not just a chunk of the question's own words (the old token-partition bug).
+    facet_cues = [q[len(anchor) + 1 :] for q in derived]
+    assert len(set(facet_cues)) == len(facet_cues)
+    assert all(cue.strip() for cue in facet_cues)
+
+
+def test_analytical_gate_distinguishes_factoid_from_explanatory():
+    assert _is_analytical_question(_QUESTION)  # "how ... shape ..."
+    assert not _is_analytical_question(_FACTOID)  # "when ..."
+    assert not _is_analytical_question("Who proposed the coastal blockade")
+    assert _is_analytical_question("Why did the coastal blockade fail")
+
+
+def test_factoid_question_stays_at_a_single_search(tmp_path):
+    corpus = _draft_corpus(tmp_path)
+    plan = _proceed_plan(corpus.corpus_id, ["coastal blockade"])
+    plan = plan.model_copy(update={"normalizedQuestion": _FACTOID})
+
+    augmented = _runner()._augment_with_floor(plan, corpus, plan.plannedToolCalls)
+
+    # No evidence-facet decomposition for a single-dimension lookup.
+    assert len([c for c in augmented if c.toolName == _SEARCH]) == 1
+    assert _derive_breadth_queries(_FACTOID, [], 2) == []

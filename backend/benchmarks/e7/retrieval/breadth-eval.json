@@ -1,81 +1,513 @@
 {
-  "generatedAt": "2026-09-27T21:43:59.787923+00:00",
+  "generatedAt": "2026-10-03T00:41:31.174389+00:00",
   "k": 2,
-  "embedder": "frozen synthetic (deterministic; no Ollama)",
+  "maxInitialSearches": 3,
+  "embedder": "frozen rule-based (deterministic; no Ollama)",
   "cases": [
     {
-      "caseId": "multi-aspect",
-      "intent": "Answer needs evidence from three aspects, each in its own source; one broad query reaches one aspect, decomposition reaches all three.",
+      "caseId": "overlap-recoverable",
+      "intent": "A broad query and the E10 token-partition sub-queries overlap on the subject passages; E11 facet sub-queries instead recover distinct mechanism and consequence evidence.",
+      "question": "How did the program operate and what consequences did it cause for the region",
       "relevantAvailable": 6,
-      "single": {
+      "before": {
+        "searches": 3,
+        "derivedCount": 2,
+        "queries": [
+          "program region overview account",
+          "program operate consequences",
+          "cause region"
+        ],
+        "perQuery": [
+          {
+            "query": "program region overview account",
+            "hits": [
+              {
+                "passageId": "psg-0000-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 0.977
+          },
+          {
+            "query": "program operate consequences",
+            "hits": [
+              {
+                "passageId": "psg-0000-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 0.692
+          },
+          {
+            "query": "cause region",
+            "hits": [
+              {
+                "passageId": "psg-0000-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 0.646
+          }
+        ],
         "distinctRelevant": 2,
         "aspectsCovered": 1,
         "relevantSources": 1,
         "noiseRetrieved": 0,
-        "chars": 1000,
-        "ms": 1.893,
+        "distinctRetrieved": 2,
+        "chars": 1546,
+        "duplicateRate": 0.667,
+        "broadOverlap": 2,
+        "maxPairwiseOverlap": 2,
+        "ms": 2.315,
         "recall": 0.333
       },
-      "decomposed": {
+      "after": {
+        "searches": 3,
+        "derivedCount": 2,
+        "queries": [
+          "program region overview account",
+          "program region how it worked in practice",
+          "program region effects and outcomes"
+        ],
+        "perQuery": [
+          {
+            "query": "program region overview account",
+            "hits": [
+              {
+                "passageId": "psg-0000-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 0.638
+          },
+          {
+            "query": "program region how it worked in practice",
+            "hits": [
+              {
+                "passageId": "psg-0001-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0001-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 0.643
+          },
+          {
+            "query": "program region effects and outcomes",
+            "hits": [
+              {
+                "passageId": "psg-0002-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0002-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 0.766
+          }
+        ],
         "distinctRelevant": 6,
         "aspectsCovered": 3,
         "relevantSources": 3,
         "noiseRetrieved": 0,
-        "chars": 4386,
-        "ms": 3.82,
-        "recall": 1.0,
+        "distinctRetrieved": 6,
+        "chars": 4638,
         "duplicateRate": 0.0,
-        "subqueries": 3
+        "broadOverlap": 0,
+        "maxPairwiseOverlap": 0,
+        "ms": 2.047,
+        "recall": 1.0
       }
     },
     {
-      "caseId": "dominant-relevant-source",
-      "intent": "All relevant evidence lives in one source spanning three aspects; breadth improves distinct relevant passages even though source diversity stays 1.",
+      "caseId": "single-source",
+      "intent": "All relevant evidence lives in one source spanning subject, mechanism and consequence aspects; facet decomposition improves passage/aspect coverage while relevant source diversity legitimately stays 1.",
+      "question": "How did the program operate and what consequences did it cause for the region",
       "relevantAvailable": 6,
-      "single": {
+      "before": {
+        "searches": 3,
+        "derivedCount": 2,
+        "queries": [
+          "program region overview account",
+          "program operate consequences",
+          "cause region"
+        ],
+        "perQuery": [
+          {
+            "query": "program region overview account",
+            "hits": [
+              {
+                "passageId": "psg-0000-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 1.279
+          },
+          {
+            "query": "program operate consequences",
+            "hits": [
+              {
+                "passageId": "psg-0000-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 0.685
+          },
+          {
+            "query": "cause region",
+            "hits": [
+              {
+                "passageId": "psg-0000-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 0.649
+          }
+        ],
         "distinctRelevant": 2,
         "aspectsCovered": 1,
         "relevantSources": 1,
         "noiseRetrieved": 0,
-        "chars": 1000,
-        "ms": 0.921,
+        "distinctRetrieved": 2,
+        "chars": 1546,
+        "duplicateRate": 0.667,
+        "broadOverlap": 2,
+        "maxPairwiseOverlap": 2,
+        "ms": 2.613,
         "recall": 0.333
       },
-      "decomposed": {
+      "after": {
+        "searches": 3,
+        "derivedCount": 2,
+        "queries": [
+          "program region overview account",
+          "program region how it worked in practice",
+          "program region effects and outcomes"
+        ],
+        "perQuery": [
+          {
+            "query": "program region overview account",
+            "hits": [
+              {
+                "passageId": "psg-0000-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 0.655
+          },
+          {
+            "query": "program region how it worked in practice",
+            "hits": [
+              {
+                "passageId": "psg-0000-0002",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0003",
+                "score": 1.0
+              }
+            ],
+            "ms": 0.704
+          },
+          {
+            "query": "program region effects and outcomes",
+            "hits": [
+              {
+                "passageId": "psg-0000-0004",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0005",
+                "score": 1.0
+              }
+            ],
+            "ms": 0.642
+          }
+        ],
         "distinctRelevant": 6,
         "aspectsCovered": 3,
         "relevantSources": 1,
         "noiseRetrieved": 0,
-        "chars": 4386,
-        "ms": 5.166,
-        "recall": 1.0,
+        "distinctRetrieved": 6,
+        "chars": 4638,
         "duplicateRate": 0.0,
-        "subqueries": 3
+        "broadOverlap": 0,
+        "maxPairwiseOverlap": 0,
+        "ms": 2.001,
+        "recall": 1.0
       }
     },
     {
-      "caseId": "dominant-noise-source",
-      "intent": "One relevant source plus two larger namesake noise sources (mirrors the Anaconda films). Decomposition must NOT pull noise passages to diversify.",
-      "relevantAvailable": 4,
-      "single": {
+      "caseId": "noisy-sources",
+      "intent": "One relevant source set plus two larger namesake noise sources (mirrors the Anaconda films). Facet decomposition must NOT pull noise passages to diversify.",
+      "question": "How did the program operate and what consequences did it cause for the region",
+      "relevantAvailable": 6,
+      "before": {
+        "searches": 3,
+        "derivedCount": 2,
+        "queries": [
+          "program region overview account",
+          "program operate consequences",
+          "cause region"
+        ],
+        "perQuery": [
+          {
+            "query": "program region overview account",
+            "hits": [
+              {
+                "passageId": "psg-0000-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 1.551
+          },
+          {
+            "query": "program operate consequences",
+            "hits": [
+              {
+                "passageId": "psg-0000-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 1.492
+          },
+          {
+            "query": "cause region",
+            "hits": [
+              {
+                "passageId": "psg-0000-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 1.532
+          }
+        ],
         "distinctRelevant": 2,
         "aspectsCovered": 1,
         "relevantSources": 1,
         "noiseRetrieved": 0,
-        "chars": 1000,
-        "ms": 4.532,
+        "distinctRetrieved": 2,
+        "chars": 1546,
+        "duplicateRate": 0.667,
+        "broadOverlap": 2,
+        "maxPairwiseOverlap": 2,
+        "ms": 4.575,
+        "recall": 0.333
+      },
+      "after": {
+        "searches": 3,
+        "derivedCount": 2,
+        "queries": [
+          "program region overview account",
+          "program region how it worked in practice",
+          "program region effects and outcomes"
+        ],
+        "perQuery": [
+          {
+            "query": "program region overview account",
+            "hits": [
+              {
+                "passageId": "psg-0000-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 2.193
+          },
+          {
+            "query": "program region how it worked in practice",
+            "hits": [
+              {
+                "passageId": "psg-0001-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0001-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 2.666
+          },
+          {
+            "query": "program region effects and outcomes",
+            "hits": [
+              {
+                "passageId": "psg-0002-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0002-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 2.547
+          }
+        ],
+        "distinctRelevant": 6,
+        "aspectsCovered": 3,
+        "relevantSources": 3,
+        "noiseRetrieved": 0,
+        "distinctRetrieved": 6,
+        "chars": 4638,
+        "duplicateRate": 0.0,
+        "broadOverlap": 0,
+        "maxPairwiseOverlap": 0,
+        "ms": 7.406,
+        "recall": 1.0
+      }
+    },
+    {
+      "caseId": "single-dimension",
+      "intent": "A straightforward factoid question invokes no analytical evidence dimension, so the backstop derives no extra searches and retrieval stays at one query.",
+      "question": "When was the program established in the region",
+      "relevantAvailable": 4,
+      "before": {
+        "searches": 3,
+        "derivedCount": 2,
+        "queries": [
+          "program region overview account",
+          "program established",
+          "region"
+        ],
+        "perQuery": [
+          {
+            "query": "program region overview account",
+            "hits": [
+              {
+                "passageId": "psg-0000-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 0.752
+          },
+          {
+            "query": "program established",
+            "hits": [
+              {
+                "passageId": "psg-0000-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 1.316
+          },
+          {
+            "query": "region",
+            "hits": [
+              {
+                "passageId": "psg-0000-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 0.727
+          }
+        ],
+        "distinctRelevant": 2,
+        "aspectsCovered": 1,
+        "relevantSources": 1,
+        "noiseRetrieved": 0,
+        "distinctRetrieved": 2,
+        "chars": 1546,
+        "duplicateRate": 0.667,
+        "broadOverlap": 2,
+        "maxPairwiseOverlap": 2,
+        "ms": 2.795,
         "recall": 0.5
       },
-      "decomposed": {
-        "distinctRelevant": 4,
-        "aspectsCovered": 2,
-        "relevantSources": 2,
+      "after": {
+        "searches": 1,
+        "derivedCount": 0,
+        "queries": [
+          "program region overview account"
+        ],
+        "perQuery": [
+          {
+            "query": "program region overview account",
+            "hits": [
+              {
+                "passageId": "psg-0000-0000",
+                "score": 1.0
+              },
+              {
+                "passageId": "psg-0000-0001",
+                "score": 1.0
+              }
+            ],
+            "ms": 0.559
+          }
+        ],
+        "distinctRelevant": 2,
+        "aspectsCovered": 1,
+        "relevantSources": 1,
         "noiseRetrieved": 0,
-        "chars": 2876,
-        "ms": 8.487,
-        "recall": 1.0,
+        "distinctRetrieved": 2,
+        "chars": 1546,
         "duplicateRate": 0.0,
-        "subqueries": 3
+        "broadOverlap": 0,
+        "maxPairwiseOverlap": 0,
+        "ms": 0.559,
+        "recall": 0.5
       }
     }
   ]

@@ -835,47 +835,170 @@ def _is_passages_only_draft(corpus: InvestigationCorpus) -> bool:
     return CAPABILITY_PASSAGES in capabilities and not (capabilities & _STRUCTURED_CAPABILITIES)
 
 
-def _partition(items: list[str], groups: int) -> list[list[str]]:
-    """Split ``items`` into ``groups`` contiguous, near-equal, non-empty groups."""
+#: Generic, subject-neutral evidence facets for decomposing an analytical,
+#: evidence-seeking question into complementary passage searches. Each facet is
+#: ``(name, cue, triggers)``:
+#:  * ``cue`` -- a short natural fragment appended to the shared subject anchor so
+#:    the search targets that evidence dimension (it steers the semantic ranking;
+#:    the anchor keeps the search lexically grounded in the subject).
+#:  * ``triggers`` -- generic question words signalling the question asks along
+#:    this dimension; used only to choose facets once the question is analytical.
+#: The vocabulary is deliberately topic-neutral (no subject/historical terms), so
+#: the anti-topic-branching guarantee holds. Ordered by evidentiary priority
+#: (what it was -> how it worked -> what it caused -> when -> who -> how judged).
+#: Ordered by additive value alongside the planner's (broad) search, which already
+#: lands on the subject/definitional passages: the dimensions that recover *new*
+#: evidence (mechanism -> consequences -> chronology) come first, then actors,
+#: interpretation, and finally definition (usually redundant with the broad query).
+_EvidenceFacet = tuple[str, str, tuple[str, ...]]
+_EVIDENCE_FACETS: tuple[_EvidenceFacet, ...] = (
+    (
+        "mechanism",
+        "how it worked in practice",
+        ("how", "mechanism", "method", "means", "process", "work", "worked", "implement", "operate"),
+    ),
+    (
+        "consequences",
+        "effects and outcomes",
+        (
+            "effect", "effects", "consequence", "consequences", "impact", "outcome", "outcomes",
+            "result", "results", "shape", "shaped", "influence", "influenced", "led", "cause",
+            "caused", "affect", "affected", "significance",
+        ),
+    ),
+    (
+        "chronology",
+        "sequence of events over time",
+        (
+            "when", "timeline", "chronology", "sequence", "stage", "stages", "phase", "phases",
+            "during", "course", "evolve", "evolved", "develop", "developed",
+        ),
+    ),
+    (
+        "actors",
+        "key people and groups involved",
+        (
+            "who", "actor", "actors", "leader", "leaders", "people", "participant", "participants",
+            "role", "roles", "commander", "commanders",
+        ),
+    ),
+    (
+        "interpretation",
+        "differing interpretations and assessments",
+        (
+            "why", "interpret", "interpretation", "assess", "assessment", "debate", "dispute",
+            "disputed", "view", "views", "controversy", "contested",
+        ),
+    ),
+    (
+        "definition",
+        "definition and purpose",
+        # "what" is deliberately omitted: in analytical questions it usually binds to
+        # another dimension ("what effects", "what consequences"), not a definition.
+        ("definition", "define", "purpose", "aim", "aims", "goal", "overview", "describe"),
+    ),
+)
 
-    groups = max(1, min(groups, len(items)))
-    size, extra = divmod(len(items), groups)
-    partitioned: list[list[str]] = []
-    start = 0
-    for index in range(groups):
-        length = size + (1 if index < extra else 0)
-        partitioned.append(items[start : start + length])
-        start += length
-    return [group for group in partitioned if group]
+#: When a question is analytical but names no specific dimension, decompose along
+#: the evidentiary core most evidence-seeking questions need.
+_DEFAULT_FACET_NAMES: tuple[str, ...] = ("mechanism", "consequences", "chronology")
+
+#: Generic markers that make a question analytical / multi-aspect -- seeking
+#: explanation rather than a single fact. Pure factoid wh-words (when/who/where/
+#: which/what) are deliberately excluded so simple lookups stay at one search.
+_ANALYTICAL_MARKERS: frozenset[str] = frozenset(
+    {
+        "how", "why",
+        "mechanism", "method", "means", "process", "implement", "operate",
+        "effect", "effects", "consequence", "consequences", "impact", "outcome",
+        "outcomes", "result", "results", "shape", "shaped", "influence", "influenced",
+        "led", "cause", "caused", "affect", "affected", "significance",
+        "role", "roles", "timeline", "chronology", "sequence", "evolve", "evolved",
+        "develop", "developed", "interpret", "interpretation", "assess", "assessment",
+        "debate", "dispute", "disputed", "controversy", "contested", "compare",
+        "comparison", "contrast", "relationship",
+    }
+)
+
+#: Evidence-dimension vocabulary (facet triggers + analytical markers) is kept out
+#: of the subject anchor, which should carry subject words only.
+_FACET_VOCABULARY: frozenset[str] = frozenset(
+    marker for _name, _cue, triggers in _EVIDENCE_FACETS for marker in triggers
+) | _ANALYTICAL_MARKERS
+
+#: A concise subject anchor keeps each derived query lexically grounded in the
+#: subject without drowning the facet cue.
+_ANCHOR_MAX_TOKENS = 4
+
+
+def _question_tokens(question: str) -> list[str]:
+    return _BREADTH_WORD_RE.findall(question.casefold())
+
+
+def _is_analytical_question(question: str) -> bool:
+    """True when the question seeks explanation across evidence dimensions (and so
+    benefits from complementary searches) rather than a single fact."""
+
+    return bool(set(_question_tokens(question)) & _ANALYTICAL_MARKERS)
+
+
+def _subject_anchor(question: str) -> str:
+    """A concise subject phrase: salient content tokens minus stopwords and
+    evidence-dimension vocabulary, truncated so the facet cue stays prominent."""
+
+    tokens = [
+        token
+        for token in _question_tokens(question)
+        if len(token) >= 3 and token not in _BREADTH_STOPWORDS and token not in _FACET_VOCABULARY
+    ]
+    tokens = list(dict.fromkeys(tokens))
+    return " ".join(tokens[:_ANCHOR_MAX_TOKENS])
+
+
+def _selected_facet_cues(question: str) -> list[str]:
+    """Cues for the evidence dimensions the question invokes, in evidentiary order;
+    fall back to the core dimensions when the question is analytical but unspecific."""
+
+    tokens = set(_question_tokens(question))
+    selected = [cue for _name, cue, triggers in _EVIDENCE_FACETS if tokens & set(triggers)]
+    if not selected:
+        by_name = {name: cue for name, cue, _triggers in _EVIDENCE_FACETS}
+        selected = [by_name[name] for name in _DEFAULT_FACET_NAMES]
+    return selected
 
 
 def _derive_breadth_queries(base_query: str, existing: list[str], n: int) -> list[str]:
-    """Derive up to ``n`` complementary, lexically-distinct sub-queries from the
-    normalized question by partitioning its salient content tokens into facets.
+    """Derive up to ``n`` complementary, anchor-preserving evidence-facet sub-queries
+    from the normalized question.
 
-    A deterministic backstop for when the planner under-decomposes: cruder than
-    the planner's semantic decomposition, but safe -- overlapping results dedupe
-    to no gain, distinct results add breadth. ``existing`` (casefolded) queries
-    are never reproduced."""
+    Each derived query is ``<subject anchor> <evidence-facet cue>``: a shared
+    concise subject anchor (lexical relevance guard) plus one generic evidence
+    dimension (definition / mechanism / consequences / chronology / actors /
+    interpretation) that steers the semantic ranking toward distinct evidence.
+    This replaces lexical token-partitioning, which produced redundant subject
+    queries and a generic-residue query. A deterministic backstop for when the
+    planner under-decomposes.
+
+    Returns ``[]`` for a non-analytical (single-dimension / factoid) question, so
+    simple lookups stay at one search. ``existing`` (casefolded) queries are never
+    reproduced; derived queries are mutually distinct and bounded by ``n``."""
 
     if n <= 0:
         return []
-    tokens = [
-        token
-        for token in _BREADTH_WORD_RE.findall(base_query.casefold())
-        if len(token) >= 3 and token not in _BREADTH_STOPWORDS
-    ]
-    tokens = list(dict.fromkeys(tokens))
-    if len(tokens) < 2:
+    if not _is_analytical_question(base_query):
+        return []
+    anchor = _subject_anchor(base_query)
+    if not anchor:
         return []
     seen = set(existing)
     derived: list[str] = []
-    for group in _partition(tokens, max(n, 2)):
-        query = " ".join(group)
+    for cue in _selected_facet_cues(base_query):
+        query = f"{anchor} {cue}"
         key = query.casefold()
-        if query and key not in seen:
-            derived.append(query)
-            seen.add(key)
+        if key in seen:
+            continue
+        derived.append(query)
+        seen.add(key)
         if len(derived) >= n:
             break
     return derived

@@ -1,6 +1,8 @@
-"""Freeze the E10 retrieval-breadth eval: decomposition assembles broader relevant
-evidence, keeps diversity relevance-gated (no noise), and does not depend on source
-count. The eval lives under benchmarks/ (not collected by pytest), imported by path."""
+"""Freeze the E10->E11 retrieval-breadth eval: evidence-facet decomposition assembles
+broader, more complementary relevant evidence than the E10 token-partition backstop,
+keeps diversity relevance-gated (no noise, no manufactured source diversity), and
+leaves single-dimension factoid questions at one search. The eval lives under
+benchmarks/ (not collected by pytest), imported by path."""
 
 from __future__ import annotations
 
@@ -25,25 +27,36 @@ def test_breadth_eval_matches_frozen_expectations():
     report = _load_eval().run_eval()
     cases = {c["caseId"]: c for c in report["cases"]}
 
-    # Multi-aspect: one broad query reaches one aspect; decomposition reaches all three.
-    multi = cases["multi-aspect"]
-    assert multi["single"]["aspectsCovered"] == 1
-    assert multi["decomposed"]["aspectsCovered"] == 3
-    assert multi["decomposed"]["distinctRelevant"] > multi["single"]["distinctRelevant"]
-    assert multi["decomposed"]["distinctRelevant"] == 6
+    # Overlap recoverable: the token-partition `before` lands sub-queries back on the
+    # subject passages (one aspect, broad overlap); facet `after` reaches three
+    # distinct aspects with no broad overlap.
+    rec = cases["overlap-recoverable"]
+    assert rec["before"]["aspectsCovered"] == 1
+    assert rec["after"]["aspectsCovered"] == 3
+    assert rec["after"]["distinctRelevant"] == 6 > rec["before"]["distinctRelevant"]
+    assert rec["after"]["broadOverlap"] == 0 < rec["before"]["broadOverlap"]
 
-    # Breadth is measured in evidence, not sources: distinct relevant passages grow
-    # while source diversity stays 1.
-    dom = cases["dominant-relevant-source"]
-    assert dom["single"]["relevantSources"] == dom["decomposed"]["relevantSources"] == 1
-    assert dom["decomposed"]["distinctRelevant"] > dom["single"]["distinctRelevant"]
+    # Legitimately single source: breadth is measured in evidence, not sources --
+    # distinct relevant passages and aspects grow while relevant source diversity
+    # legitimately stays 1 (no manufactured diversity).
+    single = cases["single-source"]
+    assert single["before"]["relevantSources"] == single["after"]["relevantSources"] == 1
+    assert single["after"]["distinctRelevant"] > single["before"]["distinctRelevant"]
+    assert single["after"]["aspectsCovered"] > single["before"]["aspectsCovered"]
 
-    # Relevance-gated diversity: namesake noise sources are never pulled in.
-    noise = cases["dominant-noise-source"]
-    assert noise["single"]["noiseRetrieved"] == 0
-    assert noise["decomposed"]["noiseRetrieved"] == 0
-    assert noise["decomposed"]["distinctRelevant"] > noise["single"]["distinctRelevant"]
+    # Noisy diverse sources: namesake noise is never pulled in to diversify.
+    noisy = cases["noisy-sources"]
+    assert noisy["before"]["noiseRetrieved"] == 0
+    assert noisy["after"]["noiseRetrieved"] == 0
+    assert noisy["after"]["distinctRelevant"] > noisy["before"]["distinctRelevant"]
 
-    # Fusion dedupes: no passage is double-counted within a query.
+    # Single-dimension factoid: the backstop derives no extra searches (retrieval
+    # stays at one query), where the old token-partition over-decomposed it.
+    factoid = cases["single-dimension"]
+    assert factoid["after"]["derivedCount"] == 0
+    assert factoid["after"]["searches"] == 1
+    assert factoid["before"]["derivedCount"] > 0
+
+    # Fusion dedupes: no passage is double-counted within the decomposition.
     for case in report["cases"]:
-        assert 0.0 <= case["decomposed"]["duplicateRate"] <= 1.0
+        assert 0.0 <= case["after"]["duplicateRate"] <= 1.0
